@@ -1,0 +1,8 @@
+-- task-branch: seed data for local development
+--
+-- このファイル自体で投入するデータはありません。
+-- サンプルプロジェクトは各プロジェクト単位の再実行可能スクリプトに分離しており、
+-- config.toml の [db.seed] sql_paths で seed.sql の後に順に投入されます（supabase start / db reset）:
+--   - sample01.sql … AWS移行 Phase1 アプリケーション移行
+--   - sample02.sql … AWS移行 Phase1 データベース移行
+-- 個別に入れ直す場合は `docker exec -i supabase_db_task-branch psql -U postgres -d postgres < supabase/sampleNN.sql`。

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# TS build info
+*.tsbuildinfo

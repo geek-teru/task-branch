@@ -1,0 +1,83 @@
+ <div class="mermaid">
+gantt
+title AWS移行 Phase1 データベース移行
+dateFormat YYYY/MM/DD
+section ステージング環境構築
+STG オンプレ側DB設定変更 (4/1 - 4/15) :active t01, 2026/04/01, 2026/04/15
+STG AWS側Aurora環境構築 (4/01 - 4/15) :active t02, 2026/04/01, 2026/04/15
+STG AWS側Auroraテスト環境構築 (4/01 - 4/15) :active t03, 2026/04/01, 2026/04/15
+STG DMS 有効化 (4/16 - 4/30) :active t04, 2026/04/16, 2026/04/30
+STG 結合試験(テスト環境) (4/16 - 4/30) :active t05, 2026/04/16, 2026/04/30
+★★★ 4/30 STG 構築・結合試験完了★★★ :milestone m01, 2026/04/30, 1d
+section 運用設計・実装
+STG 運用 設計 監視・通知設計 (5/1 - 5/14) :active t06, 2026/05/01, 2026/05/14
+STG 運用 設計 CICD基盤設計 (5/1 - 5/14) :active t07, 2026/05/01, 2026/05/14
+STG 運用 構築 CICD基盤構築 (5/15 - 5/21) :active t08, 2026/05/15, 2026/05/21
+STG DB再構築 (5/15 - 5/21) :active t09, 2026/05/15, 2026/05/21
+STG 運用 構築 監視・通知構築 (5/22 - 5/28) :active t10, 2026/05/22, 2026/05/28
+STG 運用 テスト (5/29 - 6/4) :active t11, 2026/05/29, 2026/06/04
+★★★ 5/21 運用設計・実装完了★★★ :milestone m02, 2026/05/21, 1d
+section 移行方式設計
+STG 移行影響調査 (5/1 - 5/14) :active t12, 2026/05/01, 2026/05/14
+STG 移行方式詳細設計 (5/1 - 5/14) :active t13, 2026/05/01, 2026/05/14
+STG 無停止方式詳細設計 (5/22 - 6/4) :active t14, 2026/05/22, 2026/06/04
+本部長・CTOレビュー (5/15 - 6/4) :active t15, 2026/05/15, 2026/06/04
+★★★ 6/4 移行方式設計 FIX★★★ :milestone m03, 2026/06/04, 1d
+section 負荷試験・QA試験
+STG Service A 負荷試験(テスト環境) (5/22 - 5/28) :active t16, 2026/05/22, 2026/05/28
+STG Service B 負荷試験(テスト環境) (5/29 - 6/4) :active t17, 2026/05/29, 2026/06/04
+STG QAテスト (6/5 - 6/11) :active t19, 2026/06/05, 2026/06/11
+★★★ 6/4 負荷・QA試験完了(性能・品質 FIX)★★★ :milestone m04, 2026/06/04, 1d
+section 本番環境 構築
+PRD Service A,Service C,Service B オンプレ DB設定変更 (6/5 - 6/18) :active t20, 2026/06/05, 2026/06/18
+PRD Service A,Service C,Service B Aurora構築 (6/5 - 6/18) :active t21, 2026/06/05, 2026/06/18
+PRD Service A,Service C,Service B Aurora運用適用 (6/19 - 6/25) :active t22, 2026/06/19, 2026/06/25
+PRD Service A,Service C,Service B 各種DBオブジェクト作成 (6/26 - 7/2) :active t23, 2026/06/26, 2026/07/02
+PRD Service A,Service C,Service B tmp環境 構築 (6/26 - 7/2) :active t24, 2026/06/26, 2026/07/02
+PRD Service A,Service B DMSフルロード (7/3 - 7/9) :active t25, 2026/07/03, 2026/07/09
+PRD Service C DMSフルロード (7/10 - 7/16) :active t26, 2026/07/10, 2026/07/16
+★★★ 7/2 Service A 本番環境 構築完了★★★ :milestone m05, 2026/07/02, 1d
+section Service A DB切り替え
+Service A 切り替え方式確定 (6/5 - 6/18) :active t27, 2026/06/05, 2026/06/18
+Service A 切り替え方式 部内レビュー (6/19 - 6/25) :active t28, 2026/06/19, 2026/06/25
+Service A 切り替え/切り戻し 手順作成 (6/19 - 6/25) :active t29, 2026/06/19, 2026/06/25
+RC Service A 切替/切り戻し/再切替 (6/29 - 7/3) :active t30, 2026/06/29, 2026/07/03
+STG Service A 切替/切り戻し/再切替 (7/6 - 7/10) :active t31, 2026/07/06, 2026/07/10
+PRD Service A 切替 (7/13 - 7/17) :active t32, 2026/07/13, 2026/07/17
+★★★ 7/17 Service A 切替完了★★★ :milestone m06, 2026/07/17, 1d
+section Service C DB切り替え
+Service C 切り替え方式確定 (6/19 - 6/25) :active t33, 2026/06/19, 2026/06/25
+Service C 切り替え方式 部内レビュー (6/26 - 7/2) :active t34, 2026/06/26, 2026/07/02
+Service C 切り替え/切り戻し 手順作成 (7/3 - 7/16) :active t35, 2026/07/03, 2026/07/16
+RC Service C 切替/切り戻し/再切替 (7/20 - 7/24) :active t36, 2026/07/20, 2026/07/24
+STG Service C 切替/切り戻し/再切替 (7/27 - 7/31) :active t37, 2026/07/27, 2026/07/31
+Service A,Service C 月次バッチ実行 (7/27 - 7/31) :active t38, 2026/07/27, 2026/07/31
+PRD Service C 切替 (8/3 - 8/7) :active t39, 2026/08/03, 2026/08/07
+★★★ 7/24 Service C 切替完了★★★ :milestone m07, 2026/07/24, 1d
+section 監査
+夏季休暇 (8/8 - 8/16) :active t40, 2026/08/08, 2026/08/16
+Service B Recodeバッチ実行 (8/17 - 8/27) :active t41, 2026/08/17, 2026/08/27
+脆弱性試験 (8/17 - 8/27) :active t42, 2026/08/17, 2026/08/27
+セキュリティの整備 (8/17 - 8/27) :active t43, 2026/08/17, 2026/08/27
+証跡取得 (9月) :active t44, 2026/09/01, 2026/09/30
+中間監査 (9月上旬~) :active t45, 2026/09/01, 2026/09/30
+本監査 (10/8~) :active t46, 2026/10/08, 2026/10/16
+★★★ 10/20 監査終了(仮) ★★★ :milestone m08, 2026/10/20, 1d
+section Service B 切り替え
+Service B 移行計画 移行スコープ定義 (8/17 - 8/20) :active t47, 2026/08/17, 2026/08/20
+Service B 移行計画 リスク分析 (8/21 - 9/3) :active t48, 2026/08/21, 2026/09/03
+Service B 移行計画 切り替え方式作成 (9/4 - 9/17) :active t49, 2026/09/04, 2026/09/17
+Service B 移行計画 部内レビュー (9/18 - 10/15) :active t50, 2026/09/18, 2026/10/15
+Service B 切り替え/切り戻し 手順作成 (9/18 - 10/15) :active t51, 2026/09/18, 2026/10/15
+RC Service B 切替/切り戻し/再切替 (10/16 - 10/22) :active t52, 2026/10/16, 2026/10/22
+STG Service B 切替・切り戻し・再切替 (10/23 - 10/29) :active t53, 2026/10/23, 2026/10/29
+STG Service B 切替手順作成 (10/30 - 11/06) :active t54, 2026/10/30, 2026/11/06
+PRD Service B 切替本番 (11/09 - 11/13) :active t55, 2026/11/09, 2026/11/13
+★★★1/13 デッドライン★★★ :milestone m09, 2027/01/13, 1d
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({ startOnLoad: true });
+</script>
+
+ 
