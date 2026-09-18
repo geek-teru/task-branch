@@ -58,13 +58,6 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
-// Every project's graph, for the views.
-export async function getAllProjectGraphs(): Promise<{ project: Project; graph: ProjectGraph }[]> {
-  const projects = await listProjects();
-  const graphs = await Promise.all(projects.map((p) => getProjectGraph(p.id)));
-  return projects.map((project, i) => ({ project, graph: graphs[i] }));
-}
-
 export async function updateTaskStatus(id: string, status: Status): Promise<void> {
   const { error } = await supabase.from("tasks").update({ status }).eq("id", id);
   if (error) throw error;

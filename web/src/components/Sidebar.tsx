@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 export type MenuKey = "projects" | "gantt";
 
 const MENU: { key: MenuKey; label: string }[] = [
-  { key: "projects", label: "プロジェクト一覧" },
+  { key: "projects", label: "プロジェクト" },
   { key: "gantt", label: "ガントチャート" },
 ];
 
