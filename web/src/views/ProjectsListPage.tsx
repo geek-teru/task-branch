@@ -30,7 +30,7 @@ export function ProjectsListPage({
   return (
     <div style={{ padding: 24, overflow: "auto", height: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>プロジェクト一覧</h2>
+        <h2 style={{ margin: 0, fontSize: 18 }}>プロジェクト</h2>
         <button onClick={() => setForm({ mode: "create" })} style={primaryBtn}>
           新規プロジェクト
         </button>

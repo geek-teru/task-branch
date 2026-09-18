@@ -126,8 +126,10 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
 }
 
 export function GanttView({
-  data,
-  initialProjectId,
+  projects,
+  project,
+  graph,
+  onSelectProject,
   onAddStory,
   onUpdateTask,
   onDeleteTask,
@@ -137,8 +139,10 @@ export function GanttView({
   onResizeStory,
   onReorderEpics,
 }: {
-  data: { project: Project; graph: ProjectGraph }[];
-  initialProjectId?: string;
+  projects: Project[];
+  project: Project;
+  graph: ProjectGraph;
+  onSelectProject: (projectId: string) => void;
   onAddStory?: (epic: GraphNode, values: StoryInput) => void;
   onUpdateTask?: (id: string, values: StoryInput) => void;
   onDeleteTask?: (id: string) => void;
@@ -148,13 +152,11 @@ export function GanttView({
   onResizeStory?: (id: string, startDate: string, dueDate: string) => void;
   onReorderEpics?: (orderedEpicIds: string[]) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string>(initialProjectId ?? "");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [statusMenuKey, setStatusMenuKey] = useState<string | null>(null);
   const [dragEpicId, setDragEpicId] = useState<string | null>(null);
   const [overEpicId, setOverEpicId] = useState<string | null>(null);
-  const currentId = selectedId || initialProjectId || data[0]?.project.id || "";
-  const filtered = useMemo(() => data.filter((d) => d.project.id === currentId), [data, currentId]);
+  const filtered = useMemo(() => [{ project, graph }], [project, graph]);
 
   const model = useMemo(() => {
     const rows = buildRows(filtered);
@@ -199,25 +201,21 @@ export function GanttView({
     >
       <label style={{ fontSize: 12, color: "#5f6b7a" }}>プロジェクト</label>
       <select
-        value={currentId}
+        value={project.id}
         onChange={(e) => {
-          setSelectedId(e.target.value);
+          onSelectProject(e.target.value);
           setSelectedKey(null);
         }}
         style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd2d9" }}
       >
-        {data.map((d) => (
-          <option key={d.project.id} value={d.project.id}>
-            {d.project.name}
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
           </option>
         ))}
       </select>
     </div>
   );
-
-  if (data.length === 0) {
-    return <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>;
-  }
 
   if (!model) {
     return (

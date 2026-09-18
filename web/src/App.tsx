@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
 import {
   addStory,
@@ -6,7 +7,7 @@ import {
   deleteProject,
   deleteTask,
   exportProject,
-  getAllProjectGraphs,
+  getProjectGraph,
   listProjects,
   reorderEpics,
   updateProject,
@@ -19,133 +20,144 @@ import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { GanttView } from "./views/GanttView";
 
-type Route = { name: "projects" } | { name: "gantt"; projectId?: string };
-
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [route, setRoute] = useState<Route>({ name: "projects" });
-  const [allGraphs, setAllGraphs] = useState<{ project: Project; graph: ProjectGraph }[] | null>(null);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const ganttMatch = useMatch("/projects/:projectId/gantt");
+  const isGantt = pathname === "/gantt" || ganttMatch !== null;
+  // Gantt shows one project: the one in the URL, or the first project for /gantt.
+  const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? projects[0]?.id : undefined;
+  const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isConfigured) return;
     listProjects()
       .then(setProjects)
-      .catch((e) => setError(String(e.message ?? e)));
+      .catch((e) => setError(String(e.message ?? e)))
+      .finally(() => setProjectsLoaded(true));
   }, []);
 
-  const needsGraphs = route.name === "gantt";
+  // Load only the selected project's graph.
   useEffect(() => {
-    if (!needsGraphs) return;
-    setAllGraphs(null);
-    getAllProjectGraphs()
-      .then(setAllGraphs)
+    if (!ganttProjectId) return;
+    let cancelled = false;
+    getProjectGraph(ganttProjectId)
+      .then((g) => {
+        if (!cancelled) setGraph({ projectId: ganttProjectId, graph: g });
+      })
       .catch((e) => setError(String(e.message ?? e)));
-  }, [needsGraphs]);
+    return () => {
+      cancelled = true;
+    };
+  }, [ganttProjectId]);
 
-  // Reload graphs in place (no loading flicker / remount) after a mutation.
-  const refreshAllGraphs = useCallback(async () => {
+  // Reload the graph in place (no loading flicker / remount) after a mutation.
+  const refreshGraph = useCallback(async () => {
+    if (!ganttProjectId) return;
     try {
-      setAllGraphs(await getAllProjectGraphs());
+      setGraph({ projectId: ganttProjectId, graph: await getProjectGraph(ganttProjectId) });
     } catch (e: any) {
       setError(String(e.message ?? e));
     }
-  }, []);
+  }, [ganttProjectId]);
 
   const handleAddStory = useCallback(
     async (epic: GraphNode, values: StoryInput) => {
       try {
         await addStory(epic, values);
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleUpdateTask = useCallback(
     async (id: string, values: StoryInput) => {
       try {
         await updateTask(id, values);
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleDeleteTask = useCallback(
     async (id: string) => {
       try {
         await deleteTask(id);
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleStartStory = useCallback(
     async (id: string) => {
       try {
         await updateTaskStatus(id, "in_progress");
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleCompleteStory = useCallback(
     async (id: string) => {
       try {
         await updateTaskStatus(id, "done");
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleChangeStatus = useCallback(
     async (id: string, status: Status) => {
       try {
         await updateTaskStatus(id, status);
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleResizeStory = useCallback(
     async (id: string, startDate: string, dueDate: string) => {
       try {
         await updateTaskDates(id, startDate, dueDate);
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleReorderEpics = useCallback(
     async (orderedIds: string[]) => {
       try {
         await reorderEpics(orderedIds);
-        await refreshAllGraphs();
+        await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshAllGraphs]
+    [refreshGraph]
   );
 
   const handleCreateProject = useCallback(async (name: string, description: string | null) => {
@@ -173,7 +185,7 @@ export default function App() {
     try {
       await deleteProject(id);
       setProjects((prev) => prev.filter((x) => x.id !== id));
-      setAllGraphs((prev) => (prev ? prev.filter((g) => g.project.id !== id) : prev));
+      setGraph((prev) => (prev?.projectId === id ? null : prev));
     } catch (e: any) {
       setError(String(e.message ?? e));
     }
@@ -196,9 +208,9 @@ export default function App() {
   }, []);
 
   const onNavigate = useCallback((key: MenuKey) => {
-    if (key === "projects") setRoute({ name: "projects" });
-    else if (key === "gantt") setRoute({ name: "gantt" });
-  }, []);
+    if (key === "projects") navigate("/projects");
+    else if (key === "gantt") navigate("/gantt");
+  }, [navigate]);
 
   if (!isConfigured) {
     return (
@@ -214,9 +226,39 @@ export default function App() {
     );
   }
 
+  const ganttProject = projects.find((p) => p.id === ganttProjectId);
+  const ganttPage = (
+    <main style={{ flex: 1, minHeight: 0 }}>
+      {!projectsLoaded ? (
+        <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+      ) : projects.length === 0 ? (
+        <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+      ) : !ganttProject ? (
+        <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+      ) : graph?.projectId !== ganttProject.id ? (
+        <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+      ) : (
+        <GanttView
+          projects={projects}
+          project={ganttProject}
+          graph={graph.graph}
+          onSelectProject={(projectId) => navigate(`/projects/${projectId}/gantt`)}
+          onAddStory={handleAddStory}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
+          onStartStory={handleStartStory}
+          onCompleteStory={handleCompleteStory}
+          onChangeStatus={handleChangeStatus}
+          onResizeStory={handleResizeStory}
+          onReorderEpics={handleReorderEpics}
+        />
+      )}
+    </main>
+  );
+
   return (
     <Shell>
-      <Sidebar active={route.name} onNavigate={onNavigate} />
+      <Sidebar active={isGantt ? "gantt" : "projects"} onNavigate={onNavigate} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {error && (
@@ -225,37 +267,27 @@ export default function App() {
           </div>
         )}
 
-        {route.name === "projects" ? (
-          <main style={{ flex: 1, minHeight: 0 }}>
-            <ProjectsListPage
-              projects={projects}
-              onCreate={handleCreateProject}
-              onUpdate={handleUpdateProject}
-              onDelete={handleDeleteProject}
-              onShowGantt={(projectId) => setRoute({ name: "gantt", projectId })}
-              onExport={handleExportProject}
-            />
-          </main>
-        ) : (
-          <main style={{ flex: 1, minHeight: 0 }}>
-            {!allGraphs ? (
-              <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
-            ) : (
-              <GanttView
-                data={allGraphs}
-                initialProjectId={route.projectId}
-                onAddStory={handleAddStory}
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                onStartStory={handleStartStory}
-                onCompleteStory={handleCompleteStory}
-                onChangeStatus={handleChangeStatus}
-                onResizeStory={handleResizeStory}
-                onReorderEpics={handleReorderEpics}
-              />
-            )}
-          </main>
-        )}
+        <Routes>
+          <Route path="/" element={<Navigate to="/projects" replace />} />
+          <Route
+            path="/projects"
+            element={
+              <main style={{ flex: 1, minHeight: 0 }}>
+                <ProjectsListPage
+                  projects={projects}
+                  onCreate={handleCreateProject}
+                  onUpdate={handleUpdateProject}
+                  onDelete={handleDeleteProject}
+                  onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
+                  onExport={handleExportProject}
+                />
+              </main>
+            }
+          />
+          <Route path="/projects/:projectId/gantt" element={ganttPage} />
+          <Route path="/gantt" element={ganttPage} />
+          <Route path="*" element={<Navigate to="/projects" replace />} />
+        </Routes>
       </div>
     </Shell>
   );
