@@ -201,7 +201,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | level | text | not null | `epic` / `story` / `task` |
 | title | text | not null | 名称 |
 | description | text | | 短い説明（一覧やカードに出す 1〜2 行） |
-| context | text | null可 | **epic のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。更新のたびに旧版を `epic_context_revisions` に残す |
+| context | text | null可 | **epic のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `epic_context_revisions` に残す（最新版も含む） |
 | status | text | not null, default 'todo' | `todo` / `in_progress` / `done`（作業の進み具合）。エピックは手で動かさない（§1.3） |
 | activated_at | timestamptz | null可 | **epic のみ**。null ＝ inactive（バックログ）、日時あり ＝ active（エピック）。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける。完了は列で持たず、active かつ配下の進捗率 100% から導出する |
 | assignee_type | text | null可 | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9 |
@@ -254,7 +254,8 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | created_at | timestamptz | default now() | |
 
 - UNIQUE(epic_id, version)。
-- `tasks.context` の更新時にトリガで旧版を保存する（人・AI どちらの更新でも漏れなく残す）。
+- `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
+- 人か AI かは、リクエストの JWT の `app_metadata.actor_type`（`ai` なら AI）で判定する（`current_actor_type()`）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
 
 #### task_dependencies
 
