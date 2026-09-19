@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
 import {
   addStory,
+  addTask,
   createProject,
   deleteProject,
   deleteTask,
   exportProject,
+  getKanbanLanes,
   getProjectGraph,
   listProjects,
   reorderEpics,
@@ -15,10 +17,11 @@ import {
   updateTaskDates,
   updateTaskStatus,
 } from "./lib/api";
-import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "./lib/types";
+import type { GraphNode, KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { GanttView } from "./views/GanttView";
+import { KanbanView } from "./views/KanbanView";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -27,6 +30,8 @@ export default function App() {
   const { pathname } = useLocation();
   const ganttMatch = useMatch("/projects/:projectId/gantt");
   const isGantt = pathname === "/gantt" || ganttMatch !== null;
+  const isKanban = pathname === "/kanban";
+  const [searchParams, setSearchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, or the first project for /gantt.
   const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? projects[0]?.id : undefined;
   const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
@@ -53,6 +58,59 @@ export default function App() {
       cancelled = true;
     };
   }, [ganttProjectId]);
+
+  const [lanes, setLanes] = useState<KanbanLane[] | null>(null);
+  useEffect(() => {
+    if (!isKanban) return;
+    setLanes(null);
+    getKanbanLanes()
+      .then(setLanes)
+      .catch((e) => setError(String(e.message ?? e)));
+  }, [isKanban]);
+
+  // Move a card: update locally first so the drop feels instant, then persist and resync.
+  const handleKanbanStatus = useCallback(async (taskId: string, status: Status) => {
+    setLanes((prev) =>
+      prev?.map((l) => ({ ...l, tasks: l.tasks.map((t) => (t.id === taskId ? { ...t, status } : t)) })) ?? prev
+    );
+    try {
+      await updateTaskStatus(taskId, status);
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+    try {
+      setLanes(await getKanbanLanes());
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+  }, []);
+
+  const handleAddTask = useCallback(async (story: Task, values: StoryInput) => {
+    try {
+      await addTask(story, values);
+      setLanes(await getKanbanLanes());
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+  }, []);
+
+  const handleKanbanUpdate = useCallback(async (id: string, values: StoryInput) => {
+    try {
+      await updateTask(id, values);
+      setLanes(await getKanbanLanes());
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+  }, []);
+
+  const handleKanbanDelete = useCallback(async (id: string) => {
+    try {
+      await deleteTask(id);
+      setLanes(await getKanbanLanes());
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+  }, []);
 
   // Reload the graph in place (no loading flicker / remount) after a mutation.
   const refreshGraph = useCallback(async () => {
@@ -210,6 +268,7 @@ export default function App() {
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
     else if (key === "gantt") navigate("/gantt");
+    else if (key === "kanban") navigate("/kanban");
   }, [navigate]);
 
   if (!isConfigured) {
@@ -258,7 +317,7 @@ export default function App() {
 
   return (
     <Shell>
-      <Sidebar active={isGantt ? "gantt" : "projects"} onNavigate={onNavigate} />
+      <Sidebar active={isGantt ? "gantt" : isKanban ? "kanban" : "projects"} onNavigate={onNavigate} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {error && (
@@ -286,6 +345,27 @@ export default function App() {
           />
           <Route path="/projects/:projectId/gantt" element={ganttPage} />
           <Route path="/gantt" element={ganttPage} />
+          <Route
+            path="/kanban"
+            element={
+              <main style={{ flex: 1, minHeight: 0 }}>
+                {!lanes ? (
+                  <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                ) : (
+                  <KanbanView
+                    projects={projects}
+                    lanes={lanes}
+                    projectFilter={searchParams.get("project")}
+                    onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
+                    onChangeStatus={handleKanbanStatus}
+                    onAddTask={handleAddTask}
+                    onUpdateTask={handleKanbanUpdate}
+                    onDeleteTask={handleKanbanDelete}
+                  />
+                )}
+              </main>
+            }
+          />
           <Route path="*" element={<Navigate to="/projects" replace />} />
         </Routes>
       </div>

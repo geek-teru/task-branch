@@ -2,15 +2,17 @@ import { useState, type CSSProperties } from "react";
 import type { Status, StoryInput } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 
-// Modal form to create or edit a story (title / status / dates / description).
+// Modal form to create or edit a story or task (title / status / dates / description).
 export function TaskForm({
   heading,
+  noun = "ストーリー",
   submitLabel,
   initial,
   onSubmit,
   onCancel,
 }: {
   heading: string;
+  noun?: string; // used in field labels, e.g. "タスク" → "タスク名"
   submitLabel: string;
   initial: StoryInput;
   onSubmit: (values: StoryInput) => void;
@@ -40,7 +42,7 @@ export function TaskForm({
       <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
         <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>{heading}</h3>
 
-        <label style={fieldLabel}>ストーリー名</label>
+        <label style={fieldLabel}>{noun}名</label>
         <input
           autoFocus
           value={title}
@@ -81,7 +83,7 @@ export function TaskForm({
             if (e.key === "Escape") onCancel();
           }}
           rows={3}
-          placeholder="ストーリーの説明"
+          placeholder={`${noun}の説明`}
           style={{ ...textInput, resize: "vertical", fontFamily: "inherit" }}
         />
 

@@ -47,6 +47,13 @@ export interface ProjectGraph {
   nodes: GraphNode[];
 }
 
+// One kanban swimlane: an in-progress story with its parent epic and child tasks.
+export interface KanbanLane {
+  story: Task;
+  epic: Task | null;
+  tasks: Task[];
+}
+
 export const STATUS_LABEL: Record<Status, string> = {
   todo: "未着手",
   in_progress: "進行中",

@@ -1,10 +1,11 @@
 import type { CSSProperties } from "react";
 
-export type MenuKey = "projects" | "gantt";
+export type MenuKey = "projects" | "gantt" | "kanban";
 
 const MENU: { key: MenuKey; label: string }[] = [
   { key: "projects", label: "プロジェクト" },
   { key: "gantt", label: "ガントチャート" },
+  { key: "kanban", label: "カンバン" },
 ];
 
 export function Sidebar({

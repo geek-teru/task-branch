@@ -1,10 +1,12 @@
 // Gantt view: every project's phases/tasks on a shared timeline.
 // Built from start_date/due_date on story-level nodes (epics summarize their children).
-import { useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DetailPanel } from "../components/DetailPanel";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
@@ -479,7 +481,10 @@ export function GanttView({
       </div>
       {selectedRow && (
         <DetailPanel
-          row={selectedRow}
+          title={selectedRow.label}
+          node={selectedRow.node}
+          start={selectedRow.start}
+          end={selectedRow.end}
           onClose={() => setSelectedKey(null)}
           onEdit={onUpdateTask ? (node) => setForm({ mode: "edit", node }) : undefined}
           onDelete={
@@ -519,243 +524,6 @@ export function GanttView({
         />
       )}
     </div>
-  );
-}
-
-function ConfirmDialog({
-  message,
-  onConfirm,
-  onCancel,
-}: {
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const btnBase: CSSProperties = {
-    padding: "7px 16px",
-    borderRadius: 6,
-    fontSize: 13,
-    cursor: "pointer",
-  };
-  return (
-    <div
-      onClick={onCancel}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onCancel();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 50,
-        background: "rgba(31,41,51,0.35)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff",
-          borderRadius: 8,
-          boxShadow: "0 8px 28px rgba(31,41,51,0.25)",
-          width: 380,
-          maxWidth: "90vw",
-          padding: 20,
-        }}
-      >
-        <div style={{ fontSize: 14, color: "#1f2933", lineHeight: 1.6, whiteSpace: "pre-line" }}>
-          {message}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button
-            onClick={onCancel}
-            style={{ ...btnBase, background: "#fff", color: "#3b4149", border: "1px solid #cbd2d9" }}
-          >
-            キャンセル
-          </button>
-          <button
-            autoFocus
-            onClick={onConfirm}
-            style={{ ...btnBase, background: "#1f2933", color: "#fff", border: "1px solid #1f2933" }}
-          >
-            変更する
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailPanel({
-  row,
-  onClose,
-  onEdit,
-  onDelete,
-  onStart,
-  onComplete,
-}: {
-  row: Row;
-  onClose: () => void;
-  onEdit?: (node: GraphNode) => void;
-  onDelete?: (node: GraphNode) => void;
-  onStart?: (node: GraphNode) => void;
-  onComplete?: (node: GraphNode) => void;
-}) {
-  const node = row.node;
-  const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
-  const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
-  const durationDays = row.start && row.end ? diffDays(row.start, row.end) + 1 : null;
-  const canEdit = node != null && node.level === "story";
-  const canStart = canEdit && node != null && node.status === "todo";
-  const canComplete = canEdit && node != null && node.status === "in_progress";
-  const DASH = <span style={{ color: "#94a0ad" }}>-</span>;
-
-  return (
-    <div
-      style={{
-        width: 320,
-        flexShrink: 0,
-        borderLeft: "1px solid #cbd2d9",
-        background: "#fff",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 14px",
-          borderBottom: "1px solid #e5e8eb",
-          background: "#f7f9fa",
-        }}
-      >
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#5f6b7a" }}>
-          {node ? LEVEL_LABEL[node.level] : "詳細"}
-        </span>
-        <button
-          onClick={onClose}
-          style={{
-            border: "1px solid #cbd2d9",
-            background: "#fff",
-            borderRadius: 6,
-            padding: "2px 10px",
-            fontSize: 12,
-            cursor: "pointer",
-            color: "#3b4149",
-          }}
-        >
-          閉じる
-        </button>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#1f2933", marginBottom: 14 }}>
-          {row.label}
-        </div>
-
-        <Field label="レベル">{node ? LEVEL_LABEL[node.level] : DASH}</Field>
-        <Field label="ステータス">{node?.status ? <StatusBadge status={node.status} /> : DASH}</Field>
-        <Field label="開始日">{node?.start_date ? fmt(parseDate(node.start_date)) : DASH}</Field>
-        <Field label="期限">{node?.due_date ? fmt(parseDate(node.due_date)) : DASH}</Field>
-        <Field label="期間">{durationDays != null ? `${durationDays}日` : DASH}</Field>
-        <Field label="進捗">
-          {node && node.progress != null ? `${Math.round(node.progress * 100)}%` : DASH}
-        </Field>
-        <Field label="詳細">
-          {node?.description ? (
-            <span style={{ whiteSpace: "pre-wrap", color: "#3b4149" }}>{node.description}</span>
-          ) : (
-            DASH
-          )}
-        </Field>
-        <Field label="作成日時">{node?.created_at ? fmtDateTime(node.created_at) : DASH}</Field>
-        <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
-        <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
-      </div>
-
-      {canEdit && node && (
-        <div style={{ flexShrink: 0, borderTop: "1px solid #e5e8eb", background: "#fff", padding: 12 }}>
-          {((canStart && onStart) || (canComplete && onComplete)) && (
-            <div style={{ display: "flex", gap: 8 }}>
-              {canStart && onStart && (
-                <button
-                  onClick={() => onStart(node)}
-                  title="このストーリーを進行中にします"
-                  style={{ ...panelBtn, flex: 1, background: "#0972d3", color: "#fff", borderColor: "#0972d3" }}
-                >
-                  進行中にする
-                </button>
-              )}
-              {canComplete && onComplete && (
-                <button
-                  onClick={() => onComplete(node)}
-                  style={{ ...panelBtn, flex: 1, background: "#1a7f37", color: "#fff", borderColor: "#1a7f37" }}
-                >
-                  完了にする
-                </button>
-              )}
-            </div>
-          )}
-
-          {(onEdit || onDelete) && (
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {onEdit && (
-                <button onClick={() => onEdit(node)} style={panelBtn}>
-                  変更
-                </button>
-              )}
-              {onDelete && (
-                <button onClick={() => onDelete(node)} style={{ ...panelBtn, marginLeft: "auto", color: "#a3210b", borderColor: "#f0c2ba" }}>
-                  削除
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const panelBtn: CSSProperties = {
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "6px 14px",
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a0ad", marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 13, color: "#1f2933" }}>{children}</div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: NonNullable<GraphNode["status"]> }) {
-  const c = STATUS_COLOR[status];
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 12,
-        padding: "2px 8px",
-        borderRadius: 10,
-        background: c?.bg ?? "#f4f5f6",
-        color: c?.fg ?? "#5f6b7a",
-        border: `1px solid ${c?.border ?? "#cbd2d9"}`,
-      }}
-    >
-      {STATUS_LABEL[status]}
-    </span>
   );
 }
 
