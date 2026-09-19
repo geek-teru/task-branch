@@ -8,6 +8,7 @@ export function ProjectsListPage({
   onCreate,
   onUpdate,
   onDelete,
+  onShowBacklog,
   onShowGantt,
   onExport,
 }: {
@@ -15,6 +16,7 @@ export function ProjectsListPage({
   onCreate: (name: string, description: string | null) => void;
   onUpdate: (id: string, name: string, description: string | null) => void;
   onDelete: (id: string) => void;
+  onShowBacklog: (projectId: string) => void;
   onShowGantt: (projectId: string) => void;
   onExport: (project: Project) => void;
 }) {
@@ -73,6 +75,9 @@ export function ProjectsListPage({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
                 <button onClick={() => setForm({ mode: "edit", project: p })} style={cardBtn}>
                   変更
+                </button>
+                <button onClick={() => onShowBacklog(p.id)} style={cardBtn}>
+                  バックログ
                 </button>
                 <button onClick={() => onShowGantt(p.id)} style={cardBtn}>
                   ガントチャート

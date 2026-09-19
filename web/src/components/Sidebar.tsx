@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
 
-export type MenuKey = "projects" | "gantt" | "kanban";
+export type MenuKey = "projects" | "backlog" | "gantt" | "kanban";
 
 const MENU: { key: MenuKey; label: string }[] = [
   { key: "projects", label: "プロジェクト" },
+  { key: "backlog", label: "バックログ" },
   { key: "gantt", label: "ガントチャート" },
   { key: "kanban", label: "カンバン" },
 ];

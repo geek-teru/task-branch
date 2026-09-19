@@ -18,8 +18,23 @@ begin
     returning id into p;
 
   -- ===== epic 1: 基盤（DB・API） =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', '基盤（DB・API）', 'done', 1) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', '基盤（DB・API）',
+            '3階層のタスクを保存する DB と、AI・画面が共通で使う RPC、ローカル開発環境を整える',
+            $ctx$## 背景・課題
+AI が作った計画を構造化して保存し、画面で確認したい。
+
+## ゴール
+epic > story > task の 3 階層と依存関係を DB で持ち、AI と画面が同じ RPC を使える。
+
+## 方針
+- Supabase（Postgres + PostgREST）を使い、専用のバックエンドは作らない
+- 集計・検証のロジックは RPC とトリガに集約する
+
+## 決定事項
+- 階層の整合性はトリガで守る
+- ローカルは supabase start、本番は同じ migration を db push する$ctx$,
+            'done', 1) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', 'スキーマと RPC の整備', 'done', '2026-09-14', '2026-09-20', 1,
@@ -40,8 +55,22 @@ begin
     (p, s, 'task', '初期化時にサンプルを投入（config.toml の seed sql_paths）', 'done', 3);
 
   -- ===== epic 2: 画面（Web UI） =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', '画面（Web UI）', 'in_progress', 2) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', '画面（Web UI）',
+            'プロジェクト・ガントチャート・カンバンなど、進捗を見て操作する画面を作る',
+            $ctx$## 背景・課題
+計画の進み具合をブラウザで確認・操作したい。
+
+## ゴール
+プロジェクト・バックログ・ガントチャート・カンバンで、見たい単位の進捗を追える。
+
+## 方針
+- React + Vite。画面は URL で分ける（react-router-dom）
+- 各画面は同じデータの見せ方違いとして作る
+
+## 未決事項
+- マップ（ブランチ図）の追加$ctx$,
+            'in_progress', 2) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', 'プロジェクト・ガントチャート画面', 'done', '2026-09-14', '2026-09-20', 1, null)
@@ -81,8 +110,19 @@ begin
     (p, s, 'task', 'get_task_graph に作成・更新・完了日時を追加', 'todo', 1);
 
   -- ===== epic 3: サンプルデータ・リポジトリ整備 =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', 'サンプルデータ・リポジトリ整備', 'done', 3) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', 'サンプルデータ・リポジトリ整備',
+            '動作確認用のサンプルデータを整え、公開リポジトリに社外秘の情報が残らない状態にする',
+            $ctx$## 背景・課題
+実案件の計画をサンプルにしたため、固有名詞が公開リポジトリに残っていた。
+
+## ゴール
+動作確認用のサンプルが揃い、公開リポジトリに社外秘の情報が無い。
+
+## 決定事項
+- 固有名詞は Service A / B / C などに置き換える
+- 旧名を含む履歴は、リポジトリを作り直して消した$ctx$,
+            'done', 3) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', 'サンプルデータの整備', 'done', '2026-09-14', '2026-09-20', 1, null)
@@ -102,8 +142,23 @@ begin
     (p, s, 'task', 'GitHub リポジトリの再作成と push', 'done', 2);
 
   -- ===== epic 4: AI 連携（MCP） =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', 'AI 連携（MCP）', 'todo', 4) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', 'AI 連携（MCP）',
+            'AI が MCP 経由で計画の起票・参照・作業の進行を行えるようにする。前提として認証と RLS を入れる',
+            $ctx$## 背景・課題
+AI に計画の起票や更新をさせたいが、今は REST を直接呼ぶしかない。
+
+## ゴール
+AI が MCP 経由で起票・参照・作業の進行を行える。
+
+## 方針
+- まずローカル（stdio）の MCP サーバーから作る
+- 認証情報は MCP サーバーだけが持ち、AI の会話には出さない
+- 前提として認証と RLS を入れる
+
+## 未決事項
+- AI 専用アカウントの発行方法$ctx$,
+            'todo', 4) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', 'MCP サーバー：起票と参照', 'todo', '2026-09-21', '2026-09-27', 1, null)
@@ -129,8 +184,19 @@ begin
     (p, s, 'task', 'projects / tasks に RLS ポリシーを設定', 'todo', 2);
 
   -- ===== epic 5: 並列で動く AI への対応 =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', '並列で動く AI への対応', 'todo', 5) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', '並列で動く AI への対応',
+            '複数の AI が同時に動いても、担当の重複や作業順の破綻が起きないようにする',
+            $ctx$## 背景・課題
+複数の AI が同時に動くと、同じタスクを取り合ったり、前提が終わっていない作業に着手したりする。
+
+## ゴール
+担当の重複や作業順の破綻が起きない。
+
+## 方針
+- タスクの担当を排他的に確保する
+- 依存関係（同じストーリー内のタスク間）を見て、着手できるものだけを渡す$ctx$,
+            'todo', 5) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', 'タスクの担当確保', 'todo', '2026-10-12', '2026-10-18', 1,
@@ -150,8 +216,18 @@ begin
     (p, s, 'task', 'get_next_task で依存を考慮する', 'todo', 3);
 
   -- ===== epic 6: 小さい改善 =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', '小さい改善', 'todo', 6) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', '小さい改善',
+            '完了条件や作業ログなど、日々の運用で効く小さな機能を足す',
+            $ctx$## 背景・課題
+日々の運用で、終わったかどうかの判断基準や作業の経緯が残らない。
+
+## ゴール
+タスクに完了条件と作業ログを残せる。
+
+## 方針
+- AI の記録と人のコメントを同じ場所に残す$ctx$,
+            'todo', 6) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', '完了条件と作業ログ', 'todo', '2026-10-26', '2026-11-01', 1, null)
@@ -162,8 +238,18 @@ begin
     (p, s, 'task', '詳細パネルに完了条件と作業ログを表示', 'todo', 3);
 
   -- ===== epic 7: トークン使用量の管理（優先度低） =====
-  insert into tasks(project_id, level, title, status, sort_order)
-    values (p, 'epic', 'トークン使用量の管理', 'todo', 7) returning id into e;
+  insert into tasks(project_id, level, title, description, context, status, sort_order)
+    values (p, 'epic', 'トークン使用量の管理',
+            'AI の作業で使ったトークン量を記録し、ストーリー・プロジェクト単位で見えるようにする（優先度低）',
+            $ctx$## 背景・課題
+AI の作業にどれだけトークンを使ったか分からない。
+
+## ゴール
+使用量をストーリー・プロジェクト単位で確認できる。
+
+## 方針
+- 優先度は低い。集め方（Claude Code のフック / OpenTelemetry）の検証から始める$ctx$,
+            'todo', 7) returning id into e;
 
   insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order, description)
     values (p, e, 'story', '使用量の記録', 'todo', '2026-11-02', '2026-11-08', 1, '優先度低')

@@ -70,9 +70,10 @@ AI（Claude Code の `plan` スキル）が今後のタスクを洗い出し・�
 |---|---|---|---|
 | 粒度 | 1つのコンテキスト | 1〜2週間（1スプリント） | 数時間 |
 | 役割 | 課題・問題点・改善点などの**コンテキスト（要件）**を持ち、ストーリー・タスクを洗い出す元になる | エピックの実現に必要なことを洗い出したもの。1スプリントで完了させる | ストーリーをさらに細分化した作業 |
-| 作り方 | 人が作るか、AI と壁打ちしながら作る。コンテキストは `description` に書く | エピックを active にしてから洗い出す（AI と壁打ちしてもよい）。バックログのエピックの下には、アイデアのメモとして**ラフなストーリー**を置ける | ストーリーから洗い出す |
+| 作り方 | 人が作るか、AI と壁打ちしながら作る。壁打ちの結論はドキュメント（`context`）に書く | エピックを active にしてから洗い出す（AI と壁打ちしてもよい）。バックログのエピックの下には、アイデアのメモとして**ラフなストーリー**を置ける | ストーリーから洗い出す |
 | 状態 | **バックログ（inactive）/ 進行中（active）/ 完了**。完了は配下の進捗率 100% で**自動**（手で閉じる操作は持たない） | `todo` / `in_progress` / `done` を手で動かす | `todo` / `in_progress` / `done` を手で動かす |
 | 管理のしかた | 作成後はあまり手を入れない。status ではなく、配下のストーリーから算出した**進捗率**で見る | スプリントごとの振り返り、日々の進捗確認 | 日々の進捗確認 |
+| 情報の持ち方 | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）＋ **コメント**（補足・意見を追記）。ドキュメントは更新履歴を持つ | 短い説明（`description`） | 短い説明（`description`） |
 | 依存関係・クリティカルパス | 持たない | 持たない（ストーリー間の順序は §9 Q2） | 前提タスク → 後続タスク。張れるのは**同じストーリー内のタスク間**だけ。クリティカルパスはストーリー内で求める |
 | 担当 | 持たない | 持たない | 人か AI か。人の場合は誰か |
 | 見える場所 | バックログ：バックログの一覧だけ／進行中：ガントチャート・カンバン・マップ／完了：完了として表示 | 親のエピックが進行中のときに、実行中のビューに出る（ラフなストーリーはバックログの一覧だけ） | 親のストーリーと同じ |
@@ -171,6 +172,8 @@ AI（Claude Code の `plan` スキル）が今後のタスクを洗い出し・�
 ```
 projects 1 ──< tasks(自己参照ツリー parent_id)
                  ├──< task_dependencies (同じストーリー内の task 間の有向辺)
+                 ├──< epic_comments (epic へのコメント。追記のみ)
+                 ├──< epic_context_revisions (epic のドキュメントの更新履歴)
                  └──> 担当者（人の場合。ユーザー）
 ```
 
@@ -197,7 +200,8 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | parent_id | uuid | FK→tasks.id, null可 | 親（階層）。null はルート(epic想定) |
 | level | text | not null | `epic` / `story` / `task` |
 | title | text | not null | 名称 |
-| description | text | | 詳細・AI が書いた計画内容 |
+| description | text | | 短い説明（一覧やカードに出す 1〜2 行） |
+| context | text | null可 | **epic のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `epic_context_revisions` に残す（最新版も含む） |
 | status | text | not null, default 'todo' | `todo` / `in_progress` / `done`（作業の進み具合）。エピックは手で動かさない（§1.3） |
 | activated_at | timestamptz | null可 | **epic のみ**。null ＝ inactive（バックログ）、日時あり ＝ active（エピック）。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける。完了は列で持たず、active かつ配下の進捗率 100% から導出する |
 | assignee_type | text | null可 | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9 |
@@ -217,6 +221,41 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - 親の進捗は子から集約（§3.4）。
 - **拡張フィールド（`start_date` / `due_date` / `metadata`）は nullable で初期は未使用**。ガント/カレンダー等のビュー追加時にそのまま利用でき、既存機能に影響しない。
 - 見積り（`estimate`）は未導入。導入時は `estimate_value numeric` + `estimate_unit text` を追加する想定（§10）。
+- `context` は長文になるため、一覧系の取得（カンバン・ガントチャート・`get_task_graph` など）では読み込まない。詳細・バックログの画面と、AI にエピックの文脈を渡すときだけ取得する。
+
+#### epic_comments
+
+エピックへのコメント。ドキュメント（`context`）を正の情報とし、コメントは補足・意見・壁打ちの経緯を**追記**していく。
+
+| カラム | 型 | 制約 | 説明 |
+|---|---|---|---|
+| id | uuid | PK, default gen_random_uuid() | |
+| epic_id | uuid | FK→tasks.id, not null | 対象のエピック（level=epic） |
+| author_type | text | not null | `human` / `ai` |
+| author_id | uuid | null可 | 人の場合の投稿者（ユーザー） |
+| body | text | not null | 本文（Markdown） |
+| created_at | timestamptz | default now() | |
+
+- 追記のみで、編集・削除はしない（経緯を残すため）。
+- コメントで決まったことは、ドキュメントに反映して正の情報にする。
+
+#### epic_context_revisions
+
+エピックのドキュメント（`context`）の更新履歴。差分の確認と巻き戻しに使う。
+
+| カラム | 型 | 制約 | 説明 |
+|---|---|---|---|
+| id | uuid | PK, default gen_random_uuid() | |
+| epic_id | uuid | FK→tasks.id, not null | 対象のエピック |
+| version | int | not null | 版番号（エピックごとに 1 から） |
+| context | text | not null | その版の本文 |
+| edited_by_type | text | not null | `human` / `ai` |
+| edited_by_id | uuid | null可 | 人の場合の更新者 |
+| created_at | timestamptz | default now() | |
+
+- UNIQUE(epic_id, version)。
+- `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
+- 人か AI かは、リクエストの JWT の `app_metadata.actor_type`（`ai` なら AI）で判定する（`current_actor_type()`）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
 
 #### task_dependencies
 
