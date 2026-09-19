@@ -1,0 +1,42 @@
+# Production release, run on every push to main.
+#
+# Today:  migrate only. The screen is deployed by Vercel's own Git integration at the
+#         same time, so migrations must stay backward compatible with the currently
+#         deployed screen (add columns/tables first; drop or rename in a later release).
+#
+# Later:  migrate → deploy. Turn off Vercel's automatic production deploys and add a
+#         `deploy` job with `needs: migrate` (see the commented example below).
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One production release at a time; never cancel a migration halfway.
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    uses: ./.github/workflows/supabase-migrations.yml
+    with:
+      dry_run: false
+    secrets: inherit
+
+  # deploy:
+  #   needs: migrate
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  #     VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  #     VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+  #     - run: npx vercel build --prod --token="$VERCEL_TOKEN"
+  #     - run: npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
