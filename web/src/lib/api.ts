@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { Project, ProjectGraph, Status, StoryInput, Task } from "./types";
+import type { KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -58,6 +58,38 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
+// Kanban: every in-progress story across projects, with its epic and child tasks.
+export async function getKanbanLanes(): Promise<KanbanLane[]> {
+  const { data: stories, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("level", "story")
+    .eq("status", "in_progress")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  if (!stories?.length) return [];
+
+  const epicIds = [...new Set(stories.map((s) => s.parent_id).filter((id): id is string => !!id))];
+  const [epicsRes, tasksRes] = await Promise.all([
+    supabase.from("tasks").select("*").in("id", epicIds),
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("level", "task")
+      .in("parent_id", stories.map((s) => s.id))
+      .order("sort_order", { ascending: true }),
+  ]);
+  if (epicsRes.error) throw epicsRes.error;
+  if (tasksRes.error) throw tasksRes.error;
+
+  const epics = new Map((epicsRes.data ?? []).map((e: Task) => [e.id, e]));
+  return stories.map((story: Task) => ({
+    story,
+    epic: (story.parent_id && epics.get(story.parent_id)) || null,
+    tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
+  }));
+}
+
 export async function updateTaskStatus(id: string, status: Status): Promise<void> {
   const { error } = await supabase.from("tasks").update({ status }).eq("id", id);
   if (error) throw error;
@@ -98,22 +130,32 @@ export async function deleteTask(id: string): Promise<void> {
 }
 
 // Create a new story under the given epic, appended after its existing stories.
-export async function addStory(
-  epic: Pick<Task, "id" | "project_id">,
+export function addStory(epic: Pick<Task, "id" | "project_id">, input: StoryInput): Promise<Task> {
+  return addChild(epic, "story", input);
+}
+
+// Create a new task under the given story, appended after its existing tasks.
+export function addTask(story: Pick<Task, "id" | "project_id">, input: StoryInput): Promise<Task> {
+  return addChild(story, "task", input);
+}
+
+async function addChild(
+  parent: Pick<Task, "id" | "project_id">,
+  level: "story" | "task",
   input: StoryInput
 ): Promise<Task> {
   const { data, error } = await supabase
     .from("tasks")
     .select("sort_order")
-    .eq("parent_id", epic.id)
+    .eq("parent_id", parent.id)
     .order("sort_order", { ascending: false })
     .limit(1);
   if (error) throw error;
   const nextOrder = (data?.[0]?.sort_order ?? -1) + 1;
   return createTask({
-    project_id: epic.project_id,
-    parent_id: epic.id,
-    level: "story",
+    project_id: parent.project_id,
+    parent_id: parent.id,
+    level,
     ...input,
     sort_order: nextOrder,
   });
