@@ -9,6 +9,7 @@ import {
   deleteTask,
   exportProject,
   getKanbanLanes,
+  listEpics,
   getProjectGraph,
   listProjects,
   reorderEpics,
@@ -17,11 +18,13 @@ import {
   updateTaskDates,
   updateTaskStatus,
 } from "./lib/api";
-import type { GraphNode, KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./lib/types";
+import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { GanttView } from "./views/GanttView";
 import { KanbanView } from "./views/KanbanView";
+import { BacklogView } from "./views/BacklogView";
+import { EpicDetailPage } from "./views/EpicDetailPage";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -31,6 +34,8 @@ export default function App() {
   const ganttMatch = useMatch("/projects/:projectId/gantt");
   const isGantt = pathname === "/gantt" || ganttMatch !== null;
   const isKanban = pathname === "/kanban";
+  const epicMatch = useMatch("/epics/:epicId");
+  const isBacklog = pathname === "/backlog" || epicMatch !== null;
   const [searchParams, setSearchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, or the first project for /gantt.
   const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? projects[0]?.id : undefined;
@@ -58,6 +63,22 @@ export default function App() {
       cancelled = true;
     };
   }, [ganttProjectId]);
+
+  // Backlog page: the project comes from ?project=, defaulting to the first project.
+  const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? projects[0]?.id : undefined;
+  const [backlog, setBacklog] = useState<{ projectId: string; epics: BacklogEpic[] } | null>(null);
+  useEffect(() => {
+    if (!backlogProjectId) return;
+    let cancelled = false;
+    listEpics(backlogProjectId)
+      .then((epics) => {
+        if (!cancelled) setBacklog({ projectId: backlogProjectId, epics });
+      })
+      .catch((e) => setError(String(e.message ?? e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [backlogProjectId]);
 
   const [lanes, setLanes] = useState<KanbanLane[] | null>(null);
   useEffect(() => {
@@ -269,6 +290,7 @@ export default function App() {
     if (key === "projects") navigate("/projects");
     else if (key === "gantt") navigate("/gantt");
     else if (key === "kanban") navigate("/kanban");
+    else if (key === "backlog") navigate("/backlog");
   }, [navigate]);
 
   if (!isConfigured) {
@@ -317,7 +339,10 @@ export default function App() {
 
   return (
     <Shell>
-      <Sidebar active={isGantt ? "gantt" : isKanban ? "kanban" : "projects"} onNavigate={onNavigate} />
+      <Sidebar
+        active={isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
+        onNavigate={onNavigate}
+      />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {error && (
@@ -337,6 +362,7 @@ export default function App() {
                   onCreate={handleCreateProject}
                   onUpdate={handleUpdateProject}
                   onDelete={handleDeleteProject}
+                  onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
                   onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
                   onExport={handleExportProject}
                 />
@@ -345,6 +371,37 @@ export default function App() {
           />
           <Route path="/projects/:projectId/gantt" element={ganttPage} />
           <Route path="/gantt" element={ganttPage} />
+          <Route
+            path="/backlog"
+            element={
+              <main style={{ flex: 1, minHeight: 0 }}>
+                {!projectsLoaded ? (
+                  <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                ) : projects.length === 0 ? (
+                  <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+                ) : !projects.some((p) => p.id === backlogProjectId) ? (
+                  <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                ) : (
+                  <BacklogView
+                    projects={projects}
+                    projectId={backlogProjectId!}
+                    epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
+                    onSelectProject={(id) => setSearchParams({ project: id })}
+                  />
+                )}
+              </main>
+            }
+          />
+          <Route
+            path="/epics/:epicId"
+            element={
+              <main style={{ flex: 1, minHeight: 0 }}>
+                {epicMatch?.params.epicId && (
+                  <EpicDetailPage epicId={epicMatch.params.epicId} projects={projects} onError={setError} />
+                )}
+              </main>
+            }
+          />
           <Route
             path="/kanban"
             element={

@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./types";
+import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -42,12 +42,18 @@ export async function deleteProject(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Every tasks column except the epic document (context), which can be long.
+// List queries use this; fetch context explicitly where it is needed.
+const TASK_LIST_COLUMNS =
+  "id, project_id, parent_id, level, title, description, status, sort_order, start_date, due_date, " +
+  "activated_at, assignee_type, assignee_id, metadata, created_at, updated_at, completed_at";
+
 // Single normalized snapshot the views render (get_task_graph RPC).
 export async function getProjectGraph(projectId: string): Promise<ProjectGraph> {
   const { data, error } = await supabase.rpc("get_task_graph", { project: projectId });
   if (error) throw error;
-  const raw = (data ?? {}) as { nodes?: ProjectGraph["nodes"] };
-  return { nodes: raw.nodes ?? [] };
+  const raw = (data ?? {}) as Partial<ProjectGraph>;
+  return { nodes: raw.nodes ?? [], edges: raw.edges ?? [] };
 }
 
 // One project as a nested JSON document (export_project RPC).
@@ -58,26 +64,83 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
+// Backlog page: epics of a project (active and inactive), without the context document.
+export async function listEpics(projectId: string): Promise<BacklogEpic[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id, title, description, activated_at, sort_order")
+    .eq("project_id", projectId)
+    .eq("level", "epic")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Epic detail page: the epic including its context document.
+export async function getEpic(epicId: string): Promise<Task | null> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(`${TASK_LIST_COLUMNS}, context`)
+    .eq("id", epicId)
+    .eq("level", "epic")
+    .maybeSingle()
+    .overrideTypes<Task | null, { merge: false }>();
+  if (error) throw error;
+  return data;
+}
+
+// Saving the context adds a version to epic_context_revisions (DB trigger).
+export async function updateEpicContext(epicId: string, context: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ context }).eq("id", epicId);
+  if (error) throw error;
+}
+
+export async function getLatestContextRevision(epicId: string): Promise<ContextRevision | null> {
+  const { data, error } = await supabase
+    .from("epic_context_revisions")
+    .select("version, edited_by_type, created_at")
+    .eq("epic_id", epicId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as ContextRevision | null;
+}
+
+export async function listStories(epicId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_LIST_COLUMNS)
+    .eq("parent_id", epicId)
+    .eq("level", "story")
+    .order("sort_order", { ascending: true })
+    .overrideTypes<Task[], { merge: false }>();
+  if (error) throw error;
+  return data ?? [];
+}
+
 // Kanban: every in-progress story across projects, with its epic and child tasks.
 export async function getKanbanLanes(): Promise<KanbanLane[]> {
   const { data: stories, error } = await supabase
     .from("tasks")
-    .select("*")
+    .select(TASK_LIST_COLUMNS)
     .eq("level", "story")
     .eq("status", "in_progress")
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .overrideTypes<Task[], { merge: false }>();
   if (error) throw error;
   if (!stories?.length) return [];
 
   const epicIds = [...new Set(stories.map((s) => s.parent_id).filter((id): id is string => !!id))];
   const [epicsRes, tasksRes] = await Promise.all([
-    supabase.from("tasks").select("*").in("id", epicIds),
+    supabase.from("tasks").select(TASK_LIST_COLUMNS).in("id", epicIds).overrideTypes<Task[], { merge: false }>(),
     supabase
       .from("tasks")
-      .select("*")
+      .select(TASK_LIST_COLUMNS)
       .eq("level", "task")
       .in("parent_id", stories.map((s) => s.id))
-      .order("sort_order", { ascending: true }),
+      .order("sort_order", { ascending: true })
+      .overrideTypes<Task[], { merge: false }>(),
   ]);
   if (epicsRes.error) throw epicsRes.error;
   if (tasksRes.error) throw tasksRes.error;
