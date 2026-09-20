@@ -30,6 +30,18 @@ export async function updateProject(id: string, patch: ProjectInput): Promise<Pr
   return data;
 }
 
+// Archive (false) or restore (true) a project.
+export async function setProjectActive(id: string, isActive: boolean): Promise<Project> {
+  const { data, error } = await supabase
+    .from("projects")
+    .update({ is_active: isActive })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) throw error;

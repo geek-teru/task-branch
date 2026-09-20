@@ -1,46 +1,49 @@
 import { useState, type CSSProperties } from "react";
 import type { Project, ProjectInput } from "../lib/types";
+import { ProjectForm } from "../components/ProjectForm";
 
-type FormState = { mode: "create" } | { mode: "edit"; project: Project };
-
+// Project list: navigate only. Editing / deleting / exporting lives on the detail page.
 export function ProjectsListPage({
   projects,
   onCreate,
-  onUpdate,
-  onDelete,
+  onShowDetail,
   onShowBacklog,
   onShowGantt,
-  onExport,
+  onShowKanban,
 }: {
   projects: Project[];
   onCreate: (input: ProjectInput) => void;
-  onUpdate: (id: string, input: ProjectInput) => void;
-  onDelete: (id: string) => void;
+  onShowDetail: (projectId: string) => void;
   onShowBacklog: (projectId: string) => void;
   onShowGantt: (projectId: string) => void;
-  onExport: (project: Project) => void;
+  onShowKanban: (projectId: string) => void;
 }) {
-  const [form, setForm] = useState<FormState | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
-  const submit = (input: ProjectInput) => {
-    if (!form) return;
-    if (form.mode === "create") onCreate(input);
-    else onUpdate(form.project.id, input);
-    setForm(null);
-  };
+  const inactiveCount = projects.filter((p) => !p.is_active).length;
+  const visible = showInactive ? projects : projects.filter((p) => p.is_active);
 
   return (
     <div style={{ padding: 24, overflow: "auto", height: "100%" }}>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>プロジェクト</h2>
-        <button onClick={() => setForm({ mode: "create" })} style={primaryBtn}>
+        {inactiveCount > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#5f6b7a" }}>
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+            InActive も表示（{inactiveCount}）
+          </label>
+        )}
+        <button onClick={() => setCreating(true)} style={primaryBtn}>
           新規プロジェクト
         </button>
       </div>
 
-      {projects.length === 0 ? (
+      {visible.length === 0 ? (
         <div style={{ color: "#5f6b7a" }}>
-          プロジェクトがありません。「新規プロジェクト」から作成してください。
+          {projects.length === 0
+            ? "プロジェクトがありません。「新規プロジェクト」から作成してください。"
+            : "アクティブなプロジェクトがありません。「InActive も表示」で確認できます。"}
         </div>
       ) : (
         <div
@@ -50,7 +53,7 @@ export function ProjectsListPage({
             gap: 12,
           }}
         >
-          {projects.map((p) => (
+          {visible.map((p) => (
             <div
               key={p.id}
               style={{
@@ -62,10 +65,16 @@ export function ProjectsListPage({
                 borderRadius: 10,
                 padding: 16,
                 boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                opacity: p.is_active ? 1 : 0.7,
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{p.name}</div>
-              <div style={{ fontSize: 12, color: "#5f6b7a", minHeight: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => onShowDetail(p.id)} title="詳細を開く" style={nameBtn}>
+                  {p.name}
+                </button>
+                {!p.is_active && <span style={inactiveBadge}>InActive</span>}
+              </div>
+              <div style={{ fontSize: 12, color: "#5f6b7a", minHeight: 16, marginTop: 4 }}>
                 {p.description ?? "（説明なし）"}
               </div>
               {(p.url || p.repository_url) && (
@@ -87,31 +96,14 @@ export function ProjectsListPage({
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
-                <button onClick={() => setForm({ mode: "edit", project: p })} style={cardBtn}>
-                  変更
-                </button>
                 <button onClick={() => onShowBacklog(p.id)} style={cardBtn}>
                   バックログ
                 </button>
                 <button onClick={() => onShowGantt(p.id)} style={cardBtn}>
                   ガントチャート
                 </button>
-                <button onClick={() => onExport(p)} style={cardBtn}>
-                  JSONエクスポート
-                </button>
-                <button
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `プロジェクト「${p.name}」を削除します。\n配下のエピック・ストーリー・タスク・依存関係もすべて削除されます。よろしいですか？`
-                      )
-                    ) {
-                      onDelete(p.id);
-                    }
-                  }}
-                  style={dangerBtn}
-                >
-                  削除
+                <button onClick={() => onShowKanban(p.id)} style={cardBtn}>
+                  カンバン
                 </button>
               </div>
             </div>
@@ -119,108 +111,16 @@ export function ProjectsListPage({
         </div>
       )}
 
-      {form && (
+      {creating && (
         <ProjectForm
-          initial={form.mode === "edit" ? form.project : null}
-          onSubmit={submit}
-          onCancel={() => setForm(null)}
+          initial={null}
+          onSubmit={(input) => {
+            onCreate(input);
+            setCreating(false);
+          }}
+          onCancel={() => setCreating(false)}
         />
       )}
-    </div>
-  );
-}
-
-function ProjectForm({
-  initial,
-  onSubmit,
-  onCancel,
-}: {
-  initial: Project | null;
-  onSubmit: (input: ProjectInput) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
-  const [url, setUrl] = useState(initial?.url ?? "");
-  const [repositoryUrl, setRepositoryUrl] = useState(initial?.repository_url ?? "");
-  const trimmedName = name.trim();
-  const trim = (v: string) => (v.trim() ? v.trim() : null);
-
-  const handleSubmit = () => {
-    if (!trimmedName) return;
-    onSubmit({
-      name: trimmedName,
-      description: trim(description),
-      url: trim(url),
-      repository_url: trim(repositoryUrl),
-    });
-  };
-
-  return (
-    <div style={overlay} onMouseDown={onCancel}>
-      <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>
-          {initial ? "プロジェクトを変更" : "新規プロジェクト"}
-        </h3>
-
-        <label style={fieldLabel}>プロジェクト名</label>
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSubmit();
-            if (e.key === "Escape") onCancel();
-          }}
-          placeholder="例: AWS移行 Phase1 アプリケーション移行"
-          style={textInput}
-        />
-
-        <label style={{ ...fieldLabel, marginTop: 14 }}>概要（任意）</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onCancel();
-          }}
-          rows={3}
-          placeholder="プロジェクトの説明"
-          style={{ ...textInput, resize: "vertical", fontFamily: "inherit" }}
-        />
-
-        <label style={{ ...fieldLabel, marginTop: 14 }}>URL（任意）</label>
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSubmit();
-            if (e.key === "Escape") onCancel();
-          }}
-          placeholder="https://example.vercel.app"
-          style={textInput}
-        />
-
-        <label style={{ ...fieldLabel, marginTop: 14 }}>リポジトリ（任意）</label>
-        <input
-          value={repositoryUrl}
-          onChange={(e) => setRepositoryUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSubmit();
-            if (e.key === "Escape") onCancel();
-          }}
-          placeholder="https://github.com/owner/repo"
-          style={textInput}
-        />
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button onClick={onCancel} style={cardBtn}>
-            キャンセル
-          </button>
-          <button onClick={handleSubmit} disabled={!trimmedName} style={primaryBtn}>
-            {initial ? "保存" : "作成"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -233,6 +133,17 @@ const primaryBtn: CSSProperties = {
   borderRadius: 6,
   padding: "7px 14px",
   fontSize: 13,
+  cursor: "pointer",
+};
+
+const nameBtn: CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  textAlign: "left",
+  fontWeight: 600,
+  fontSize: 15,
+  color: "#0972d3",
   cursor: "pointer",
 };
 
@@ -254,45 +165,12 @@ const cardBtn: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const dangerBtn: CSSProperties = {
-  ...cardBtn,
-  marginLeft: "auto",
-  color: "#a3210b",
-  borderColor: "#f0c2ba",
-};
-
-const overlay: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(31,41,51,0.4)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 100,
-};
-
-const dialog: CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  padding: 24,
-  width: 420,
-  maxWidth: "90vw",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-};
-
-const fieldLabel: CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 600,
+const inactiveBadge: CSSProperties = {
+  fontSize: 10,
+  borderRadius: 999,
+  padding: "1px 8px",
+  background: "#f2f3f4",
   color: "#5f6b7a",
-  marginBottom: 6,
-};
-
-const textInput: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  fontSize: 13,
-  padding: "8px 10px",
-  borderRadius: 6,
-  border: "1px solid #cbd2d9",
+  border: "1px solid #d5dbdb",
+  whiteSpace: "nowrap",
 };
