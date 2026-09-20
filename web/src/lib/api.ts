@@ -76,6 +76,32 @@ export async function listEpics(projectId: string): Promise<BacklogEpic[]> {
   return data ?? [];
 }
 
+// Backlog page: add a backlog item, i.e. an inactive epic (activated_at stays null),
+// appended after the project's existing epics.
+export async function createEpic(projectId: string, title: string, description: string | null): Promise<BacklogEpic> {
+  const { data: last, error: lastError } = await supabase
+    .from("tasks")
+    .select("sort_order")
+    .eq("project_id", projectId)
+    .eq("level", "epic")
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (lastError) throw lastError;
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      project_id: projectId,
+      level: "epic",
+      title,
+      description,
+      sort_order: (last?.[0]?.sort_order ?? 0) + 1,
+    })
+    .select("id, title, description, activated_at, sort_order")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // Epic detail page: the epic including its context document.
 export async function getEpic(epicId: string): Promise<Task | null> {
   const { data, error } = await supabase
