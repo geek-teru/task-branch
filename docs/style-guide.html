@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>task-branch スタイルガイド</title>
+<style>
+  /* このページ自身も task-branch の決まりで作っている（色・文字サイズ・余白はすべて下記の値） */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Meiryo, sans-serif;
+    color: #16191d;
+    background: #f4f5f6;
+    line-height: 1.7;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 16px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e5e8eb; }
+  h3 { font-size: 14px; margin: 24px 0 8px; }
+  p, li { font-size: 13px; color: #3b4149; }
+  .lead { color: #5f6b7a; font-size: 13px; margin: 0 0 8px; }
+  code { background: #eff1f3; padding: 1px 4px; border-radius: 4px; font-size: 0.9em; }
+  pre {
+    background: #1f2933; color: #e5e8eb; border-radius: 6px; padding: 12px 14px;
+    font-size: 12px; line-height: 1.6; overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; color: inherit; font-size: 12px; }
+  .card { background: #fff; border: 1px solid #e5e8eb; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .toc { columns: 2; font-size: 13px; }
+  .toc a { color: #0972d3; text-decoration: none; }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; padding: 6px 8px; font-size: 12px; font-weight: 600; color: #5f6b7a; border-bottom: 1px solid #e5e8eb; }
+  td { padding: 8px; border-bottom: 1px solid #eef0f2; vertical-align: top; font-size: 13px; }
+  td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+
+  /* 色見本 */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .swatch { border: 1px solid #e5e8eb; border-radius: 6px; overflow: hidden; background: #fff; }
+  .swatch .chip { height: 44px; }
+  .swatch .meta { padding: 6px 8px; font-size: 11px; color: #5f6b7a; }
+  .swatch .meta b { display: block; color: #1f2933; font-size: 12px; font-weight: 600; }
+  .swatch .meta .mono { color: #94a0ad; }
+
+  /* 見本置き場 */
+  .demo { background: #f7f8f9; border: 1px dashed #cbd2d9; border-radius: 6px; padding: 16px; margin: 8px 0 10px; }
+  .demo.dark { background: #1f2933; border-color: #3d4b57; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .note { font-size: 12px; color: #5f6b7a; margin: 4px 0 0; }
+
+  /* --- アプリのコンポーネント（実物と同じ値） --- */
+  .btn-primary { background: #0972d3; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+  .btn-secondary { background: #fff; color: #3b4149; border: 1px solid #cbd2d9; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .btn-panel { background: #fff; color: #3b4149; border: 1px solid #cbd2d9; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .btn-danger { background: #fff; color: #a3210b; border: 1px solid #f0c2ba; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+  .btn-start { background: #0972d3; color: #fff; border: 1px solid #0972d3; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .btn-done { background: #1a7f37; color: #fff; border: 1px solid #1a7f37; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .btn-confirm { background: #1f2933; color: #fff; border: 1px solid #1f2933; border-radius: 6px; padding: 7px 16px; font-size: 13px; cursor: pointer; }
+  .btn-quiet { background: none; border: none; padding: 4px 6px; font-size: 12px; color: #5f6b7a; cursor: pointer; text-decoration: underline; }
+  .btn-add { width: 18px; height: 18px; line-height: 16px; padding: 0; border: 1px solid #cbd2d9; border-radius: 4px; background: #fff; color: #0972d3; cursor: pointer; font-size: 13px; }
+
+  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid; white-space: nowrap; }
+  .badge-todo { background: #e2f4fb; color: #0b5e73; border-color: #33a9c9; }
+  .badge-doing { background: #eaf2fc; color: #0b4a8a; border-color: #0972d3; }
+  .badge-done { background: #eaf6ec; color: #12652b; border-color: #1a7f37; }
+  .pill { font-size: 11px; border-radius: 999px; padding: 2px 10px; border: 1px solid; white-space: nowrap; }
+  .pill-active { background: #e8f3ff; color: #0972d3; border-color: #b5d6f7; }
+  .pill-inactive { background: #f2f3f4; color: #5f6b7a; border-color: #d5dbdb; }
+  .id-badge {
+    background: none; border: none; border-bottom: 1px dotted #cbd2d9; padding: 0;
+    font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #94a0ad; cursor: pointer; white-space: nowrap; line-height: 1.6;
+  }
+
+  .app-card { background: #fff; border: 1px solid #e5e8eb; border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); max-width: 300px; }
+  .app-card .title { font-weight: 600; font-size: 15px; color: #0972d3; }
+  .app-card .desc { font-size: 12px; color: #5f6b7a; margin-top: 4px; }
+  .app-card .meta { font-size: 11px; color: #94a0ad; margin-top: 10px; }
+
+  .dialog-form { background: #fff; border-radius: 12px; padding: 24px; width: 420px; max-width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+  .dialog-confirm { background: #fff; border-radius: 8px; padding: 20px; width: 380px; max-width: 100%; box-shadow: 0 8px 28px rgba(31,41,51,0.25); }
+  .field-label { display: block; font-size: 12px; font-weight: 600; color: #5f6b7a; margin-bottom: 6px; }
+  .text-input { width: 100%; font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd2d9; }
+
+  .panel { width: 320px; background: #fff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden; }
+  .panel .head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #e5e8eb; background: #f7f9fa; font-size: 12px; font-weight: 600; color: #5f6b7a; }
+  .panel .body { padding: 16px; }
+  .panel .name { font-size: 15px; font-weight: 600; color: #1f2933; margin-bottom: 14px; }
+  .panel .f-label { font-size: 11px; font-weight: 600; color: #94a0ad; margin-bottom: 3px; }
+  .panel .f-value { font-size: 13px; color: #1f2933; margin-bottom: 12px; }
+
+  .menu { min-width: 160px; background: #fff; border: 1px solid #cbd2d9; border-radius: 6px; box-shadow: 0 4px 12px rgba(31,41,51,0.18); padding: 4px; }
+  .menu button { display: block; width: 100%; text-align: left; padding: 6px 12px; border: none; border-radius: 4px; background: transparent; color: #1f2933; font-size: 12px; cursor: pointer; }
+  .menu button.sep { border-top: 1px solid #e5e8eb; margin-top: 4px; padding-top: 10px; }
+  .menu button.danger { color: #a3210b; }
+
+  .nav { width: 220px; background: #1f2933; color: #e5e8eb; border-radius: 6px; overflow: hidden; }
+  .nav .brand { padding: 14px 16px; font-weight: 700; font-size: 16px; border-bottom: 1px solid #2f3b46; }
+  .nav .item { padding: 9px 10px; margin: 2px 8px; border-radius: 6px; font-size: 13px; color: #cbd2d9; }
+  .nav .item.active { background: #0972d3; color: #fff; font-weight: 600; }
+
+  .bar { height: 16px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>task-branch スタイルガイド</h1>
+<p class="lead">
+  画面の見た目をそろえるための決まり。値は <code>web/src</code> の実装から起こしたもので、ここが正。
+  新しい画面を作るとき、既存の値にないものを足す前にこのページを見る。
+</p>
+
+<div class="card">
+  <div class="toc">
+    <div><a href="#basis">1. 基本方針</a></div>
+    <div><a href="#color">2. 色</a></div>
+    <div><a href="#type">3. タイポグラフィ</a></div>
+    <div><a href="#space">4. 余白・角丸・影</a></div>
+    <div><a href="#parts">5. コンポーネント</a></div>
+    <div><a href="#rules">6. 書き方の決まり</a></div>
+  </div>
+</div>
+
+<h2 id="basis">1. 基本方針</h2>
+<ul>
+  <li>CSS フレームワークは使わない。スタイルは React のインライン <code>style</code>（<code>CSSProperties</code> オブジェクト）で書く。</li>
+  <li>配色は落ち着いた業務画面寄り（AWS コンソール風）。彩度の高い色はアクセント（青）とステータスだけに使う。</li>
+  <li>文字は小さめ（本文 13px）。情報量を詰めても読めるよう、色の濃淡で階層を出す。</li>
+  <li>UI の文言は日本語。ボタンは何が起きるかが分かる動詞にする（「変更」「削除」「移動する」）。</li>
+  <li>全体の背景は <code>#f4f5f6</code>、コンテンツは白いカードに載せる。</li>
+</ul>
+
+<h2 id="color">2. 色</h2>
+
+<h3>テキスト</h3>
+<div class="swatches">
+  <div class="swatch"><div class="chip" style="background:#16191d"></div><div class="meta"><b>本文（body）</b><span class="mono">#16191d</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#1f2933"></div><div class="meta"><b>見出し・強い文字</b><span class="mono">#1f2933</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#3b4149"></div><div class="meta"><b>通常の文字</b><span class="mono">#3b4149</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#5f6b7a"></div><div class="meta"><b>補助・ラベル</b><span class="mono">#5f6b7a</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#94a0ad"></div><div class="meta"><b>弱い補助・空値</b><span class="mono">#94a0ad</span></div></div>
+</div>
+
+<h3>背景・枠線</h3>
+<div class="swatches">
+  <div class="swatch"><div class="chip" style="background:#f4f5f6"></div><div class="meta"><b>ページ背景</b><span class="mono">#f4f5f6</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#ffffff;border-bottom:1px solid #e5e8eb"></div><div class="meta"><b>カード・表の地</b><span class="mono">#ffffff</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#f7f9fa"></div><div class="meta"><b>ヘッダ行・パネル頭</b><span class="mono">#f7f9fa</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#eef1f3"></div><div class="meta"><b>選択中・行の強調</b><span class="mono">#eef1f3</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#e5e8eb"></div><div class="meta"><b>枠線（標準）</b><span class="mono">#e5e8eb</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#cbd2d9"></div><div class="meta"><b>枠線（強・入力/ボタン）</b><span class="mono">#cbd2d9</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#eef0f2"></div><div class="meta"><b>表の行区切り</b><span class="mono">#eef0f2</span></div></div>
+</div>
+
+<h3>アクセント（青）</h3>
+<div class="swatches">
+  <div class="swatch"><div class="chip" style="background:#0972d3"></div><div class="meta"><b>主ボタン・リンク・選択</b><span class="mono">#0972d3</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#eaf2fc"></div><div class="meta"><b>青の地（ドロップ先など）</b><span class="mono">#eaf2fc</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#e8f3ff"></div><div class="meta"><b>Active バッジの地</b><span class="mono">#e8f3ff</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#b5d6f7"></div><div class="meta"><b>Active バッジの枠</b><span class="mono">#b5d6f7</span></div></div>
+</div>
+
+<h3>ステータス（<code>lib/style.ts</code> の <code>STATUS_COLOR</code>）</h3>
+<table>
+  <thead><tr><th>状態</th><th>見本</th><th>bg</th><th>border</th><th>fg</th></tr></thead>
+  <tbody>
+    <tr><td>未着手 todo</td><td><span class="badge badge-todo">未着手</span></td><td class="mono">#e2f4fb</td><td class="mono">#33a9c9</td><td class="mono">#0b5e73</td></tr>
+    <tr><td>進行中 in_progress</td><td><span class="badge badge-doing">進行中</span></td><td class="mono">#eaf2fc</td><td class="mono">#0972d3</td><td class="mono">#0b4a8a</td></tr>
+    <tr><td>完了 done</td><td><span class="badge badge-done">完了</span></td><td class="mono">#eaf6ec</td><td class="mono">#1a7f37</td><td class="mono">#12652b</td></tr>
+  </tbody>
+</table>
+<p class="note">ガントのバーとカンバンのカードも同じ3色。バーは <code>border</code> 色で塗り、カードは左端 3px の線に使う。</p>
+
+<h3>危険・注意</h3>
+<div class="swatches">
+  <div class="swatch"><div class="chip" style="background:#a3210b"></div><div class="meta"><b>削除の文字</b><span class="mono">#a3210b</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#f0c2ba"></div><div class="meta"><b>削除ボタンの枠</b><span class="mono">#f0c2ba</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#fdeceb"></div><div class="meta"><b>エラーバーの地</b><span class="mono">#fdeceb</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#d13212"></div><div class="meta"><b>今日の線（ガント）</b><span class="mono">#d13212</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#1a7f37"></div><div class="meta"><b>完了にする</b><span class="mono">#1a7f37</span></div></div>
+</div>
+
+<h3>サイドナビ（暗い面）</h3>
+<div class="swatches">
+  <div class="swatch"><div class="chip" style="background:#1f2933"></div><div class="meta"><b>地</b><span class="mono">#1f2933</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#2f3b46"></div><div class="meta"><b>区切り線</b><span class="mono">#2f3b46</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#3d4b57"></div><div class="meta"><b>ボタンの枠</b><span class="mono">#3d4b57</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#cbd2d9"></div><div class="meta"><b>項目の文字</b><span class="mono">#cbd2d9</span></div></div>
+</div>
+
+<h2 id="type">3. タイポグラフィ</h2>
+<pre><code>font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+  "Noto Sans JP", Meiryo, sans-serif;</code></pre>
+<p class="note">ID などの固定幅は <code>ui-monospace, SFMono-Regular, Menlo, Consolas, monospace</code>。</p>
+<table>
+  <thead><tr><th>サイズ</th><th>太さ</th><th>使うところ</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">20px</td><td>600</td><td>詳細画面の見出し（プロジェクト名など）</td></tr>
+    <tr><td class="mono">18px</td><td>600</td><td>ページ見出し（一覧の「プロジェクト」など）</td></tr>
+    <tr><td class="mono">16px</td><td>600–700</td><td>モーダルの見出し、サイドナビのブランド</td></tr>
+    <tr><td class="mono">15px</td><td>600</td><td>カードのタイトル、パネルの対象名、プロジェクト見出し</td></tr>
+    <tr><td class="mono">14px</td><td>600</td><td>セクション見出し（カード内の h3）</td></tr>
+    <tr><td class="mono">13px</td><td>400</td><td><b>本文の基準</b>。表のセル、パネルの値、主ボタン</td></tr>
+    <tr><td class="mono">12px</td><td>400–600</td><td>補助テキスト、副ボタン、表の見出し、フォームのラベル</td></tr>
+    <tr><td class="mono">11px</td><td>400–600</td><td>メタ情報（作成日）、パネルの項目ラベル、ID、バッジ</td></tr>
+    <tr><td class="mono">10px</td><td>400</td><td>ごく小さい印（▾ など）</td></tr>
+  </tbody>
+</table>
+
+<h2 id="space">4. 余白・角丸・影</h2>
+
+<h3>余白</h3>
+<table>
+  <thead><tr><th>値</th><th>使うところ</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">24px</td><td>ページの外周、フォームモーダルの内側</td></tr>
+    <tr><td class="mono">16px</td><td>カードの内側、パネル本体</td></tr>
+    <tr><td class="mono">12px</td><td>グリッドやボタン列の間隔（カード間は 12px、ボタン間は 6–8px）</td></tr>
+    <tr><td class="mono">8px 12px</td><td>ツールバー、表の見出し行</td></tr>
+    <tr><td class="mono">7px 14px</td><td>主ボタン</td></tr>
+    <tr><td class="mono">5px 10px</td><td>副ボタン（カード上・ツールバー）</td></tr>
+    <tr><td class="mono">2px 8px / 2px 10px</td><td>バッジ・ピル</td></tr>
+  </tbody>
+</table>
+
+<h3>角丸</h3>
+<div class="demo row">
+  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:4px"></div>
+  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:6px"></div>
+  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:10px"></div>
+  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:12px"></div>
+  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:999px"></div>
+</div>
+<p class="note">
+  <code>4px</code> メニュー項目・小さい四角ボタン／<code>6px</code> ボタン・入力・確認モーダル（標準）／
+  <code>10px</code> カード・パネル・ステータスバッジ／<code>12px</code> フォームモーダル／<code>999px</code> 状態のピル。
+</p>
+
+<h3>影</h3>
+<table>
+  <thead><tr><th>値</th><th>使うところ</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">0 1px 2px rgba(0,0,0,0.05)</td><td>カード（ほんのり浮かせる）</td></tr>
+    <tr><td class="mono">0 4px 12px rgba(31,41,51,0.18)</td><td>ドロップダウンメニュー</td></tr>
+    <tr><td class="mono">0 8px 28px rgba(31,41,51,0.25)</td><td>確認モーダル</td></tr>
+    <tr><td class="mono">0 8px 32px rgba(0,0,0,0.2)</td><td>フォームモーダル</td></tr>
+  </tbody>
+</table>
+<p class="note">モーダルの背景幕は <code>rgba(31,41,51,0.4)</code>（確認モーダルは <code>0.35</code>）。<code>z-index</code> はメニュー 20／確認 50／フォーム 100。</p>
+
+<h2 id="parts">5. コンポーネント</h2>
+
+<h3>ボタン</h3>
+<div class="demo row">
+  <button class="btn-primary">新規プロジェクト</button>
+  <button class="btn-secondary">変更</button>
+  <button class="btn-panel">変更</button>
+  <button class="btn-start">進行中にする</button>
+  <button class="btn-done">完了にする</button>
+  <button class="btn-danger">削除</button>
+  <button class="btn-quiet">アーカイブする</button>
+  <button class="btn-add">+</button>
+</div>
+<table>
+  <thead><tr><th>種類</th><th>見た目</th><th>使うところ</th></tr></thead>
+  <tbody>
+    <tr><td>プライマリ</td><td class="mono">#0972d3 / 白文字 / 13px / 7px 14px / r6</td><td>その画面の主役（新規作成、追加、保存）。1画面に1つ</td></tr>
+    <tr><td>セカンダリ</td><td class="mono">白 / #3b4149 / 12px / 5px 10px / 枠 #cbd2d9</td><td>カードやツールバーの操作</td></tr>
+    <tr><td>パネル</td><td class="mono">白 / #3b4149 / 13px / 6px 14px</td><td>詳細パネルの下部（変更・削除）</td></tr>
+    <tr><td>進行中にする</td><td class="mono">#0972d3</td><td>着手。パネル下部で横いっぱい</td></tr>
+    <tr><td>完了にする</td><td class="mono">#1a7f37</td><td>完了。同上</td></tr>
+    <tr><td>削除</td><td class="mono">文字 #a3210b / 枠 #f0c2ba</td><td>破壊的操作。右端に寄せる（<code>marginLeft: auto</code>）</td></tr>
+    <tr><td>控えめ</td><td class="mono">枠なし / 下線 / #5f6b7a / 12px</td><td>本筋でない操作（アーカイブ、区切り線の下）</td></tr>
+    <tr><td>小さい四角</td><td class="mono">18×18 / r4 / #0972d3</td><td>行の中の「追加（＋）」</td></tr>
+  </tbody>
+</table>
+
+<h3>バッジ・ピル・ID</h3>
+<div class="demo row">
+  <span class="badge badge-todo">未着手</span>
+  <span class="badge badge-doing">進行中</span>
+  <span class="badge badge-done">完了</span>
+  <span class="pill pill-active">Active</span>
+  <span class="pill pill-inactive">InActive（アーカイブ）</span>
+  <button class="id-badge" title="クリックでコピー">fb21e348</button>
+</div>
+<p class="note">
+  ステータスバッジは 12px・角丸 10px。状態のピル（Active / InActive、エピックのバックログ表示）は 11px・角丸 999px。
+  ID は uuid の先頭8桁だけを等幅・<code>#94a0ad</code>・点線の下線で出し、クリックで全体をコピーする。
+</p>
+
+<h3>カード</h3>
+<div class="demo">
+  <div class="app-card">
+    <div class="title">AI駆動タスク管理アプリケーション</div>
+    <div class="desc">AI で使うことを前提にしたタスク管理ツール自体の開発</div>
+    <div class="meta">作成: 2026/9/19</div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn-secondary">バックログ</button>
+      <button class="btn-secondary">ガントチャート</button>
+      <button class="btn-secondary">カンバン</button>
+    </div>
+  </div>
+</div>
+<p class="note">白地・枠 <code>#e5e8eb</code>・角丸 10px・内側 16px・影 <code>0 1px 2px</code>。一覧は <code>repeat(auto-fill, minmax(260px, 1fr))</code> のグリッドに 12px 間隔で並べる。</p>
+
+<h3>表</h3>
+<div class="demo" style="background:#fff">
+  <table>
+    <thead><tr><th>名前</th><th>ID</th><th>状態</th><th>期間</th></tr></thead>
+    <tbody>
+      <tr><td>スタイルガイドの作成<div style="font-size:12px;color:#5f6b7a;margin-top:2px">UI の見た目の決まりを1枚の HTML にまとめる</div></td><td><button class="id-badge">fb21e348</button></td><td><span class="badge badge-doing">進行中</span></td><td style="color:#5f6b7a">2026-09-20 〜 2026-11-30</td></tr>
+      <tr><td>スタイルガイドの適用</td><td><button class="id-badge">1a2b3c4d</button></td><td><span class="badge badge-todo">未着手</span></td><td style="color:#5f6b7a">—</td></tr>
+    </tbody>
+  </table>
+</div>
+<p class="note">見出しは 12px・<code>#5f6b7a</code>・下線 <code>#e5e8eb</code>、セルは 13px・区切り <code>#eef0f2</code>・<code>vertical-align: top</code>。値が無いときは「—」（<code>#94a0ad</code>）。</p>
+
+<h3>詳細パネル</h3>
+<div class="demo">
+  <div class="panel">
+    <div class="head"><span>タスク</span><button class="btn-secondary">閉じる</button></div>
+    <div class="body">
+      <div class="name">スタイルガイドの作成</div>
+      <div class="f-label">ID</div><div class="f-value"><button class="id-badge">fb21e348</button></div>
+      <div class="f-label">ステータス</div><div class="f-value"><span class="badge badge-doing">進行中</span> <span style="font-size:10px;color:#5f6b7a">▾</span></div>
+      <div class="f-label">期限</div><div class="f-value" style="margin-bottom:0">2026/11/30</div>
+    </div>
+  </div>
+</div>
+<p class="note">幅 320px・右側に固定。ヘッダは <code>#f7f9fa</code>、項目ラベルは 11px <code>#94a0ad</code>、値は 13px <code>#1f2933</code>、項目間は 12px。</p>
+
+<h3>モーダル</h3>
+<div class="demo row" style="align-items:flex-start;gap:16px">
+  <div class="dialog-form" style="width:340px">
+    <h3 style="margin:0 0 16px;font-size:16px">プロジェクトを変更</h3>
+    <label class="field-label">プロジェクト名</label>
+    <input class="text-input" value="task-branch" />
+    <div class="row" style="justify-content:flex-end;margin-top:20px">
+      <button class="btn-secondary">キャンセル</button>
+      <button class="btn-primary">保存</button>
+    </div>
+  </div>
+  <div class="dialog-confirm" style="width:320px">
+    <div style="font-size:14px;color:#1f2933;line-height:1.6">「スタイルガイドの作成」のステータスを『完了』に変更します。よろしいですか？</div>
+    <div class="row" style="justify-content:flex-end;margin-top:20px">
+      <button class="btn-secondary">キャンセル</button>
+      <button class="btn-confirm">変更する</button>
+    </div>
+  </div>
+</div>
+<p class="note">
+  入力フォームは幅 420px・角丸 12px・内側 24px。確認は幅 380px・角丸 8px・内側 20px で、確定ボタンは <code>#1f2933</code>。
+  確認の文言は「何を・どうする」を書き、末尾は「よろしいですか？」。ボタンは動詞（「変更する」「移動する」）。
+</p>
+
+<h3>ドロップダウン（…メニュー）</h3>
+<div class="demo row" style="align-items:flex-start">
+  <button class="btn-secondary" style="padding:5px 10px;font-size:14px;line-height:14px">…</button>
+  <div class="menu">
+    <button>バックログ</button>
+    <button>ガントチャート</button>
+    <button>カンバン</button>
+    <button class="sep">JSONエクスポート</button>
+    <button>アーカイブする</button>
+    <button class="danger">削除</button>
+  </div>
+</div>
+<p class="note">主要な操作だけ画面に出し、残りは「…」にまとめる。項目は 12px・角丸 4px、区切りは上線 <code>#e5e8eb</code>。背面のクリックで閉じる。</p>
+
+<h3>サイドナビ</h3>
+<div class="demo row" style="align-items:flex-start;gap:16px">
+  <div class="nav">
+    <div class="brand">task-branch</div>
+    <div style="padding:8px 0">
+      <div class="item">プロジェクト</div>
+      <div class="item">バックログ</div>
+      <div class="item active">ガントチャート</div>
+      <div class="item">カンバン</div>
+    </div>
+  </div>
+  <div class="nav" style="width:52px">
+    <div class="brand" style="text-align:center;padding:14px 0">»</div>
+    <div style="padding:8px 0;text-align:center;color:#cbd2d9;font-size:15px">
+      <div style="padding:9px 0">▦</div>
+      <div style="padding:9px 0">≡</div>
+      <div style="padding:9px 0;background:#0972d3;color:#fff;margin:0 8px;border-radius:6px">▬</div>
+      <div style="padding:9px 0">▥</div>
+    </div>
+  </div>
+</div>
+<p class="note">幅は既定 220px（160–480 でドラッグ変更）。閉じると 52px でアイコンだけ。選択中は <code>#0972d3</code> の地に白・太字。</p>
+
+<h3>列幅のドラッグハンドル</h3>
+<div class="demo" style="padding:0">
+  <div style="display:flex;background:#fff;border-radius:6px;overflow:hidden">
+    <div style="position:relative;width:200px;padding:8px 12px;font-size:12px;font-weight:600;color:#3b4149;border-right:1px solid #cbd2d9">
+      エピック / ストーリー
+      <span style="position:absolute;top:0;bottom:0;right:-3px;width:7px;background:rgba(9,114,211,0.25);cursor:col-resize"></span>
+    </div>
+    <div style="flex:1;padding:8px 12px;font-size:12px;color:#5f6b7a">…</div>
+  </div>
+</div>
+<p class="note">
+  幅 7px・<code>cursor: col-resize</code>・境界をまたいで <code>right: -3px</code> に置く（見た目は透明。上は分かるよう着色）。
+  ヘッダだけでなく<b>全行に置いて</b>、表のどこからでも掴めるようにする。変更した幅は localStorage に残す。
+</p>
+
+<h2 id="rules">6. 書き方の決まり</h2>
+<ul>
+  <li>スタイルはコンポーネントのファイル末尾に <code>const btn: CSSProperties = {…}</code> の形でまとめる。JSX の中に長い style を直接書かない。</li>
+  <li>複数の画面で使う値は <code>web/src/lib/style.ts</code> に置く（今は <code>STATUS_COLOR</code>）。色を新しく増やすときは、まずこのガイドの既存色で足りないかを見る。</li>
+  <li>ホバーなどの状態変化は <code>useState</code> で持って style を切り替える（CSS の <code>:hover</code> は使えないため）。</li>
+  <li>破壊的な操作（削除・ステータス変更・移動）は必ず確認を挟む。文面は「対象」と「起きること」を書く。</li>
+  <li>フォームは Enter で送信（IME 変換中は無視: <code>e.nativeEvent.isComposing</code>）、Escape でキャンセル。失敗したらモーダルは閉じない。</li>
+  <li>表示の好み（列幅、開閉状態）は localStorage に保存し、読み書きは try/catch で囲む。</li>
+  <li>日付は <code>toLocaleString("ja-JP")</code>。値が無いときは「—」か「-」で埋め、空欄にしない。</li>
+  <li>読み込み中は「読み込み中…」、空のときは次の一手を書く（例:「プロジェクトがありません。「新規プロジェクト」から作成してください。」）。</li>
+</ul>
+
+</div>
+</body>
+</html>
