@@ -93,12 +93,7 @@ export function DetailPanel<T extends DetailNode>({
           {title}
         </div>
 
-        {node && (
-          <div style={{ marginBottom: 12 }}>
-            <IdBadge id={node.id} />
-          </div>
-        )}
-
+        {node && <Field label="ID"><IdBadge id={node.id} /></Field>}
         <Field label="レベル">{node ? LEVEL_LABEL[node.level] : DASH}</Field>
         <Field label="ステータス">
           {node?.status ? (

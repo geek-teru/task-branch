@@ -3,10 +3,12 @@ import type { CSSProperties } from "react";
 // Small confirmation modal (message + キャンセル / 変更する). Click-away or Escape cancels.
 export function ConfirmDialog({
   message,
+  confirmLabel = "変更する",
   onConfirm,
   onCancel,
 }: {
   message: string;
+  confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -58,7 +60,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             style={{ ...btnBase, background: "#1f2933", color: "#fff", border: "1px solid #1f2933" }}
           >
-            変更する
+            {confirmLabel}
           </button>
         </div>
       </div>

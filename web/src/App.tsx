@@ -13,6 +13,7 @@ import {
   createEpic,
   getProjectGraph,
   listProjects,
+  moveStory,
   reorderEpics,
   updateProject,
   updateTask,
@@ -243,6 +244,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  const handleMoveStory = useCallback(
+    async (storyId: string, targetEpicId: string) => {
+      try {
+        await moveStory(storyId, targetEpicId);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleReorderEpics = useCallback(
     async (orderedIds: string[]) => {
       try {
@@ -348,6 +361,7 @@ export default function App() {
           onChangeStatus={handleChangeStatus}
           onResizeStory={handleResizeStory}
           onReorderEpics={handleReorderEpics}
+          onMoveStory={handleMoveStory}
         />
       )}
     </main>

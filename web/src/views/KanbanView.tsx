@@ -5,6 +5,7 @@ import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
+import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 
@@ -74,7 +75,7 @@ export function KanbanView({
     const done = tasks.filter((t) => t.status === "done").length;
     return (
       <div key={story.id} style={{ display: "flex", borderBottom: "1px solid #e5e8eb" }}>
-        <div style={{ width: LABEL_W, flex: "none", padding: "10px 12px", boxSizing: "border-box" }}>
+        <div style={{ width: LABEL_W, flex: "none", padding: "10px 12px", boxSizing: "border-box", position: "relative" }}>
           {epic && <div style={{ fontSize: 11, color: "#5f6b7a" }}>{epic.title}</div>}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 2 }}>
             <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{story.title}</div>
@@ -85,6 +86,8 @@ export function KanbanView({
           <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 4 }}>
             {tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}
           </div>
+          {/* same handle as the header, so the column can be dragged from any lane */}
+          <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
         </div>
 
         {STATUS_ORDER.map((s) => {
@@ -320,7 +323,10 @@ function Card({
       }}
     >
       {task.title}
-      {task.due_date && <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 2 }}>期限 {task.due_date}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 11, color: "#94a0ad" }}>
+        <IdBadge id={task.id} />
+        {task.due_date && <span>期限 {task.due_date}</span>}
+      </div>
     </div>
   );
 }
