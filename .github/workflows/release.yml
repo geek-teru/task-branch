@@ -26,6 +26,7 @@ jobs:
     uses: ./.github/workflows/supabase-migrations.yml
     with:
       dry_run: false
+      environment: prd
     secrets: inherit
 
   # deploy:

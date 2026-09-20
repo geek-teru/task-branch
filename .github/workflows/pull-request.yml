@@ -15,4 +15,5 @@ jobs:
     uses: ./.github/workflows/supabase-migrations.yml
     with:
       dry_run: true
+      environment: prd
     secrets: inherit
