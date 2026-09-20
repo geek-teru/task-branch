@@ -1,0 +1,19 @@
+# Pull request checks.
+#   migration-plan: list the migrations this PR would apply to production when merged
+#                   (supabase db push --dry-run; nothing is changed).
+name: pull-request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  migration-plan:
+    uses: ./.github/workflows/supabase-migrations.yml
+    with:
+      dry_run: true
+      environment: prd
+    secrets: inherit

@@ -383,9 +383,24 @@ npx supabase start         # ローカル Supabase 起動 (Docker)
 
 ### 6.2 本番（将来）
 
+本番は Supabase Cloud（DB・API）＋ Vercel（画面）。マイグレーションは GitHub Actions で適用する。
+
+| ワークフロー | 起動 | やること |
+|---|---|---|
+| `release.yml` | `main` への push（手動実行も可） | 本番に `supabase db push`。将来、画面のデプロイをこの後ろに足す |
+| `pull-request.yml` | `main` 向けの PR | `supabase db push --dry-run` で、マージ時に適用される migration を一覧にする（何も変更しない） |
+| `supabase-migrations.yml` | 上の 2 つから呼ばれる部品 | `link` → `db push`（`dry_run` 入力で切り替え） |
+
+- 必要な Secrets：`SUPABASE_ACCESS_TOKEN` / `SUPABASE_DB_PASSWORD` / `SUPABASE_PROJECT_ID`。GitHub の **Environment `prd`** に登録する（リポジトリ全体ではなく環境ごとに持たせ、あとから承認ルールやブランチ制限を付けられるようにする）。
+- **`--include-seed` は使わない**：seed のサンプル SQL は「同名のプロジェクトを消してから入れ直す」ため、本番のデータが初期化される。
+- **今は画面が先に更新されうる**：画面は Vercel の Git 連携で、migration と同時にデプロイされる。そのため migration は、今公開中の画面と両立する形にする（列・テーブルは先に足し、削除や名前の変更は後のリリースで行う）。
+- **将来**：Vercel の自動の本番デプロイを止め、`release.yml` に `deploy` ジョブを `needs: migrate` で足して「migration → 画面のデプロイ」の順にする。
+
+手動で適用する場合（CI が使えないとき）：
+
 ```bash
 npx supabase link --project-ref <cloud-ref>
-npx supabase db push       # 同一マイグレーションをクラウドへ
+npx supabase db push       # 同一マイグレーションをクラウドへ（--include-seed は付けない）
 ```
 
 - フロントの環境変数（API URL / key）を切り替えるだけで「どこからでも編集」を実現。
