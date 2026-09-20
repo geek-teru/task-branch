@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./types";
+import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -13,20 +13,13 @@ export async function listProjects(): Promise<Project[]> {
   return data ?? [];
 }
 
-export async function createProject(name: string, description?: string): Promise<Project> {
-  const { data, error } = await supabase
-    .from("projects")
-    .insert({ name, description: description ?? null })
-    .select()
-    .single();
+export async function createProject(input: ProjectInput): Promise<Project> {
+  const { data, error } = await supabase.from("projects").insert(input).select().single();
   if (error) throw error;
   return data;
 }
 
-export async function updateProject(
-  id: string,
-  patch: { name: string; description: string | null }
-): Promise<Project> {
+export async function updateProject(id: string, patch: ProjectInput): Promise<Project> {
   const { data, error } = await supabase
     .from("projects")
     .update(patch)
@@ -143,6 +136,23 @@ export async function listStories(epicId: string): Promise<Task[]> {
     .overrideTypes<Task[], { merge: false }>();
   if (error) throw error;
   return data ?? [];
+}
+
+// Move a story under another epic of the same project, appended after that epic's stories.
+export async function moveStory(storyId: string, targetEpicId: string): Promise<void> {
+  const { data: last, error: lastError } = await supabase
+    .from("tasks")
+    .select("sort_order")
+    .eq("parent_id", targetEpicId)
+    .eq("level", "story")
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (lastError) throw lastError;
+  const { error } = await supabase
+    .from("tasks")
+    .update({ parent_id: targetEpicId, sort_order: (last?.[0]?.sort_order ?? 0) + 1 })
+    .eq("id", storyId);
+  if (error) throw error;
 }
 
 // Kanban: every in-progress story across projects, with its epic and child tasks.

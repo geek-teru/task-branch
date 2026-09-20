@@ -13,13 +13,14 @@ import {
   createEpic,
   getProjectGraph,
   listProjects,
+  moveStory,
   reorderEpics,
   updateProject,
   updateTask,
   updateTaskDates,
   updateTaskStatus,
 } from "./lib/api";
-import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, Status, StoryInput, Task } from "./lib/types";
+import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { GanttView } from "./views/GanttView";
@@ -243,6 +244,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  const handleMoveStory = useCallback(
+    async (storyId: string, targetEpicId: string) => {
+      try {
+        await moveStory(storyId, targetEpicId);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleReorderEpics = useCallback(
     async (orderedIds: string[]) => {
       try {
@@ -255,9 +268,9 @@ export default function App() {
     [refreshGraph]
   );
 
-  const handleCreateProject = useCallback(async (name: string, description: string | null) => {
+  const handleCreateProject = useCallback(async (input: ProjectInput) => {
     try {
-      const p = await createProject(name, description ?? undefined);
+      const p = await createProject(input);
       setProjects((prev) => [...prev, p]);
     } catch (e: any) {
       setError(String(e.message ?? e));
@@ -265,9 +278,9 @@ export default function App() {
   }, []);
 
   const handleUpdateProject = useCallback(
-    async (id: string, name: string, description: string | null) => {
+    async (id: string, input: ProjectInput) => {
       try {
-        const p = await updateProject(id, { name, description });
+        const p = await updateProject(id, input);
         setProjects((prev) => prev.map((x) => (x.id === id ? p : x)));
       } catch (e: any) {
         setError(String(e.message ?? e));
@@ -348,6 +361,7 @@ export default function App() {
           onChangeStatus={handleChangeStatus}
           onResizeStory={handleResizeStory}
           onReorderEpics={handleReorderEpics}
+          onMoveStory={handleMoveStory}
         />
       )}
     </main>

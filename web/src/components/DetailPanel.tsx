@@ -1,7 +1,8 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Status, Task } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
+import { IdBadge } from "./IdBadge";
 
 // A story or task shown in the panel; progress is present for graph nodes only.
 export type DetailNode = Task & { progress?: number | null };
@@ -25,6 +26,7 @@ export function DetailPanel<T extends DetailNode>({
   onDelete,
   onStart,
   onComplete,
+  onChangeStatus,
 }: {
   title: string;
   node: T | null;
@@ -35,6 +37,7 @@ export function DetailPanel<T extends DetailNode>({
   onDelete?: (node: T) => void;
   onStart?: (node: T) => void;
   onComplete?: (node: T) => void;
+  onChangeStatus?: (node: T, status: Status) => void; // status badge → menu
 }) {
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
   const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
@@ -90,8 +93,19 @@ export function DetailPanel<T extends DetailNode>({
           {title}
         </div>
 
+        {node && <Field label="ID"><IdBadge id={node.id} /></Field>}
         <Field label="レベル">{node ? LEVEL_LABEL[node.level] : DASH}</Field>
-        <Field label="ステータス">{node?.status ? <StatusBadge status={node.status} /> : DASH}</Field>
+        <Field label="ステータス">
+          {node?.status ? (
+            onChangeStatus && node.level !== "epic" ? (
+              <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
+            ) : (
+              <StatusBadge status={node.status} />
+            )
+          ) : (
+            DASH
+          )}
+        </Field>
         <Field label="開始日">{node?.start_date ? fmt(parseDate(node.start_date)) : DASH}</Field>
         <Field label="期限">{node?.due_date ? fmt(parseDate(node.due_date)) : DASH}</Field>
         <Field label="期間">{durationDays != null ? `${durationDays}日` : DASH}</Field>
@@ -172,6 +186,74 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </div>
   );
 }
+
+// Badge that opens a small menu to pick any status.
+function StatusPicker({ status, onPick }: { status: Status; onPick: (status: Status) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <button onClick={() => setOpen((v) => !v)} title="クリックでステータスを変更" style={pickerBtn}>
+        <StatusBadge status={status} />
+        <span style={{ fontSize: 10, color: "#5f6b7a" }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
+          <span style={pickerMenu}>
+            {STATUS_ORDER.map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setOpen(false);
+                  if (s !== status) onPick(s);
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "5px 10px",
+                  border: "none",
+                  borderRadius: 4,
+                  background: s === status ? "#eef1f3" : "transparent",
+                  color: "#1f2933",
+                  fontSize: 12,
+                  fontWeight: s === status ? 600 : 400,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {STATUS_LABEL[s]}
+              </button>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+const pickerBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+};
+
+const pickerMenu: CSSProperties = {
+  position: "absolute",
+  left: 0,
+  top: "calc(100% + 4px)",
+  zIndex: 20,
+  minWidth: 96,
+  background: "#fff",
+  border: "1px solid #cbd2d9",
+  borderRadius: 6,
+  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
+  padding: 4,
+};
 
 function StatusBadge({ status }: { status: Status }) {
   const c = STATUS_COLOR[status];

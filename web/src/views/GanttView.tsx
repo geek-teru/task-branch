@@ -2,15 +2,15 @@
 // Built from start_date/due_date on story-level nodes (epics summarize their children).
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
+import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
-const LABEL_W = 320;
 const HEADER_H = 34;
 const MS_DAY = 86_400_000;
 
@@ -140,6 +140,7 @@ export function GanttView({
   onChangeStatus,
   onResizeStory,
   onReorderEpics,
+  onMoveStory,
 }: {
   projects: Project[];
   project: Project;
@@ -153,11 +154,18 @@ export function GanttView({
   onChangeStatus?: (id: string, status: Status) => void;
   onResizeStory?: (id: string, startDate: string, dueDate: string) => void;
   onReorderEpics?: (orderedEpicIds: string[]) => void;
+  onMoveStory?: (storyId: string, targetEpicId: string) => void;
 }) {
+  const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [statusMenuKey, setStatusMenuKey] = useState<string | null>(null);
-  const [dragEpicId, setDragEpicId] = useState<string | null>(null);
-  const [overEpicId, setOverEpicId] = useState<string | null>(null);
+  // Row being dragged: an epic (reorder) or a story (move to another epic).
+  const [drag, setDrag] = useState<{ kind: "epic" | "story"; id: string; title: string; parentId: string | null } | null>(null);
+  const [overKey, setOverKey] = useState<string | null>(null);
+  const [form, setForm] = useState<
+    { mode: "create"; epic: GraphNode; prevEnd: Date | null } | { mode: "edit"; node: GraphNode } | null
+  >(null);
+  // Pending change awaiting confirmation via the custom modal.
+  const [confirm, setConfirm] = useState<{ message: string; label?: string; onConfirm: () => void } | null>(null);
   const filtered = useMemo(() => [{ project, graph }], [project, graph]);
 
   const model = useMemo(() => {
@@ -234,24 +242,40 @@ export function GanttView({
   const selectedRow = selectedKey ? rows.find((r) => r.key === selectedKey) ?? null : null;
 
   const epicIds = rows.filter((r) => r.kind === "epic").map((r) => r.node!.id);
+  const epicTitle = (id: string) => rows.find((r) => r.kind === "epic" && r.node?.id === id)?.label ?? "";
+  const endDrag = () => {
+    setDrag(null);
+    setOverKey(null);
+  };
+
   const handleEpicDrop = (targetId: string) => {
-    if (!onReorderEpics || !dragEpicId || dragEpicId === targetId) return;
-    const from = epicIds.indexOf(dragEpicId);
+    if (!onReorderEpics || drag?.kind !== "epic" || drag.id === targetId) return;
+    const from = epicIds.indexOf(drag.id);
     const target = epicIds.indexOf(targetId);
     if (from < 0 || target < 0) return;
-    const next = epicIds.filter((id) => id !== dragEpicId);
+    const next = epicIds.filter((id) => id !== drag.id);
     let insertAt = next.indexOf(targetId);
     if (from < target) insertAt += 1; // dragging down: drop after the target
-    next.splice(insertAt, 0, dragEpicId);
+    next.splice(insertAt, 0, drag.id);
     onReorderEpics(next);
   };
 
-  const [form, setForm] = useState<
-    { mode: "create"; epic: GraphNode; prevEnd: Date | null } | { mode: "edit"; node: GraphNode } | null
-  >(null);
+  // Epic a dragged story would land in when dropped on this row (null = not a drop target).
+  const storyDropEpicId = (r: Row): string | null => {
+    if (!onMoveStory || drag?.kind !== "story") return null;
+    const target = r.kind === "epic" ? r.node?.id ?? null : r.kind === "story" ? r.node?.parent_id ?? null : null;
+    return target && target !== drag.parentId ? target : null;
+  };
 
-  // Pending change awaiting confirmation via the custom modal.
-  const [confirm, setConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const handleStoryDrop = (targetEpicId: string) => {
+    if (!onMoveStory || drag?.kind !== "story") return;
+    const { id, title } = drag;
+    setConfirm({
+      message: `「${title}」を\nエピック「${epicTitle(targetEpicId)}」へ移動します。よろしいですか？`,
+      label: "移動する",
+      onConfirm: () => onMoveStory(id, targetEpicId),
+    });
+  };
 
   const submitForm = (values: StoryInput) => {
     if (!form) return;
@@ -287,6 +311,7 @@ export function GanttView({
             }}
           >
             プロジェクト / エピック / ストーリー
+            <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
           </div>
           <div style={{ position: "relative", width: timelineW, background: "#f7f9fa", borderBottom: "1px solid #cbd2d9" }}>
             {months.map((mo) => (
@@ -327,54 +352,58 @@ export function GanttView({
             )}
           </div>
 
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const storyTarget = storyDropEpicId(r);
+            const epicTarget =
+              drag?.kind === "epic" && r.kind === "epic" && r.node && r.node.id !== drag.id ? r.node.id : null;
+            const canDrop = !!storyTarget || !!epicTarget;
+            const isOver = canDrop && overKey === r.key;
+            const canDragRow =
+              !!r.node && ((r.kind === "epic" && !!onReorderEpics) || (r.kind === "story" && !!onMoveStory));
+            return (
             <div key={r.key} style={{ display: "flex", height: ROW_H, position: "relative" }}>
               <div
-                draggable={r.kind === "epic" && !!onReorderEpics}
+                draggable={canDragRow}
                 onDragStart={
-                  r.kind === "epic" && r.node && onReorderEpics ? () => setDragEpicId(r.node!.id) : undefined
+                  canDragRow
+                    ? () =>
+                        setDrag({
+                          kind: r.kind === "epic" ? "epic" : "story",
+                          id: r.node!.id,
+                          title: r.label,
+                          parentId: r.node!.parent_id,
+                        })
+                    : undefined
                 }
                 onDragOver={
-                  r.kind === "epic" && r.node && dragEpicId
+                  canDrop
                     ? (e) => {
                         e.preventDefault();
-                        if (overEpicId !== r.node!.id) setOverEpicId(r.node!.id);
+                        if (overKey !== r.key) setOverKey(r.key);
                       }
                     : undefined
                 }
-                onDragLeave={
-                  r.kind === "epic" && r.node
-                    ? () => setOverEpicId((cur) => (cur === r.node!.id ? null : cur))
-                    : undefined
-                }
+                onDragLeave={() => setOverKey((cur) => (cur === r.key ? null : cur))}
                 onDrop={
-                  r.kind === "epic" && r.node
+                  canDrop
                     ? (e) => {
                         e.preventDefault();
-                        handleEpicDrop(r.node!.id);
-                        setDragEpicId(null);
-                        setOverEpicId(null);
+                        if (storyTarget) handleStoryDrop(storyTarget);
+                        else if (epicTarget) handleEpicDrop(epicTarget);
+                        endDrag();
                       }
                     : undefined
                 }
-                onDragEnd={() => {
-                  setDragEpicId(null);
-                  setOverEpicId(null);
-                }}
+                onDragEnd={endDrag}
                 style={{
                   width: LABEL_W,
                   flexShrink: 0,
                   position: "sticky",
                   left: 0,
                   zIndex: 2,
-                  background:
-                    r.node && overEpicId === r.node.id
-                      ? "#eaf2fc"
-                      : r.kind === "project"
-                      ? "#eef1f3"
-                      : "#fff",
-                  boxShadow: r.node && overEpicId === r.node.id ? "inset 0 2px 0 #0972d3" : undefined,
-                  opacity: r.node && dragEpicId === r.node.id ? 0.4 : undefined,
+                  background: isOver ? "#eaf2fc" : r.kind === "project" ? "#eef1f3" : "#fff",
+                  boxShadow: isOver ? "inset 0 2px 0 #0972d3" : undefined,
+                  opacity: r.node && drag?.id === r.node.id ? 0.4 : undefined,
                   borderRight: "1px solid #cbd2d9",
                   borderBottom: "1px solid #f0f2f4",
                   display: "flex",
@@ -383,10 +412,16 @@ export function GanttView({
                   fontSize: r.kind === "project" ? 12 : 11,
                   fontWeight: r.kind === "story" ? 400 : 700,
                   color: r.kind === "story" ? "#3b4149" : "#1f2933",
-                  cursor: r.kind === "epic" && onReorderEpics ? "grab" : undefined,
+                  cursor: canDragRow ? "grab" : undefined,
                   gap: 4,
                 }}
-                title={r.kind === "epic" && onReorderEpics ? `${r.label}（ドラッグで並び替え）` : r.label}
+                title={
+                  r.kind === "epic" && onReorderEpics
+                    ? `${r.label}（ドラッグで並び替え）`
+                    : r.kind === "story" && onMoveStory
+                    ? `${r.label}（ドラッグで別のエピックへ移動）`
+                    : r.label
+                }
               >
                 <span
                   onClick={() => {
@@ -427,6 +462,7 @@ export function GanttView({
                     +
                   </button>
                 )}
+                <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
               </div>
               <div style={{ position: "relative", width: timelineW, borderBottom: "1px solid #f0f2f4" }}>
                 {r.start && r.end && (
@@ -435,25 +471,6 @@ export function GanttView({
                     timelineStart={timelineStart}
                     selected={r.key === selectedKey}
                     onSelect={() => setSelectedKey(r.key)}
-                    statusMenuOpen={r.key === statusMenuKey}
-                    onToggleStatusMenu={
-                      r.kind === "story" && r.node && onChangeStatus
-                        ? () => setStatusMenuKey((cur) => (cur === r.key ? null : r.key))
-                        : undefined
-                    }
-                    onPickStatus={
-                      r.kind === "story" && r.node && onChangeStatus
-                        ? (status) => {
-                            setStatusMenuKey(null);
-                            const node = r.node!;
-                            setConfirm({
-                              message: `「${r.label}」のステータスを『${STATUS_LABEL[status]}』に変更します。よろしいですか？`,
-                              onConfirm: () => onChangeStatus(node.id, status),
-                            });
-                          }
-                        : undefined
-                    }
-                    onCloseStatusMenu={() => setStatusMenuKey(null)}
                     onResize={
                       r.kind === "story" && r.node && onResizeStory
                         ? (startDate, dueDate) => {
@@ -473,7 +490,8 @@ export function GanttView({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         {/* extra room so the last row's status menu (opens below the bar) stays on-screen */}
         <div style={{ height: 160 }} />
@@ -499,6 +517,15 @@ export function GanttView({
           }
           onStart={onStartStory ? (node) => onStartStory(node.id) : undefined}
           onComplete={onCompleteStory ? (node) => onCompleteStory(node.id) : undefined}
+          onChangeStatus={
+            onChangeStatus
+              ? (node, status) =>
+                  setConfirm({
+                    message: `「${node.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。よろしいですか？`,
+                    onConfirm: () => onChangeStatus(node.id, status),
+                  })
+              : undefined
+          }
         />
       )}
       </div>
@@ -516,6 +543,7 @@ export function GanttView({
       {confirm && (
         <ConfirmDialog
           message={confirm.message}
+          confirmLabel={confirm.label}
           onConfirm={() => {
             confirm.onConfirm();
             setConfirm(null);
@@ -532,20 +560,12 @@ function Bar({
   timelineStart,
   selected,
   onSelect,
-  statusMenuOpen,
-  onToggleStatusMenu,
-  onPickStatus,
-  onCloseStatusMenu,
   onResize,
 }: {
   row: Row;
   timelineStart: Date;
   selected: boolean;
   onSelect: () => void;
-  statusMenuOpen?: boolean;
-  onToggleStatusMenu?: () => void;
-  onPickStatus?: (status: Status) => void;
-  onCloseStatusMenu?: () => void;
   onResize?: (startDate: string, dueDate: string) => void;
 }) {
   const start = row.start as Date;
@@ -600,8 +620,7 @@ function Bar({
       <div
         onClick={() => {
           if (drag) return;
-          if (onToggleStatusMenu) onToggleStatusMenu();
-          else onSelect();
+          onSelect();
         }}
         title={`${row.label}\n${fmt(pStart)} 〜 ${fmt(pEnd)}`}
         style={{
@@ -614,7 +633,7 @@ function Bar({
           background: isPhase ? "#94a0ad" : c?.border ?? "#94a0ad",
           opacity: isPhase ? 0.55 : 1,
           cursor: "pointer",
-          outline: selected || statusMenuOpen || drag ? "2px solid #1f2933" : "none",
+          outline: selected || drag ? "2px solid #1f2933" : "none",
           outlineOffset: 1,
         }}
       />
@@ -648,58 +667,6 @@ function Bar({
               zIndex: 10,
             }}
           />
-        </>
-      )}
-      {statusMenuOpen && onPickStatus && (
-        <>
-          {/* backdrop: click-away closes the menu */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              onCloseStatusMenu?.();
-            }}
-            style={{ position: "fixed", inset: 0, zIndex: 19 }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              left,
-              top: ROW_H - 2,
-              zIndex: 20,
-              minWidth: 96,
-              background: "#fff",
-              border: "1px solid #cbd2d9",
-              borderRadius: 6,
-              boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
-              padding: 4,
-            }}
-          >
-            {STATUS_ORDER.map((s) => (
-              <button
-                key={s}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPickStatus(s);
-                }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "5px 10px",
-                  border: "none",
-                  borderRadius: 4,
-                  background: s === row.status ? "#eef1f3" : "transparent",
-                  color: "#1f2933",
-                  fontSize: 12,
-                  fontWeight: s === row.status ? 600 : 400,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {STATUS_LABEL[s]}
-              </button>
-            ))}
-          </div>
         </>
       )}
       {!isPhase && (

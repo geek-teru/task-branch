@@ -5,6 +5,7 @@ import type { ContextRevision, Project, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
+import { IdBadge } from "../components/IdBadge";
 
 // Epic detail: view / edit the context document and add stories.
 // Loads its own data through the api layer (the epic's context is only needed here).
@@ -87,6 +88,7 @@ export function EpicDetailPage({
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>{epic.title}</h2>
         <span style={active ? activeBadge : inactiveBadge}>{active ? "エピック（Active）" : "バックログ（Inactive）"}</span>
+        <IdBadge id={epic.id} />
       </div>
       <div style={{ fontSize: 13, color: epic.description ? "#3b4149" : "#94a0ad" }}>
         {epic.description ?? "（説明なし）"}
@@ -150,6 +152,7 @@ export function EpicDetailPage({
             <thead>
               <tr>
                 <th style={th}>名前</th>
+                <th style={{ ...th, width: 96 }}>ID</th>
                 <th style={{ ...th, width: 110 }}>状態</th>
                 <th style={{ ...th, width: 200 }}>期間</th>
               </tr>
@@ -162,6 +165,9 @@ export function EpicDetailPage({
                     <td style={td}>
                       <div style={{ fontWeight: 600 }}>{s.title}</div>
                       {s.description && <div style={{ fontSize: 12, color: "#5f6b7a", marginTop: 2 }}>{s.description}</div>}
+                    </td>
+                    <td style={td}>
+                      <IdBadge id={s.id} />
                     </td>
                     <td style={td}>
                       <span style={{ ...badge, background: c.bg, color: c.fg, borderColor: c.border }}>{STATUS_LABEL[s.status]}</span>
