@@ -4,10 +4,8 @@ import type { Project, ProjectInput } from "../lib/types";
 import { ProjectForm } from "../components/ProjectForm";
 import { IdBadge } from "../components/IdBadge";
 
-type Tile = { key: string; title: string; note: string; onOpen: (projectId: string) => void };
-
-// Project detail: the project's home. Header + metadata, big links into the three views,
-// and the destructive actions kept apart at the bottom.
+// Project detail: view / edit the project itself. Everything except 変更 lives in
+// the "…" menu next to it (jump to a view, export, archive, delete).
 export function ProjectDetailPage({
   project,
   onUpdate,
@@ -28,145 +26,82 @@ export function ProjectDetailPage({
   onShowKanban: (projectId: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [hovered, setHovered] = useState<string | null>(null);
 
-  const tiles: Tile[] = [
-    { key: "backlog", title: "バックログ", note: "エピックとバックログの一覧", onOpen: onShowBacklog },
-    { key: "gantt", title: "ガントチャート", note: "エピックとストーリーの期間", onOpen: onShowGantt },
-    { key: "kanban", title: "カンバン", note: "進行中ストーリーのタスク", onOpen: onShowKanban },
-  ];
+  const archive = () => {
+    const message = project.is_active
+      ? `プロジェクト「${project.name}」をアーカイブします。\nガントチャート・カンバン・バックログの選択肢から外れます。よろしいですか？`
+      : `プロジェクト「${project.name}」をアクティブに戻します。よろしいですか？`;
+    if (window.confirm(message)) onSetActive(project.id, !project.is_active);
+  };
+
+  const remove = () => {
+    if (
+      window.confirm(
+        `プロジェクト「${project.name}」を削除します。\n配下のエピック・ストーリー・タスク・依存関係もすべて削除されます。よろしいですか？`
+      )
+    ) {
+      onDelete(project.id);
+    }
+  };
 
   return (
-    <div style={{ height: "100%", overflow: "auto", boxSizing: "border-box" }}>
-      <div style={{ maxWidth: 880, padding: "20px 24px 40px" }}>
-        <Link to="/projects" style={{ fontSize: 12, color: "#0972d3", textDecoration: "none" }}>
-          ← プロジェクト
-        </Link>
+    <div style={{ height: "100%", overflow: "auto", padding: 24, boxSizing: "border-box" }}>
+      <Link to="/projects" style={{ fontSize: 12, color: "#0972d3", textDecoration: "none" }}>
+        ← プロジェクト
+      </Link>
 
-        {/* header */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, margin: "12px 0 0" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 20 }}>{project.name}</h2>
-              {!project.is_active && <span style={inactiveBadge}>アーカイブ済み</span>}
-              <IdBadge id={project.id} />
-            </div>
-            <div style={{ fontSize: 13, color: project.description ? "#5f6b7a" : "#94a0ad", marginTop: 6 }}>
-              {project.description ?? "（説明なし）"}
-            </div>
-          </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
+        <h2 style={{ margin: 0, fontSize: 18 }}>{project.name}</h2>
+        <span style={project.is_active ? activeBadge : inactiveBadge}>
+          {project.is_active ? "Active" : "InActive（アーカイブ）"}
+        </span>
+        <IdBadge id={project.id} />
 
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <button onClick={() => setEditing(true)} style={btn}>
-              変更
-            </button>
-            <button onClick={() => onExport(project)} style={btn}>
-              JSONエクスポート
-            </button>
-          </div>
-        </div>
-
-        {/* metadata */}
-        <div style={metaRow}>
-          <Meta label="サイト">
-            {project.url ? (
-              <a href={project.url} target="_blank" rel="noreferrer" style={link} title={project.url}>
-                {hostOf(project.url)}
-              </a>
-            ) : (
-              DASH
-            )}
-          </Meta>
-          <Meta label="リポジトリ">
-            {project.repository_url ? (
-              <a href={project.repository_url} target="_blank" rel="noreferrer" style={link} title={project.repository_url}>
-                {repoOf(project.repository_url)}
-              </a>
-            ) : (
-              DASH
-            )}
-          </Meta>
-          <Meta label="作成">{fmt(project.created_at)}</Meta>
-          <Meta label="更新">{fmt(project.updated_at)}</Meta>
-        </div>
-
-        {/* views */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 20 }}>
-          {tiles.map((t) => {
-            const on = hovered === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => t.onOpen(project.id)}
-                onMouseEnter={() => setHovered(t.key)}
-                onMouseLeave={() => setHovered((cur) => (cur === t.key ? null : cur))}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  textAlign: "left",
-                  background: "#fff",
-                  border: `1px solid ${on ? "#0972d3" : "#e5e8eb"}`,
-                  borderRadius: 10,
-                  padding: "14px 16px",
-                  cursor: "pointer",
-                  boxShadow: on ? "0 2px 8px rgba(9,114,211,0.12)" : "0 1px 2px rgba(0,0,0,0.04)",
-                  transition: "border-color 120ms, box-shadow 120ms",
-                }}
-              >
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1f2933" }}>{t.title}</span>
-                  <span style={{ display: "block", fontSize: 11, color: "#94a0ad", marginTop: 3 }}>{t.note}</span>
-                </span>
-                <span style={{ fontSize: 14, color: on ? "#0972d3" : "#cbd2d9" }}>→</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* archive / delete */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginTop: 28,
-            paddingTop: 14,
-            borderTop: "1px solid #e5e8eb",
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: "#94a0ad" }}>
-            {project.is_active
-              ? "アーカイブすると、ガントチャート・カンバン・バックログの選択肢から外れます。"
-              : "アーカイブ中です。アクティブに戻すと各画面の選択肢に再び表示されます。"}
-          </div>
-          <button
-            onClick={() => {
-              const message = project.is_active
-                ? `プロジェクト「${project.name}」をアーカイブします。\nガントチャート・カンバン・バックログの選択肢から外れます。よろしいですか？`
-                : `プロジェクト「${project.name}」をアクティブに戻します。よろしいですか？`;
-              if (window.confirm(message)) onSetActive(project.id, !project.is_active);
-            }}
-            style={quietBtn}
-          >
-            {project.is_active ? "アーカイブする" : "アクティブに戻す"}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => setEditing(true)} style={btn}>
+            変更
           </button>
-          <button
-            onClick={() => {
-              if (
-                window.confirm(
-                  `プロジェクト「${project.name}」を削除します。\n配下のエピック・ストーリー・タスク・依存関係もすべて削除されます。よろしいですか？`
-                )
-              ) {
-                onDelete(project.id);
-              }
-            }}
-            style={{ ...quietBtn, color: "#a3210b" }}
-          >
-            削除
-          </button>
+          <ActionMenu
+            items={[
+              { label: "バックログ", onSelect: () => onShowBacklog(project.id) },
+              { label: "ガントチャート", onSelect: () => onShowGantt(project.id) },
+              { label: "カンバン", onSelect: () => onShowKanban(project.id) },
+              { label: "JSONエクスポート", onSelect: () => onExport(project), separated: true },
+              { label: project.is_active ? "アーカイブする" : "アクティブに戻す", onSelect: archive },
+              { label: "削除", onSelect: remove, danger: true },
+            ]}
+          />
         </div>
       </div>
+      <div style={{ fontSize: 13, color: project.description ? "#3b4149" : "#94a0ad" }}>
+        {project.description ?? "（説明なし）"}
+      </div>
+
+      <section style={card}>
+        <div style={cardHeader}>
+          <h3 style={h3}>基本情報</h3>
+        </div>
+        <Field label="URL">
+          {project.url ? (
+            <a href={project.url} target="_blank" rel="noreferrer" style={link}>
+              {project.url}
+            </a>
+          ) : (
+            DASH
+          )}
+        </Field>
+        <Field label="リポジトリ">
+          {project.repository_url ? (
+            <a href={project.repository_url} target="_blank" rel="noreferrer" style={link}>
+              {project.repository_url}
+            </a>
+          ) : (
+            DASH
+          )}
+        </Field>
+        <Field label="作成日時">{fmt(project.created_at)}</Field>
+        <Field label="更新日時">{fmt(project.updated_at)}</Field>
+      </section>
 
       {editing && (
         <ProjectForm
@@ -182,51 +117,105 @@ export function ProjectDetailPage({
   );
 }
 
-const DASH = <span style={{ color: "#94a0ad" }}>—</span>;
+type ActionItem = { label: string; onSelect: () => void; danger?: boolean; separated?: boolean };
 
-function Meta({ label, children }: { label: string; children: ReactNode }) {
+// "…" button: the project's actions, collapsed into one pulldown.
+function ActionMenu({ items }: { items: ActionItem[] }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 11, color: "#94a0ad", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 12, color: "#3b4149", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {children}
-      </div>
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="そのほかの操作"
+        aria-label="そのほかの操作"
+        style={{ ...btn, padding: "5px 10px", lineHeight: "14px", fontSize: 14 }}
+      >
+        …
+      </button>
+      {open && (
+        <>
+          {/* click-away closes the menu */}
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
+          <div style={menu}>
+            {items.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => {
+                  setOpen(false);
+                  item.onSelect();
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "6px 12px",
+                  border: "none",
+                  borderTop: item.separated ? "1px solid #e5e8eb" : "none",
+                  marginTop: item.separated ? 4 : 0,
+                  paddingTop: item.separated ? 10 : 6,
+                  borderRadius: 4,
+                  background: "transparent",
+                  color: item.danger ? "#a3210b" : "#1f2933",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-// Show links short: the host for a site, owner/repo for a repository.
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
+const DASH = <span style={{ color: "#94a0ad" }}>—</span>;
 
-function repoOf(url: string): string {
-  try {
-    const path = new URL(url).pathname.replace(/^\/|\/$/g, "");
-    return path || url;
-  } catch {
-    return url;
-  }
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "5px 0", fontSize: 13 }}>
+      <div style={{ width: 96, flexShrink: 0, color: "#94a0ad", fontSize: 12, fontWeight: 600 }}>{label}</div>
+      <div style={{ minWidth: 0, wordBreak: "break-all" }}>{children}</div>
+    </div>
+  );
 }
 
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" });
 }
 
-const metaRow: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-  gap: 16,
-  marginTop: 16,
-  padding: "12px 16px",
+const menu: CSSProperties = {
+  position: "absolute",
+  right: 0,
+  top: "calc(100% + 4px)",
+  zIndex: 20,
+  minWidth: 160,
+  background: "#fff",
+  border: "1px solid #cbd2d9",
+  borderRadius: 6,
+  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
+  padding: 4,
+};
+
+const card: CSSProperties = {
+  marginTop: 20,
   background: "#fff",
   border: "1px solid #e5e8eb",
   borderRadius: 10,
+  padding: 16,
+  maxWidth: 720,
 };
+
+const cardHeader: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  marginBottom: 12,
+};
+
+const h3: CSSProperties = { margin: 0, fontSize: 14 };
 
 const link: CSSProperties = { color: "#0972d3", textDecoration: "none" };
 
@@ -235,29 +224,30 @@ const btn: CSSProperties = {
   color: "#3b4149",
   border: "1px solid #cbd2d9",
   borderRadius: 6,
-  padding: "5px 12px",
+  padding: "5px 10px",
   fontSize: 12,
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
 
-const quietBtn: CSSProperties = {
-  background: "none",
-  border: "none",
-  padding: "4px 6px",
-  fontSize: 12,
-  color: "#5f6b7a",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  textDecoration: "underline",
-};
-
-const inactiveBadge: CSSProperties = {
+const badgeBase: CSSProperties = {
   fontSize: 11,
   borderRadius: 999,
   padding: "2px 10px",
+  border: "1px solid",
+  whiteSpace: "nowrap",
+};
+
+const activeBadge: CSSProperties = {
+  ...badgeBase,
+  background: "#e8f3ff",
+  color: "#0972d3",
+  borderColor: "#b5d6f7",
+};
+
+const inactiveBadge: CSSProperties = {
+  ...badgeBase,
   background: "#f2f3f4",
   color: "#5f6b7a",
-  border: "1px solid #d5dbdb",
-  whiteSpace: "nowrap",
+  borderColor: "#d5dbdb",
 };
