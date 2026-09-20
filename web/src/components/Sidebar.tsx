@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 export type MenuKey = "projects" | "backlog" | "gantt" | "kanban";
 
@@ -16,10 +17,13 @@ export function Sidebar({
   active: MenuKey | null;
   onNavigate: (key: MenuKey) => void;
 }) {
+  const { width, startResize } = useResizableWidth("sidebar.width", 220, 160, 480);
+
   return (
     <aside
       style={{
-        width: 220,
+        position: "relative",
+        width,
         flexShrink: 0,
         background: "#1f2933",
         color: "#e5e8eb",
@@ -42,6 +46,12 @@ export function Sidebar({
           );
         })}
       </nav>
+
+      <div
+        onMouseDown={startResize}
+        title="ドラッグで幅を変更"
+        style={{ ...resizeHandleStyle, right: -3 }}
+      />
     </aside>
   );
 }

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { addStory, getEpic, getLatestContextRevision, listStories, updateEpicContext } from "../lib/api";
-import type { ContextRevision, Project, StoryInput, Task } from "../lib/types";
+import { addStory, getEpic, getLatestContextRevision, listEpics, listStories, moveStory, updateEpicContext } from "../lib/api";
+import type { BacklogEpic, ContextRevision, Project, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
+import { IdBadge } from "../components/IdBadge";
 
 // Epic detail: view / edit the context document and add stories.
 // Loads its own data through the api layer (the epic's context is only needed here).
@@ -23,6 +24,7 @@ export function EpicDetailPage({
   const [draft, setDraft] = useState<string | null>(null); // non-null while editing
   const [saving, setSaving] = useState(false);
   const [addingStory, setAddingStory] = useState(false);
+  const [moving, setMoving] = useState<{ story: Task; epics: BacklogEpic[] } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +70,27 @@ export function EpicDetailPage({
     setDraft(null);
   };
 
+  // Move a story to another epic: pick from the project's other epics.
+  const startMove = async (story: Task) => {
+    try {
+      const epics = await listEpics(epic.project_id);
+      setMoving({ story, epics: epics.filter((e) => e.id !== epic.id) });
+    } catch (err: any) {
+      onError(String(err.message ?? err));
+    }
+  };
+
+  const submitMove = async (targetEpicId: string) => {
+    if (!moving) return;
+    try {
+      await moveStory(moving.story.id, targetEpicId);
+      setMoving(null);
+      await load();
+    } catch (err: any) {
+      onError(String(err.message ?? err));
+    }
+  };
+
   const submitStory = async (values: StoryInput) => {
     setAddingStory(false);
     try {
@@ -87,6 +110,7 @@ export function EpicDetailPage({
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>{epic.title}</h2>
         <span style={active ? activeBadge : inactiveBadge}>{active ? "エピック（Active）" : "バックログ（Inactive）"}</span>
+        <IdBadge id={epic.id} />
       </div>
       <div style={{ fontSize: 13, color: epic.description ? "#3b4149" : "#94a0ad" }}>
         {epic.description ?? "（説明なし）"}
@@ -152,6 +176,7 @@ export function EpicDetailPage({
                 <th style={th}>名前</th>
                 <th style={{ ...th, width: 110 }}>状態</th>
                 <th style={{ ...th, width: 200 }}>期間</th>
+                <th style={{ ...th, width: 72 }} />
               </tr>
             </thead>
             <tbody>
@@ -161,6 +186,9 @@ export function EpicDetailPage({
                   <tr key={s.id}>
                     <td style={td}>
                       <div style={{ fontWeight: 600 }}>{s.title}</div>
+                      <div style={{ marginTop: 4 }}>
+                        <IdBadge id={s.id} />
+                      </div>
                       {s.description && <div style={{ fontSize: 12, color: "#5f6b7a", marginTop: 2 }}>{s.description}</div>}
                     </td>
                     <td style={td}>
@@ -169,6 +197,11 @@ export function EpicDetailPage({
                     <td style={{ ...td, color: "#5f6b7a" }}>
                       {s.start_date || s.due_date ? `${s.start_date ?? "—"} 〜 ${s.due_date ?? "—"}` : "—"}
                     </td>
+                    <td style={td}>
+                      <button onClick={() => startMove(s)} style={btn} title="別のエピックへ移動">
+                        移動
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -176,6 +209,15 @@ export function EpicDetailPage({
           </table>
         )}
       </section>
+
+      {moving && (
+        <MoveStoryForm
+          story={moving.story}
+          epics={moving.epics}
+          onSubmit={submitMove}
+          onCancel={() => setMoving(null)}
+        />
+      )}
 
       {addingStory && (
         <TaskForm
@@ -189,6 +231,104 @@ export function EpicDetailPage({
     </div>
   );
 }
+
+// Pick the epic to move a story to (same project). Its tasks and their dependencies move with it.
+function MoveStoryForm({
+  story,
+  epics,
+  onSubmit,
+  onCancel,
+}: {
+  story: Task;
+  epics: BacklogEpic[];
+  onSubmit: (targetEpicId: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [target, setTarget] = useState(epics[0]?.id ?? "");
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div style={overlay} onMouseDown={onCancel}>
+      <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>ストーリーを移動</h3>
+        <div style={{ fontSize: 13, marginBottom: 14 }}>{story.title}</div>
+
+        {epics.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#94a0ad" }}>移動先のエピックがありません。</div>
+        ) : (
+          <>
+            <label style={fieldLabel}>移動先のエピック</label>
+            <select value={target} onChange={(e) => setTarget(e.target.value)} style={textInput}>
+              {epics.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.title}
+                  {e.activated_at ? "" : "（バックログ）"}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+          <button onClick={onCancel} disabled={saving} style={btn}>
+            キャンセル
+          </button>
+          <button
+            onClick={async () => {
+              if (!target || saving) return;
+              setSaving(true);
+              try {
+                await onSubmit(target);
+              } finally {
+                setSaving(false);
+              }
+            }}
+            disabled={!target || saving}
+            style={primaryBtn}
+          >
+            {saving ? "移動中…" : "移動"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const overlay: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(31,41,51,0.4)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 100,
+};
+
+const dialog: CSSProperties = {
+  background: "#fff",
+  borderRadius: 12,
+  padding: 24,
+  width: 420,
+  maxWidth: "90vw",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+};
+
+const fieldLabel: CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#5f6b7a",
+  marginBottom: 6,
+};
+
+const textInput: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  fontSize: 13,
+  padding: "8px 10px",
+  borderRadius: 6,
+  border: "1px solid #cbd2d9",
+};
 
 const card: CSSProperties = {
   marginTop: 20,

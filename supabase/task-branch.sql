@@ -13,8 +13,9 @@ declare
   e uuid;
   s uuid;
 begin
-  insert into projects(name, description)
-    values ('task-branch', 'AI で使うことを前提にしたタスク管理ツール自体の開発')
+  insert into projects(name, description, url, repository_url)
+    values ('task-branch', 'AI で使うことを前提にしたタスク管理ツール自体の開発',
+            'https://task-branch.vercel.app', 'https://github.com/geek-teru/task-branch')
     returning id into p;
 
   -- ===== epic 1: 基盤（DB・API） =====

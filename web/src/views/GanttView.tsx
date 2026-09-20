@@ -2,15 +2,15 @@
 // Built from start_date/due_date on story-level nodes (epics summarize their children).
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
+import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
-const LABEL_W = 320;
 const HEADER_H = 34;
 const MS_DAY = 86_400_000;
 
@@ -154,8 +154,8 @@ export function GanttView({
   onResizeStory?: (id: string, startDate: string, dueDate: string) => void;
   onReorderEpics?: (orderedEpicIds: string[]) => void;
 }) {
+  const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [statusMenuKey, setStatusMenuKey] = useState<string | null>(null);
   const [dragEpicId, setDragEpicId] = useState<string | null>(null);
   const [overEpicId, setOverEpicId] = useState<string | null>(null);
   const filtered = useMemo(() => [{ project, graph }], [project, graph]);
@@ -287,6 +287,7 @@ export function GanttView({
             }}
           >
             プロジェクト / エピック / ストーリー
+            <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
           </div>
           <div style={{ position: "relative", width: timelineW, background: "#f7f9fa", borderBottom: "1px solid #cbd2d9" }}>
             {months.map((mo) => (
@@ -435,25 +436,6 @@ export function GanttView({
                     timelineStart={timelineStart}
                     selected={r.key === selectedKey}
                     onSelect={() => setSelectedKey(r.key)}
-                    statusMenuOpen={r.key === statusMenuKey}
-                    onToggleStatusMenu={
-                      r.kind === "story" && r.node && onChangeStatus
-                        ? () => setStatusMenuKey((cur) => (cur === r.key ? null : r.key))
-                        : undefined
-                    }
-                    onPickStatus={
-                      r.kind === "story" && r.node && onChangeStatus
-                        ? (status) => {
-                            setStatusMenuKey(null);
-                            const node = r.node!;
-                            setConfirm({
-                              message: `「${r.label}」のステータスを『${STATUS_LABEL[status]}』に変更します。よろしいですか？`,
-                              onConfirm: () => onChangeStatus(node.id, status),
-                            });
-                          }
-                        : undefined
-                    }
-                    onCloseStatusMenu={() => setStatusMenuKey(null)}
                     onResize={
                       r.kind === "story" && r.node && onResizeStory
                         ? (startDate, dueDate) => {
@@ -499,6 +481,15 @@ export function GanttView({
           }
           onStart={onStartStory ? (node) => onStartStory(node.id) : undefined}
           onComplete={onCompleteStory ? (node) => onCompleteStory(node.id) : undefined}
+          onChangeStatus={
+            onChangeStatus
+              ? (node, status) =>
+                  setConfirm({
+                    message: `「${node.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。よろしいですか？`,
+                    onConfirm: () => onChangeStatus(node.id, status),
+                  })
+              : undefined
+          }
         />
       )}
       </div>
@@ -532,20 +523,12 @@ function Bar({
   timelineStart,
   selected,
   onSelect,
-  statusMenuOpen,
-  onToggleStatusMenu,
-  onPickStatus,
-  onCloseStatusMenu,
   onResize,
 }: {
   row: Row;
   timelineStart: Date;
   selected: boolean;
   onSelect: () => void;
-  statusMenuOpen?: boolean;
-  onToggleStatusMenu?: () => void;
-  onPickStatus?: (status: Status) => void;
-  onCloseStatusMenu?: () => void;
   onResize?: (startDate: string, dueDate: string) => void;
 }) {
   const start = row.start as Date;
@@ -600,8 +583,7 @@ function Bar({
       <div
         onClick={() => {
           if (drag) return;
-          if (onToggleStatusMenu) onToggleStatusMenu();
-          else onSelect();
+          onSelect();
         }}
         title={`${row.label}\n${fmt(pStart)} 〜 ${fmt(pEnd)}`}
         style={{
@@ -614,7 +596,7 @@ function Bar({
           background: isPhase ? "#94a0ad" : c?.border ?? "#94a0ad",
           opacity: isPhase ? 0.55 : 1,
           cursor: "pointer",
-          outline: selected || statusMenuOpen || drag ? "2px solid #1f2933" : "none",
+          outline: selected || drag ? "2px solid #1f2933" : "none",
           outlineOffset: 1,
         }}
       />
@@ -648,58 +630,6 @@ function Bar({
               zIndex: 10,
             }}
           />
-        </>
-      )}
-      {statusMenuOpen && onPickStatus && (
-        <>
-          {/* backdrop: click-away closes the menu */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              onCloseStatusMenu?.();
-            }}
-            style={{ position: "fixed", inset: 0, zIndex: 19 }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              left,
-              top: ROW_H - 2,
-              zIndex: 20,
-              minWidth: 96,
-              background: "#fff",
-              border: "1px solid #cbd2d9",
-              borderRadius: 6,
-              boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
-              padding: 4,
-            }}
-          >
-            {STATUS_ORDER.map((s) => (
-              <button
-                key={s}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPickStatus(s);
-                }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "5px 10px",
-                  border: "none",
-                  borderRadius: 4,
-                  background: s === row.status ? "#eef1f3" : "transparent",
-                  color: "#1f2933",
-                  fontSize: 12,
-                  fontWeight: s === row.status ? 600 : 400,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {STATUS_LABEL[s]}
-              </button>
-            ))}
-          </div>
         </>
       )}
       {!isPhase && (

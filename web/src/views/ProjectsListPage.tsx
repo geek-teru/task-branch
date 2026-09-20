@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import type { Project } from "../lib/types";
+import type { Project, ProjectInput } from "../lib/types";
 
 type FormState = { mode: "create" } | { mode: "edit"; project: Project };
 
@@ -13,8 +13,8 @@ export function ProjectsListPage({
   onExport,
 }: {
   projects: Project[];
-  onCreate: (name: string, description: string | null) => void;
-  onUpdate: (id: string, name: string, description: string | null) => void;
+  onCreate: (input: ProjectInput) => void;
+  onUpdate: (id: string, input: ProjectInput) => void;
   onDelete: (id: string) => void;
   onShowBacklog: (projectId: string) => void;
   onShowGantt: (projectId: string) => void;
@@ -22,10 +22,10 @@ export function ProjectsListPage({
 }) {
   const [form, setForm] = useState<FormState | null>(null);
 
-  const submit = (name: string, description: string | null) => {
+  const submit = (input: ProjectInput) => {
     if (!form) return;
-    if (form.mode === "create") onCreate(name, description);
-    else onUpdate(form.project.id, name, description);
+    if (form.mode === "create") onCreate(input);
+    else onUpdate(form.project.id, input);
     setForm(null);
   };
 
@@ -68,6 +68,20 @@ export function ProjectsListPage({
               <div style={{ fontSize: 12, color: "#5f6b7a", minHeight: 16 }}>
                 {p.description ?? "（説明なし）"}
               </div>
+              {(p.url || p.repository_url) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+                  {p.url && (
+                    <a href={p.url} target="_blank" rel="noreferrer" style={linkStyle} title={p.url}>
+                      サイト
+                    </a>
+                  )}
+                  {p.repository_url && (
+                    <a href={p.repository_url} target="_blank" rel="noreferrer" style={linkStyle} title={p.repository_url}>
+                      リポジトリ
+                    </a>
+                  )}
+                </div>
+              )}
               <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 10 }}>
                 作成: {new Date(p.created_at).toLocaleDateString("ja-JP")}
               </div>
@@ -122,17 +136,24 @@ function ProjectForm({
   onCancel,
 }: {
   initial: Project | null;
-  onSubmit: (name: string, description: string | null) => void;
+  onSubmit: (input: ProjectInput) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [url, setUrl] = useState(initial?.url ?? "");
+  const [repositoryUrl, setRepositoryUrl] = useState(initial?.repository_url ?? "");
   const trimmedName = name.trim();
+  const trim = (v: string) => (v.trim() ? v.trim() : null);
 
   const handleSubmit = () => {
     if (!trimmedName) return;
-    const d = description.trim();
-    onSubmit(trimmedName, d ? d : null);
+    onSubmit({
+      name: trimmedName,
+      description: trim(description),
+      url: trim(url),
+      repository_url: trim(repositoryUrl),
+    });
   };
 
   return (
@@ -167,6 +188,30 @@ function ProjectForm({
           style={{ ...textInput, resize: "vertical", fontFamily: "inherit" }}
         />
 
+        <label style={{ ...fieldLabel, marginTop: 14 }}>URL（任意）</label>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSubmit();
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="https://example.vercel.app"
+          style={textInput}
+        />
+
+        <label style={{ ...fieldLabel, marginTop: 14 }}>リポジトリ（任意）</label>
+        <input
+          value={repositoryUrl}
+          onChange={(e) => setRepositoryUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSubmit();
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="https://github.com/owner/repo"
+          style={textInput}
+        />
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onCancel} style={cardBtn}>
             キャンセル
@@ -189,6 +234,13 @@ const primaryBtn: CSSProperties = {
   padding: "7px 14px",
   fontSize: 13,
   cursor: "pointer",
+};
+
+const linkStyle: CSSProperties = {
+  fontSize: 12,
+  color: "#0972d3",
+  textDecoration: "none",
+  whiteSpace: "nowrap",
 };
 
 const cardBtn: CSSProperties = {

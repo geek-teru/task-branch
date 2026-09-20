@@ -8,6 +8,8 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
+  url: string | null; // related site (deployment etc.)
+  repository_url: string | null; // GitHub etc.
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +33,14 @@ export interface Task {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+}
+
+// Editable fields of a project, shared by the create/edit form and the API.
+export interface ProjectInput {
+  name: string;
+  description: string | null;
+  url: string | null;
+  repository_url: string | null;
 }
 
 // Editable fields for a story, shared by the create/edit form and the API.
