@@ -10,6 +10,7 @@ import {
   exportProject,
   getKanbanLanes,
   listEpics,
+  createEpic,
   getProjectGraph,
   listProjects,
   reorderEpics,
@@ -79,6 +80,21 @@ export default function App() {
       cancelled = true;
     };
   }, [backlogProjectId]);
+
+  // Add a backlog item (inactive epic) to the selected project, then reload the list.
+  const handleAddBacklog = useCallback(
+    async (title: string, description: string | null) => {
+      if (!backlogProjectId) return;
+      try {
+        await createEpic(backlogProjectId, title, description);
+        setBacklog({ projectId: backlogProjectId, epics: await listEpics(backlogProjectId) });
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+        throw e;
+      }
+    },
+    [backlogProjectId]
+  );
 
   const [lanes, setLanes] = useState<KanbanLane[] | null>(null);
   useEffect(() => {
@@ -387,6 +403,7 @@ export default function App() {
                     projectId={backlogProjectId!}
                     epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
                     onSelectProject={(id) => setSearchParams({ project: id })}
+                    onAddBacklog={handleAddBacklog}
                   />
                 )}
               </main>
