@@ -10,6 +10,7 @@ export interface Project {
   description: string | null;
   url: string | null; // related site (deployment etc.)
   repository_url: string | null; // GitHub etc.
+  is_active: boolean; // false = archived: hidden from the gantt / kanban / backlog pickers
   created_at: string;
   updated_at: string;
 }

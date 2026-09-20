@@ -15,6 +15,7 @@ import {
   listProjects,
   moveStory,
   reorderEpics,
+  setProjectActive,
   updateProject,
   updateTask,
   updateTaskDates,
@@ -23,6 +24,7 @@ import {
 import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { ProjectsListPage } from "./views/ProjectsListPage";
+import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
 import { KanbanView } from "./views/KanbanView";
 import { BacklogView } from "./views/BacklogView";
@@ -34,13 +36,15 @@ export default function App() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const ganttMatch = useMatch("/projects/:projectId/gantt");
+  const projectMatch = useMatch("/projects/:projectId");
   const isGantt = pathname === "/gantt" || ganttMatch !== null;
   const isKanban = pathname === "/kanban";
   const epicMatch = useMatch("/epics/:epicId");
   const isBacklog = pathname === "/backlog" || epicMatch !== null;
   const [searchParams, setSearchParams] = useSearchParams();
-  // Gantt shows one project: the one in the URL, or the first project for /gantt.
-  const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? projects[0]?.id : undefined;
+  // Gantt shows one project: the one in the URL, or the first active project for /gantt.
+  const defaultProjectId = (projects.find((p) => p.is_active) ?? projects[0])?.id;
+  const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? defaultProjectId : undefined;
   const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +71,7 @@ export default function App() {
   }, [ganttProjectId]);
 
   // Backlog page: the project comes from ?project=, defaulting to the first project.
-  const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? projects[0]?.id : undefined;
+  const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? defaultProjectId : undefined;
   const [backlog, setBacklog] = useState<{ projectId: string; epics: BacklogEpic[] } | null>(null);
   useEffect(() => {
     if (!backlogProjectId) return;
@@ -289,6 +293,15 @@ export default function App() {
     []
   );
 
+  const handleSetProjectActive = useCallback(async (id: string, isActive: boolean) => {
+    try {
+      const p = await setProjectActive(id, isActive);
+      setProjects((prev) => prev.map((x) => (x.id === id ? p : x)));
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+  }, []);
+
   const handleDeleteProject = useCallback(async (id: string) => {
     try {
       await deleteProject(id);
@@ -336,6 +349,11 @@ export default function App() {
     );
   }
 
+  // Archived projects stay reachable by URL but drop out of the pickers.
+  const pickerProjects = (currentId: string | null | undefined) =>
+    projects.filter((p) => p.is_active || p.id === currentId);
+
+  const detailProject = projects.find((p) => p.id === projectMatch?.params.projectId);
   const ganttProject = projects.find((p) => p.id === ganttProjectId);
   const ganttPage = (
     <main style={{ flex: 1, minHeight: 0 }}>
@@ -349,7 +367,7 @@ export default function App() {
         <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
       ) : (
         <GanttView
-          projects={projects}
+          projects={pickerProjects(ganttProjectId)}
           project={ganttProject}
           graph={graph.graph}
           onSelectProject={(projectId) => navigate(`/projects/${projectId}/gantt`)}
@@ -390,12 +408,37 @@ export default function App() {
                 <ProjectsListPage
                   projects={projects}
                   onCreate={handleCreateProject}
-                  onUpdate={handleUpdateProject}
-                  onDelete={handleDeleteProject}
+                  onShowDetail={(projectId) => navigate(`/projects/${projectId}`)}
                   onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
                   onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
-                  onExport={handleExportProject}
+                  onShowKanban={(projectId) => navigate(`/kanban?project=${projectId}`)}
                 />
+              </main>
+            }
+          />
+          <Route
+            path="/projects/:projectId"
+            element={
+              <main style={{ flex: 1, minHeight: 0 }}>
+                {!projectsLoaded ? (
+                  <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                ) : !detailProject ? (
+                  <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                ) : (
+                  <ProjectDetailPage
+                    project={detailProject}
+                    onUpdate={handleUpdateProject}
+                    onDelete={(id) => {
+                      handleDeleteProject(id);
+                      navigate("/projects");
+                    }}
+                    onSetActive={handleSetProjectActive}
+                    onExport={handleExportProject}
+                    onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
+                    onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
+                    onShowKanban={(projectId) => navigate(`/kanban?project=${projectId}`)}
+                  />
+                )}
               </main>
             }
           />
@@ -413,7 +456,7 @@ export default function App() {
                   <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
                 ) : (
                   <BacklogView
-                    projects={projects}
+                    projects={pickerProjects(backlogProjectId)}
                     projectId={backlogProjectId!}
                     epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
                     onSelectProject={(id) => setSearchParams({ project: id })}
@@ -441,7 +484,7 @@ export default function App() {
                   <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
                 ) : (
                   <KanbanView
-                    projects={projects}
+                    projects={pickerProjects(searchParams.get("project"))}
                     lanes={lanes}
                     projectFilter={searchParams.get("project")}
                     onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
