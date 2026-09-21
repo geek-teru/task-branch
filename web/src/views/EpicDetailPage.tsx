@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { addStory, getEpic, getLatestContextRevision, listStories, updateEpicContext } from "../lib/api";
+import {
+  addStory,
+  getEpic,
+  getLatestContextRevision,
+  listStories,
+  setEpicActive,
+  updateEpicContext,
+  updateEpicInfo,
+} from "../lib/api";
 import type { ContextRevision, Project, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { IdBadge } from "../components/IdBadge";
+import { EpicStateBadge } from "../components/EpicStateBadge";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 // Epic detail: view / edit the context document and add stories.
 // Loads its own data through the api layer (the epic's context is only needed here).
@@ -24,6 +34,8 @@ export function EpicDetailPage({
   const [draft, setDraft] = useState<string | null>(null); // non-null while editing
   const [saving, setSaving] = useState(false);
   const [addingStory, setAddingStory] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [pendingState, setPendingState] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +81,27 @@ export function EpicDetailPage({
     setDraft(null);
   };
 
+  const changeState = async (next: boolean) => {
+    try {
+      await setEpicActive(epic.id, next);
+      setPendingState(null);
+      await load();
+    } catch (err: any) {
+      onError(String(err.message ?? err));
+    }
+  };
+
+  // 名前と説明の変更。コンテキストの編集とは別。
+  const submitInfo = async (title: string, description: string | null) => {
+    try {
+      await updateEpicInfo(epic.id, title, description);
+      setEditingInfo(false);
+      await load();
+    } catch (err: any) {
+      onError(String(err.message ?? err));
+    }
+  };
+
   const submitStory = async (values: StoryInput) => {
     setAddingStory(false);
     try {
@@ -87,8 +120,11 @@ export function EpicDetailPage({
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>{epic.title}</h2>
-        <span style={active ? activeBadge : inactiveBadge}>{active ? "Active" : "InActive"}</span>
+        <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
         <IdBadge id={epic.id} />
+        <button onClick={() => setEditingInfo(true)} style={{ ...btn, marginLeft: "auto" }}>
+          変更
+        </button>
       </div>
       <div style={{ fontSize: 13, color: epic.description ? "#3b4149" : "#94a0ad" }}>
         {epic.description ?? "（説明なし）"}
@@ -183,6 +219,27 @@ export function EpicDetailPage({
         )}
       </section>
 
+      {pendingState !== null && (
+        <ConfirmDialog
+          message={
+            pendingState
+              ? `「${epic.title}」を Active にします。エピックとして着手した扱いになります。よろしいですか？`
+              : `「${epic.title}」を InActive にします。バックログに戻ります。よろしいですか？`
+          }
+          onConfirm={() => changeState(pendingState)}
+          onCancel={() => setPendingState(null)}
+        />
+      )}
+
+      {editingInfo && (
+        <EpicInfoForm
+          initialTitle={epic.title}
+          initialDescription={epic.description}
+          onSubmit={submitInfo}
+          onCancel={() => setEditingInfo(false)}
+        />
+      )}
+
       {addingStory && (
         <TaskForm
           heading={`ストーリーを追加（${epic.title}）`}
@@ -195,6 +252,112 @@ export function EpicDetailPage({
     </div>
   );
 }
+
+// 名前（必須）と説明。コンテキストは詳細画面のエディタで編集する。
+function EpicInfoForm({
+  initialTitle,
+  initialDescription,
+  onSubmit,
+  onCancel,
+}: {
+  initialTitle: string;
+  initialDescription: string | null;
+  onSubmit: (title: string, description: string | null) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription ?? "");
+  const [saving, setSaving] = useState(false);
+  const trimmed = title.trim();
+
+  const submit = async () => {
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      const d = description.trim();
+      await onSubmit(trimmed, d ? d : null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={overlay} onMouseDown={onCancel}>
+      <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>エピックを変更</h3>
+
+        <label style={fieldLabel}>名前</label>
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) submit();
+            if (e.key === "Escape") onCancel();
+          }}
+          style={textInput}
+        />
+
+        <label style={{ ...fieldLabel, marginTop: 14 }}>説明（任意）</label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onCancel();
+          }}
+          rows={3}
+          placeholder="一覧に出す 1〜2 行の説明"
+          style={{ ...textInput, resize: "vertical", fontFamily: "inherit" }}
+        />
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+          <button onClick={onCancel} disabled={saving} style={btn}>
+            キャンセル
+          </button>
+          <button onClick={submit} disabled={!trimmed || saving} style={primaryBtn}>
+            {saving ? "保存中…" : "保存"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const overlay: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(31,41,51,0.4)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 100,
+};
+
+const dialog: CSSProperties = {
+  background: "#fff",
+  borderRadius: 12,
+  padding: 24,
+  width: 420,
+  maxWidth: "90vw",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+};
+
+const fieldLabel: CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#5f6b7a",
+  marginBottom: 6,
+};
+
+const textInput: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  fontSize: 13,
+  padding: "8px 10px",
+  borderRadius: 6,
+  border: "1px solid #cbd2d9",
+};
 
 const card: CSSProperties = {
   marginTop: 20,
@@ -264,5 +427,3 @@ const badge: CSSProperties = {
   border: "1px solid",
   whiteSpace: "nowrap",
 };
-const activeBadge: CSSProperties = { ...badge, background: "#eaf2fc", color: "#0b4a8a", borderColor: "#0972d3" };
-const inactiveBadge: CSSProperties = { ...badge, background: "#f4f5f6", color: "#5f6b7a", borderColor: "#cbd2d9" };

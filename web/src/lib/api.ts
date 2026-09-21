@@ -121,6 +121,21 @@ export async function getEpic(epicId: string): Promise<Task | null> {
 }
 
 // Saving the context adds a version to epic_context_revisions (DB trigger).
+// Rename an epic / edit its one-line description. The context document has its own function.
+export async function updateEpicInfo(epicId: string, title: string, description: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ title, description }).eq("id", epicId);
+  if (error) throw error;
+}
+
+// Activate an epic (activated_at = now) or shelve it back to the backlog (null).
+export async function setEpicActive(epicId: string, active: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ activated_at: active ? new Date().toISOString() : null })
+    .eq("id", epicId);
+  if (error) throw error;
+}
+
 export async function updateEpicContext(epicId: string, context: string | null): Promise<void> {
   const { error } = await supabase.from("tasks").update({ context }).eq("id", epicId);
   if (error) throw error;
