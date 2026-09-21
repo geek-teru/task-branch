@@ -128,6 +128,18 @@ export default function App() {
     }
   }, []);
 
+  const handleKanbanAddStory = useCallback(
+    async (epic: Pick<Task, "id" | "project_id">, values: StoryInput) => {
+      try {
+        await addStory(epic, values);
+        setLanes(await getKanbanLanes());
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    []
+  );
+
   const handleKanbanMove = useCallback(async (taskId: string, storyId: string, status: Status) => {
     try {
       await moveTask(taskId, storyId, status);
@@ -504,6 +516,7 @@ export default function App() {
                     onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
                     onChangeStatus={handleKanbanStatus}
                     onMoveTask={handleKanbanMove}
+                    onAddStory={handleKanbanAddStory}
                     onAddTask={handleAddTask}
                     onUpdateTask={handleKanbanUpdate}
                     onDeleteTask={handleKanbanDelete}

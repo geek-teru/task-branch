@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
+import { listEpics } from "../lib/api";
+import type { BacklogEpic, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
@@ -22,6 +23,7 @@ export function KanbanView({
   onChangeProjectFilter,
   onChangeStatus,
   onMoveTask,
+  onAddStory,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -32,6 +34,7 @@ export function KanbanView({
   onChangeProjectFilter: (projectId: string | null) => void;
   onChangeStatus: (taskId: string, status: Status) => void;
   onMoveTask: (taskId: string, storyId: string, status: Status) => void;
+  onAddStory: (epic: Pick<Task, "id" | "project_id">, values: StoryInput) => void;
   onAddTask: (story: Task, values: StoryInput) => void;
   onUpdateTask: (id: string, values: StoryInput) => void;
   onDeleteTask: (id: string) => void;
@@ -40,6 +43,10 @@ export function KanbanView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<Task | null>(null);
+  // ストーリー追加: エピックを選んでから、いつもの TaskForm で名前と期間を入れる
+  const [pickEpic, setPickEpic] = useState<{ project: Project; epics: BacklogEpic[] } | null>(null);
+  const [epicId, setEpicId] = useState("");
+  const [storyForm, setStoryForm] = useState<{ epic: Pick<Task, "id" | "project_id">; epicTitle: string } | null>(null);
   // targetStory がある＝別ストーリーへの移動。無ければ同じストーリー内のステータス変更。
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
@@ -68,6 +75,16 @@ export function KanbanView({
     const tasks = visibleProjects.flatMap((p) => lanesByProject.get(p.id) ?? []).flatMap((l) => l.tasks);
     return tasks.find((t) => t.id === selectedId) ?? null;
   }, [visibleProjects, lanesByProject, selectedId]);
+
+  const startAddStory = async (project: Project) => {
+    try {
+      const epics = await listEpics(project.id);
+      setEpicId(epics[0]?.id ?? "");
+      setPickEpic({ project, epics });
+    } catch (e: any) {
+      window.alert(String(e.message ?? e));
+    }
+  };
 
   const endDrag = () => {
     setDrag(null);
@@ -195,7 +212,12 @@ export function KanbanView({
               const projectLanes = lanesByProject.get(p.id) ?? [];
               return (
                 <section key={p.id} style={{ marginBottom: 28 }}>
-                  <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>{p.name}</h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
+                    <h3 style={{ margin: 0, fontSize: 15 }}>{p.name}</h3>
+                    <button onClick={() => startAddStory(p)} style={quietBtn}>
+                      ストーリーを追加
+                    </button>
+                  </div>
                   {projectLanes.length === 0 ? (
                     <div style={{ fontSize: 13, color: "#5f6b7a" }}>進行中のストーリーがありません。</div>
                   ) : (
@@ -266,6 +288,67 @@ export function KanbanView({
             setEditing(null);
           }}
           onCancel={() => setEditing(null)}
+        />
+      )}
+
+      {pickEpic && (
+        <div style={overlay} onMouseDown={() => setPickEpic(null)}>
+          <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>ストーリーを追加（{pickEpic.project.name}）</h3>
+            {pickEpic.epics.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#94a0ad" }}>
+                このプロジェクトにはエピックがありません。先にバックログから追加してください。
+              </div>
+            ) : (
+              <>
+                <label style={fieldLabel}>エピック</label>
+                <select value={epicId} onChange={(e) => setEpicId(e.target.value)} style={selectInput}>
+                  {pickEpic.epics.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.title}
+                      {e.activated_at ? "" : "（バックログ）"}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 6 }}>
+                  カンバンに出るよう、追加したストーリーは進行中にします。
+                </div>
+              </>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+              <button onClick={() => setPickEpic(null)} style={quietBtn}>
+                キャンセル
+              </button>
+              <button
+                onClick={() => {
+                  const epic = pickEpic.epics.find((e) => e.id === epicId);
+                  if (!epic) return;
+                  setStoryForm({
+                    epic: { id: epic.id, project_id: pickEpic.project.id },
+                    epicTitle: epic.title,
+                  });
+                  setPickEpic(null);
+                }}
+                disabled={!epicId}
+                style={primaryBtn}
+              >
+                次へ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {storyForm && (
+        <TaskForm
+          heading={`ストーリーを追加（${storyForm.epicTitle}）`}
+          submitLabel="追加"
+          initial={{ title: "", status: "in_progress", start_date: null, due_date: null, description: null }}
+          onSubmit={(values) => {
+            onAddStory(storyForm.epic, values);
+            setStoryForm(null);
+          }}
+          onCancel={() => setStoryForm(null)}
         />
       )}
 
@@ -375,6 +458,63 @@ const weak: CSSProperties = {
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
+};
+
+const quietBtn: CSSProperties = {
+  background: "#fff",
+  color: "#3b4149",
+  border: "1px solid #cbd2d9",
+  borderRadius: 6,
+  padding: "5px 10px",
+  fontSize: 12,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const primaryBtn: CSSProperties = {
+  background: "#0972d3",
+  color: "#fff",
+  border: "none",
+  borderRadius: 6,
+  padding: "7px 14px",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const overlay: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(31,41,51,0.4)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 100,
+};
+
+const dialog: CSSProperties = {
+  background: "#fff",
+  borderRadius: 12,
+  padding: 24,
+  width: 420,
+  maxWidth: "90vw",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+};
+
+const fieldLabel: CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#5f6b7a",
+  marginBottom: 6,
+};
+
+const selectInput: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  fontSize: 13,
+  padding: "8px 10px",
+  borderRadius: 6,
+  border: "1px solid #cbd2d9",
 };
 
 // Same look as the gantt's "add story" button.
