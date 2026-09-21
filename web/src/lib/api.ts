@@ -214,6 +214,25 @@ export async function updateTaskDates(id: string, start_date: string, due_date: 
 
 // Persist a new epic ordering: assign sort_order = position (1-based) in the
 // given id list. Called after a drag-and-drop reorder in the gantt.
+// Move a task to another story. The column it was dropped on decides the status.
+// Tasks with dependencies are rejected by the DB trigger (dependencies are per story).
+export async function moveTask(taskId: string, targetStoryId: string, status: Status): Promise<void> {
+  const { data: last, error: lastError } = await supabase
+    .from("tasks")
+    .select("sort_order")
+    .eq("parent_id", targetStoryId)
+    .eq("level", "task")
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (lastError) throw lastError;
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({ parent_id: targetStoryId, sort_order: (last?.[0]?.sort_order ?? 0) + 1, status })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
 export async function reorderEpics(orderedIds: string[]): Promise<void> {
   const results = await Promise.all(
     orderedIds.map((id, i) => supabase.from("tasks").update({ sort_order: i + 1 }).eq("id", id))
