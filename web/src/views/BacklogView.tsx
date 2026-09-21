@@ -61,7 +61,6 @@ export function BacklogView({
                 <th style={{ ...th, width: "30%" }}>名前</th>
                 <th style={th}>説明</th>
                 <th style={{ ...th, width: 160 }}>状態</th>
-                <th style={{ ...th, width: 72 }} />
               </tr>
             </thead>
             <tbody>
@@ -69,7 +68,11 @@ export function BacklogView({
                 const active = e.activated_at != null;
                 return (
                   <tr key={e.id}>
-                    <td style={{ ...td, fontWeight: 600 }}>{e.title}</td>
+                    <td style={td}>
+                      <Link to={`/epics/${e.id}`} style={titleLink} title="詳細を開く">
+                        {e.title}
+                      </Link>
+                    </td>
                     <td style={{ ...td, color: e.description ? "#3b4149" : "#94a0ad" }}>
                       {e.description ?? "（説明なし）"}
                     </td>
@@ -77,11 +80,6 @@ export function BacklogView({
                       <span style={active ? activeBadge : inactiveBadge}>
                         {active ? "エピック（Active）" : "バックログ（Inactive）"}
                       </span>
-                    </td>
-                    <td style={td}>
-                      <Link to={`/epics/${e.id}`} style={detailBtn}>
-                        詳細
-                      </Link>
                     </td>
                   </tr>
                 );
@@ -201,6 +199,12 @@ const td: CSSProperties = {
   color: "#1f2933",
 };
 
+const titleLink: CSSProperties = {
+  color: "#0972d3",
+  fontWeight: 600,
+  textDecoration: "none",
+};
+
 const primaryBtn: CSSProperties = {
   background: "#0972d3",
   color: "#fff",
@@ -255,18 +259,6 @@ const textInput: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 6,
   border: "1px solid #cbd2d9",
-};
-
-const detailBtn: CSSProperties = {
-  display: "inline-block",
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "3px 10px",
-  fontSize: 12,
-  textDecoration: "none",
-  whiteSpace: "nowrap",
 };
 
 const badge: CSSProperties = {
