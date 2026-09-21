@@ -2,6 +2,8 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogEpic, Project } from "../lib/types";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
+import { EpicStateBadge } from "../components/EpicStateBadge";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 // Epics of one project: active ones (エピック) and inactive ones (バックログ).
 // Only name / description / state are shown; the document (context) is not loaded here.
@@ -11,14 +13,17 @@ export function BacklogView({
   epics,
   onSelectProject,
   onAddBacklog,
+  onSetActive,
 }: {
   projects: Project[];
   projectId: string;
   epics: BacklogEpic[] | null;
   onSelectProject: (projectId: string) => void;
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
+  onSetActive: (epicId: string, active: boolean) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [pendingState, setPendingState] = useState<{ epic: BacklogEpic; active: boolean } | null>(null);
   // 名前と状態はドラッグで幅を変えられる。説明は残り幅を使う。
   const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
   const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
@@ -110,9 +115,10 @@ export function BacklogView({
                       {e.description ?? "（説明なし）"}
                     </td>
                     <td style={{ ...td, position: "relative" }}>
-                      <span style={active ? activeBadge : inactiveBadge}>
-                        {active ? "Active" : "InActive"}
-                      </span>
+                      <EpicStateBadge
+                        active={active}
+                        onPick={(next) => setPendingState({ epic: e, active: next })}
+                      />
                       <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
                     </td>
                   </tr>
@@ -122,6 +128,21 @@ export function BacklogView({
           </table>
         )}
       </div>
+
+      {pendingState && (
+        <ConfirmDialog
+          message={
+            pendingState.active
+              ? `「${pendingState.epic.title}」を Active にします。エピックとして着手した扱いになります。よろしいですか？`
+              : `「${pendingState.epic.title}」を InActive にします。バックログに戻ります。よろしいですか？`
+          }
+          onConfirm={() => {
+            onSetActive(pendingState.epic.id, pendingState.active);
+            setPendingState(null);
+          }}
+          onCancel={() => setPendingState(null)}
+        />
+      )}
 
       {adding && (
         <BacklogForm
@@ -296,14 +317,3 @@ const textInput: CSSProperties = {
   border: "1px solid #cbd2d9",
 };
 
-const badge: CSSProperties = {
-  display: "inline-block",
-  fontSize: 12,
-  padding: "2px 8px",
-  borderRadius: 10,
-  border: "1px solid",
-  whiteSpace: "nowrap",
-};
-
-const activeBadge: CSSProperties = { ...badge, background: "#eaf2fc", color: "#0b4a8a", borderColor: "#0972d3" };
-const inactiveBadge: CSSProperties = { ...badge, background: "#f4f5f6", color: "#5f6b7a", borderColor: "#cbd2d9" };

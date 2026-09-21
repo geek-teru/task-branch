@@ -127,6 +127,15 @@ export async function updateEpicInfo(epicId: string, title: string, description:
   if (error) throw error;
 }
 
+// Activate an epic (activated_at = now) or shelve it back to the backlog (null).
+export async function setEpicActive(epicId: string, active: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ activated_at: active ? new Date().toISOString() : null })
+    .eq("id", epicId);
+  if (error) throw error;
+}
+
 export async function updateEpicContext(epicId: string, context: string | null): Promise<void> {
   const { error } = await supabase.from("tasks").update({ context }).eq("id", epicId);
   if (error) throw error;

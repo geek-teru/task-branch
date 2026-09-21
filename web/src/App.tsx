@@ -11,6 +11,7 @@ import {
   getKanbanLanes,
   listEpics,
   createEpic,
+  setEpicActive,
   getProjectGraph,
   listProjects,
   moveStory,
@@ -97,6 +98,20 @@ export default function App() {
       } catch (e: any) {
         setError(String(e.message ?? e));
         throw e;
+      }
+    },
+    [backlogProjectId]
+  );
+
+  // Activate / shelve an epic from the backlog list, then reload it.
+  const handleSetEpicActive = useCallback(
+    async (epicId: string, active: boolean) => {
+      if (!backlogProjectId) return;
+      try {
+        await setEpicActive(epicId, active);
+        setBacklog({ projectId: backlogProjectId, epics: await listEpics(backlogProjectId) });
+      } catch (e: any) {
+        setError(String(e.message ?? e));
       }
     },
     [backlogProjectId]
@@ -487,6 +502,7 @@ export default function App() {
                     epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
                     onSelectProject={(id) => setSearchParams({ project: id })}
                     onAddBacklog={handleAddBacklog}
+                    onSetActive={handleSetEpicActive}
                   />
                 )}
               </main>

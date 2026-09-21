@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { addStory, getEpic, getLatestContextRevision, listStories, updateEpicContext, updateEpicInfo } from "../lib/api";
+import {
+  addStory,
+  getEpic,
+  getLatestContextRevision,
+  listStories,
+  setEpicActive,
+  updateEpicContext,
+  updateEpicInfo,
+} from "../lib/api";
 import type { ContextRevision, Project, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { IdBadge } from "../components/IdBadge";
+import { EpicStateBadge } from "../components/EpicStateBadge";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 // Epic detail: view / edit the context document and add stories.
 // Loads its own data through the api layer (the epic's context is only needed here).
@@ -25,6 +35,7 @@ export function EpicDetailPage({
   const [saving, setSaving] = useState(false);
   const [addingStory, setAddingStory] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
+  const [pendingState, setPendingState] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +81,16 @@ export function EpicDetailPage({
     setDraft(null);
   };
 
+  const changeState = async (next: boolean) => {
+    try {
+      await setEpicActive(epic.id, next);
+      setPendingState(null);
+      await load();
+    } catch (err: any) {
+      onError(String(err.message ?? err));
+    }
+  };
+
   // 名前と説明の変更。コンテキストの編集とは別。
   const submitInfo = async (title: string, description: string | null) => {
     try {
@@ -99,7 +120,7 @@ export function EpicDetailPage({
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>{epic.title}</h2>
-        <span style={active ? activeBadge : inactiveBadge}>{active ? "Active" : "InActive"}</span>
+        <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
         <IdBadge id={epic.id} />
         <button onClick={() => setEditingInfo(true)} style={{ ...btn, marginLeft: "auto" }}>
           変更
@@ -197,6 +218,18 @@ export function EpicDetailPage({
           </table>
         )}
       </section>
+
+      {pendingState !== null && (
+        <ConfirmDialog
+          message={
+            pendingState
+              ? `「${epic.title}」を Active にします。エピックとして着手した扱いになります。よろしいですか？`
+              : `「${epic.title}」を InActive にします。バックログに戻ります。よろしいですか？`
+          }
+          onConfirm={() => changeState(pendingState)}
+          onCancel={() => setPendingState(null)}
+        />
+      )}
 
       {editingInfo && (
         <EpicInfoForm
@@ -394,5 +427,3 @@ const badge: CSSProperties = {
   border: "1px solid",
   whiteSpace: "nowrap",
 };
-const activeBadge: CSSProperties = { ...badge, background: "#eaf2fc", color: "#0b4a8a", borderColor: "#0972d3" };
-const inactiveBadge: CSSProperties = { ...badge, background: "#f4f5f6", color: "#5f6b7a", borderColor: "#cbd2d9" };
