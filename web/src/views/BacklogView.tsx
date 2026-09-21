@@ -21,7 +21,7 @@ export function BacklogView({
   const [adding, setAdding] = useState(false);
   // 名前と状態はドラッグで幅を変えられる。説明は残り幅を使う。
   const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
-  const state = useResizableWidth("backlog.stateWidth", 160, 120, 360, { invert: true });
+  const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
   // 状態での絞り込み。all = 両方出す
   const [stateFilter, setStateFilter] = useState<"all" | "active" | "inactive">("all");
 
@@ -63,8 +63,8 @@ export function BacklogView({
           style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd2d9" }}
         >
           <option value="all">すべて</option>
-          <option value="active">エピック（Active）</option>
-          <option value="inactive">バックログ（Inactive）</option>
+          <option value="active">Active</option>
+          <option value="inactive">InActive</option>
         </select>
         <button onClick={() => setAdding(true)} style={{ ...primaryBtn, marginLeft: "auto" }}>
           バックログを追加
@@ -78,7 +78,7 @@ export function BacklogView({
           <div style={{ color: "#5f6b7a" }}>エピック・バックログがありません。「バックログを追加」から登録してください。</div>
         ) : visible.length === 0 ? (
           <div style={{ color: "#5f6b7a" }}>
-            {stateFilter === "active" ? "エピック（Active）" : "バックログ（Inactive）"}はありません。
+            {stateFilter === "active" ? "Active" : "InActive"}のエピックはありません。
           </div>
         ) : (
           <table style={table}>
@@ -111,7 +111,7 @@ export function BacklogView({
                     </td>
                     <td style={{ ...td, position: "relative" }}>
                       <span style={active ? activeBadge : inactiveBadge}>
-                        {active ? "エピック（Active）" : "バックログ（Inactive）"}
+                        {active ? "Active" : "InActive"}
                       </span>
                       <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
                     </td>
