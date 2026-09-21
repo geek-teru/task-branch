@@ -143,6 +143,7 @@ export function KanbanView({
               }}
               style={{
                 flex: 1,
+                minWidth: 0,
                 minHeight: 64,
                 padding: 8,
                 borderLeft: "1px solid #e5e8eb",
@@ -235,7 +236,7 @@ export function KanbanView({
                         <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
                       </div>
                         {STATUS_ORDER.map((s) => (
-                          <div key={s} style={{ ...headerCell, flex: 1, borderLeft: "1px solid #e5e8eb" }}>
+                          <div key={s} style={{ ...headerCell, flex: 1, minWidth: 0, borderLeft: "1px solid #e5e8eb" }}>
                             <span style={{ ...dot, background: STATUS_COLOR[s].border }} />
                             {STATUS_LABEL[s]}
                           </div>
@@ -424,7 +425,6 @@ function Card({
       style={{
         background: "#fff",
         border: "1px solid #e5e8eb",
-        borderLeft: `3px solid ${STATUS_COLOR[task.status].border}`,
         borderRadius: 6,
         padding: "6px 8px",
         marginBottom: 6,
