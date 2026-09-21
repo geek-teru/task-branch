@@ -21,6 +21,7 @@ export function KanbanView({
   projectFilter,
   onChangeProjectFilter,
   onChangeStatus,
+  onMoveTask,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -30,6 +31,7 @@ export function KanbanView({
   projectFilter: string | null;
   onChangeProjectFilter: (projectId: string | null) => void;
   onChangeStatus: (taskId: string, status: Status) => void;
+  onMoveTask: (taskId: string, storyId: string, status: Status) => void;
   onAddTask: (story: Task, values: StoryInput) => void;
   onUpdateTask: (id: string, values: StoryInput) => void;
   onDeleteTask: (id: string) => void;
@@ -38,7 +40,8 @@ export function KanbanView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<Task | null>(null);
-  const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status } | null>(null);
+  // targetStory がある＝別ストーリーへの移動。無ければ同じストーリー内のステータス変更。
+  const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
   const [over, setOver] = useState<{ storyId: string; status: Status } | null>(null);
 
@@ -91,7 +94,12 @@ export function KanbanView({
         </div>
 
         {STATUS_ORDER.map((s) => {
-          const canDrop = drag?.storyId === story.id && drag.task.status !== s;
+          // 同じプロジェクト内なら、同じストーリーの同じ列以外どこへでも落とせる
+          // （別ストーリーなら移動になる）。プロジェクトをまたぐ移動は許さない。
+          const canDrop =
+            !!drag &&
+            drag.task.project_id === story.project_id &&
+            !(drag.storyId === story.id && drag.task.status === s);
           const isOver = canDrop && over?.storyId === story.id && over.status === s;
           return (
             <div
@@ -107,7 +115,13 @@ export function KanbanView({
               onDragLeave={() => setOver((cur) => (cur?.storyId === story.id && cur.status === s ? null : cur))}
               onDrop={(e) => {
                 e.preventDefault();
-                if (canDrop && drag) setPendingMove({ task: drag.task, status: s });
+                if (canDrop && drag) {
+                  setPendingMove({
+                    task: drag.task,
+                    status: s,
+                    targetStory: drag.storyId === story.id ? undefined : story,
+                  });
+                }
                 endDrag();
               }}
               style={{
@@ -271,9 +285,19 @@ export function KanbanView({
 
       {pendingMove && (
         <ConfirmDialog
-          message={`「${pendingMove.task.title}」のステータスを『${STATUS_LABEL[pendingMove.status]}』に変更します。よろしいですか？`}
+          message={
+            pendingMove.targetStory
+              ? `「${pendingMove.task.title}」を\nストーリー「${pendingMove.targetStory.title}」へ移動し、` +
+                `ステータスを『${STATUS_LABEL[pendingMove.status]}』にします。よろしいですか？`
+              : `「${pendingMove.task.title}」のステータスを『${STATUS_LABEL[pendingMove.status]}』に変更します。よろしいですか？`
+          }
+          confirmLabel={pendingMove.targetStory ? "移動する" : undefined}
           onConfirm={() => {
-            onChangeStatus(pendingMove.task.id, pendingMove.status);
+            if (pendingMove.targetStory) {
+              onMoveTask(pendingMove.task.id, pendingMove.targetStory.id, pendingMove.status);
+            } else {
+              onChangeStatus(pendingMove.task.id, pendingMove.status);
+            }
             setPendingMove(null);
           }}
           onCancel={() => setPendingMove(null)}

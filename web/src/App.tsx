@@ -14,6 +14,7 @@ import {
   getProjectGraph,
   listProjects,
   moveStory,
+  moveTask,
   reorderEpics,
   setProjectActive,
   updateProject,
@@ -117,6 +118,19 @@ export default function App() {
     );
     try {
       await updateTaskStatus(taskId, status);
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+    try {
+      setLanes(await getKanbanLanes());
+    } catch (e: any) {
+      setError(String(e.message ?? e));
+    }
+  }, []);
+
+  const handleKanbanMove = useCallback(async (taskId: string, storyId: string, status: Status) => {
+    try {
+      await moveTask(taskId, storyId, status);
     } catch (e: any) {
       setError(String(e.message ?? e));
     }
@@ -489,6 +503,7 @@ export default function App() {
                     projectFilter={searchParams.get("project")}
                     onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
                     onChangeStatus={handleKanbanStatus}
+                    onMoveTask={handleKanbanMove}
                     onAddTask={handleAddTask}
                     onUpdateTask={handleKanbanUpdate}
                     onDeleteTask={handleKanbanDelete}
