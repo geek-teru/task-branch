@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogEpic, Project } from "../lib/types";
+import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 // Epics of one project: active ones (エピック) and inactive ones (バックログ).
 // Only name / description / state are shown; the document (context) is not loaded here.
@@ -18,6 +19,9 @@ export function BacklogView({
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
+  // 名前と状態はドラッグで幅を変えられる。説明は残り幅を使う。
+  const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
+  const state = useResizableWidth("backlog.stateWidth", 160, 120, 360, { invert: true });
   // 状態での絞り込み。all = 両方出す
   const [stateFilter, setStateFilter] = useState<"all" | "active" | "inactive">("all");
 
@@ -80,9 +84,15 @@ export function BacklogView({
           <table style={table}>
             <thead>
               <tr>
-                <th style={{ ...th, width: "30%" }}>名前</th>
+                <th style={{ ...th, width: name.width, position: "relative" }}>
+                  名前
+                  <div onMouseDown={name.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+                </th>
                 <th style={th}>説明</th>
-                <th style={{ ...th, width: 160 }}>状態</th>
+                <th style={{ ...th, width: state.width, position: "relative" }}>
+                  状態
+                  <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -90,18 +100,20 @@ export function BacklogView({
                 const active = e.activated_at != null;
                 return (
                   <tr key={e.id}>
-                    <td style={td}>
+                    <td style={{ ...td, position: "relative" }}>
                       <Link to={`/epics/${e.id}`} style={titleLink} title="詳細を開く">
                         {e.title}
                       </Link>
+                      <div onMouseDown={name.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
                     </td>
                     <td style={{ ...td, color: e.description ? "#3b4149" : "#94a0ad" }}>
                       {e.description ?? "（説明なし）"}
                     </td>
-                    <td style={td}>
+                    <td style={{ ...td, position: "relative" }}>
                       <span style={active ? activeBadge : inactiveBadge}>
                         {active ? "エピック（Active）" : "バックログ（Inactive）"}
                       </span>
+                      <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
                     </td>
                   </tr>
                 );
@@ -195,6 +207,7 @@ function BacklogForm({
 
 const table: CSSProperties = {
   width: "100%",
+  tableLayout: "fixed",
   borderCollapse: "separate",
   borderSpacing: 0,
   background: "#fff",
