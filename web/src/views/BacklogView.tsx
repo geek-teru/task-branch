@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogEpic, Project } from "../lib/types";
 
@@ -18,6 +18,14 @@ export function BacklogView({
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
+  // 状態での絞り込み。all = 両方出す
+  const [stateFilter, setStateFilter] = useState<"all" | "active" | "inactive">("all");
+
+  const visible = useMemo(() => {
+    if (!epics) return null;
+    if (stateFilter === "all") return epics;
+    return epics.filter((e) => (stateFilter === "active" ? e.activated_at != null : e.activated_at == null));
+  }, [epics, stateFilter]);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -44,16 +52,30 @@ export function BacklogView({
             </option>
           ))}
         </select>
+        <label style={{ fontSize: 12, color: "#5f6b7a", marginLeft: 8 }}>状態</label>
+        <select
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value as "all" | "active" | "inactive")}
+          style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd2d9" }}
+        >
+          <option value="all">すべて</option>
+          <option value="active">エピック（Active）</option>
+          <option value="inactive">バックログ（Inactive）</option>
+        </select>
         <button onClick={() => setAdding(true)} style={{ ...primaryBtn, marginLeft: "auto" }}>
           バックログを追加
         </button>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: "auto", boxSizing: "border-box" }}>
-        {!epics ? (
+        {!visible ? (
           <div style={{ color: "#5f6b7a" }}>読み込み中…</div>
-        ) : epics.length === 0 ? (
+        ) : epics!.length === 0 ? (
           <div style={{ color: "#5f6b7a" }}>エピック・バックログがありません。「バックログを追加」から登録してください。</div>
+        ) : visible.length === 0 ? (
+          <div style={{ color: "#5f6b7a" }}>
+            {stateFilter === "active" ? "エピック（Active）" : "バックログ（Inactive）"}はありません。
+          </div>
         ) : (
           <table style={table}>
             <thead>
@@ -64,7 +86,7 @@ export function BacklogView({
               </tr>
             </thead>
             <tbody>
-              {epics.map((e) => {
+              {visible.map((e) => {
                 const active = e.activated_at != null;
                 return (
                   <tr key={e.id}>
