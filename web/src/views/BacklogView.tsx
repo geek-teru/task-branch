@@ -1,6 +1,7 @@
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogEpic, Project } from "../lib/types";
+import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 // Epics of one project: active ones (エピック) and inactive ones (バックログ).
 // Only name / description / state are shown; the document (context) is not loaded here.
@@ -18,6 +19,17 @@ export function BacklogView({
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
+  // 名前と状態はドラッグで幅を変えられる。説明は残り幅を使う。
+  const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
+  const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
+  // 状態での絞り込み。all = 両方出す
+  const [stateFilter, setStateFilter] = useState<"all" | "active" | "inactive">("all");
+
+  const visible = useMemo(() => {
+    if (!epics) return null;
+    if (stateFilter === "all") return epics;
+    return epics.filter((e) => (stateFilter === "active" ? e.activated_at != null : e.activated_at == null));
+  }, [epics, stateFilter]);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -44,44 +56,64 @@ export function BacklogView({
             </option>
           ))}
         </select>
+        <label style={{ fontSize: 12, color: "#5f6b7a", marginLeft: 8 }}>状態</label>
+        <select
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value as "all" | "active" | "inactive")}
+          style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd2d9" }}
+        >
+          <option value="all">すべて</option>
+          <option value="active">Active</option>
+          <option value="inactive">InActive</option>
+        </select>
         <button onClick={() => setAdding(true)} style={{ ...primaryBtn, marginLeft: "auto" }}>
           バックログを追加
         </button>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: "auto", boxSizing: "border-box" }}>
-        {!epics ? (
+        {!visible ? (
           <div style={{ color: "#5f6b7a" }}>読み込み中…</div>
-        ) : epics.length === 0 ? (
+        ) : epics!.length === 0 ? (
           <div style={{ color: "#5f6b7a" }}>エピック・バックログがありません。「バックログを追加」から登録してください。</div>
+        ) : visible.length === 0 ? (
+          <div style={{ color: "#5f6b7a" }}>
+            {stateFilter === "active" ? "Active" : "InActive"}のエピックはありません。
+          </div>
         ) : (
           <table style={table}>
             <thead>
               <tr>
-                <th style={{ ...th, width: "30%" }}>名前</th>
+                <th style={{ ...th, width: name.width, position: "relative" }}>
+                  名前
+                  <div onMouseDown={name.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+                </th>
                 <th style={th}>説明</th>
-                <th style={{ ...th, width: 160 }}>状態</th>
-                <th style={{ ...th, width: 72 }} />
+                <th style={{ ...th, width: state.width, position: "relative" }}>
+                  状態
+                  <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {epics.map((e) => {
+              {visible.map((e) => {
                 const active = e.activated_at != null;
                 return (
                   <tr key={e.id}>
-                    <td style={{ ...td, fontWeight: 600 }}>{e.title}</td>
+                    <td style={{ ...td, position: "relative" }}>
+                      <Link to={`/epics/${e.id}`} style={titleLink} title="詳細を開く">
+                        {e.title}
+                      </Link>
+                      <div onMouseDown={name.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+                    </td>
                     <td style={{ ...td, color: e.description ? "#3b4149" : "#94a0ad" }}>
                       {e.description ?? "（説明なし）"}
                     </td>
-                    <td style={td}>
+                    <td style={{ ...td, position: "relative" }}>
                       <span style={active ? activeBadge : inactiveBadge}>
-                        {active ? "エピック（Active）" : "バックログ（Inactive）"}
+                        {active ? "Active" : "InActive"}
                       </span>
-                    </td>
-                    <td style={td}>
-                      <Link to={`/epics/${e.id}`} style={detailBtn}>
-                        詳細
-                      </Link>
+                      <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
                     </td>
                   </tr>
                 );
@@ -175,6 +207,7 @@ function BacklogForm({
 
 const table: CSSProperties = {
   width: "100%",
+  tableLayout: "fixed",
   borderCollapse: "separate",
   borderSpacing: 0,
   background: "#fff",
@@ -199,6 +232,12 @@ const td: CSSProperties = {
   borderBottom: "1px solid #eef0f2",
   verticalAlign: "top",
   color: "#1f2933",
+};
+
+const titleLink: CSSProperties = {
+  color: "#0972d3",
+  fontWeight: 600,
+  textDecoration: "none",
 };
 
 const primaryBtn: CSSProperties = {
@@ -255,18 +294,6 @@ const textInput: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 6,
   border: "1px solid #cbd2d9",
-};
-
-const detailBtn: CSSProperties = {
-  display: "inline-block",
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "3px 10px",
-  fontSize: 12,
-  textDecoration: "none",
-  whiteSpace: "nowrap",
 };
 
 const badge: CSSProperties = {

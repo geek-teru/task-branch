@@ -87,7 +87,7 @@ export function EpicDetailPage({
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
         <h2 style={{ margin: 0, fontSize: 18 }}>{epic.title}</h2>
-        <span style={active ? activeBadge : inactiveBadge}>{active ? "エピック（Active）" : "バックログ（Inactive）"}</span>
+        <span style={active ? activeBadge : inactiveBadge}>{active ? "Active" : "InActive"}</span>
         <IdBadge id={epic.id} />
       </div>
       <div style={{ fontSize: 13, color: epic.description ? "#3b4149" : "#94a0ad" }}>
