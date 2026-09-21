@@ -440,7 +440,7 @@ function Card({
       <div style={{ fontSize: 11, color: "#94a0ad", lineHeight: 1.6 }}>
         <IdBadge id={task.id} />
       </div>
-      <div style={weak} title={[epicTitle, storyTitle].filter(Boolean).join(" - ")}>
+      <div style={placeStyle} title={[epicTitle, storyTitle].filter(Boolean).join(" - ")}>
         {place}
       </div>
       <div style={{ marginTop: 2 }}>{task.title}</div>
@@ -451,6 +451,15 @@ function Card({
 
 // 長い名前はカードの幅を食うので、6文字で切って「…」を付ける。
 const clip = (text: string) => (text.length > 6 ? `${text.slice(0, 6)}…` : text);
+
+// エピック - ストーリーは「補助・ラベル」、期限はそれより弱い色で出す。
+const placeStyle: CSSProperties = {
+  fontSize: 11,
+  color: "#5f6b7a",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 
 const weak: CSSProperties = {
   fontSize: 11,
