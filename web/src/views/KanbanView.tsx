@@ -148,7 +148,7 @@ export function KanbanView({
                 padding: 8,
                 borderLeft: "1px solid #e5e8eb",
                 background: isOver ? "#eaf2fc" : canDrop ? "#f7fafe" : undefined,
-                outline: isOver ? "2px dashed #0972d3" : "none",
+                outline: isOver ? "2px solid #0972d3" : "none",
                 outlineOffset: -4,
               }}
             >
