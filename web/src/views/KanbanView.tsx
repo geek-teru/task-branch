@@ -126,6 +126,8 @@ export function KanbanView({
                   <Card
                     key={t.id}
                     task={t}
+                    epicTitle={epic?.title ?? null}
+                    storyTitle={story.title}
                     dragging={drag?.task.id === t.id}
                     selected={selectedId === t.id}
                     onSelect={() => setSelectedId(t.id)}
@@ -281,8 +283,11 @@ export function KanbanView({
   );
 }
 
+// 上から ID / エピック - ストーリー / タイトル / 期限。上2行は弱い補助として出す。
 function Card({
   task,
+  epicTitle,
+  storyTitle,
   dragging,
   selected,
   onSelect,
@@ -290,12 +295,15 @@ function Card({
   onDragEnd,
 }: {
   task: Task;
+  epicTitle: string | null;
+  storyTitle: string;
   dragging: boolean;
   selected: boolean;
   onSelect: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const place = [epicTitle, storyTitle].filter(Boolean).map((t) => clip(t as string)).join(" - ");
   return (
     <div
       draggable
@@ -322,14 +330,28 @@ function Card({
         boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
       }}
     >
-      {task.title}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, fontSize: 11, color: "#94a0ad" }}>
+      <div style={{ fontSize: 11, color: "#94a0ad", lineHeight: 1.6 }}>
         <IdBadge id={task.id} />
-        {task.due_date && <span>期限 {task.due_date}</span>}
       </div>
+      <div style={weak} title={[epicTitle, storyTitle].filter(Boolean).join(" - ")}>
+        {place}
+      </div>
+      <div style={{ marginTop: 2 }}>{task.title}</div>
+      {task.due_date && <div style={weak}>期限 {task.due_date}</div>}
     </div>
   );
 }
+
+// 長い名前はカードの幅を食うので、6文字で切って「…」を付ける。
+const clip = (text: string) => (text.length > 6 ? `${text.slice(0, 6)}…` : text);
+
+const weak: CSSProperties = {
+  fontSize: 11,
+  color: "#94a0ad",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 
 // Same look as the gantt's "add story" button.
 const addBtn: CSSProperties = {
