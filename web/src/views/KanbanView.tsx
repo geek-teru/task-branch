@@ -312,7 +312,7 @@ export function KanbanView({
                   ))}
                 </select>
                 <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 6 }}>
-                  カンバンに出るよう、追加したストーリーは進行中にします。
+                  ステータスは次の画面で選べます。既定は、カンバンに出るよう進行中です。
                 </div>
               </>
             )}
@@ -345,6 +345,7 @@ export function KanbanView({
           heading={`ストーリーを追加（${storyForm.epicTitle}）`}
           submitLabel="追加"
           initial={{ title: "", status: "in_progress", start_date: null, due_date: null, description: null }}
+          todoHint="未着手のままだとカンバンには出ません（ガントチャートとバックログから見えます）。"
           onSubmit={(values) => {
             onAddStory(storyForm.epic, values);
             setStoryForm(null);
