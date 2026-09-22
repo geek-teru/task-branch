@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { listEpics } from "../lib/api";
 import type { BacklogEpic, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
@@ -11,6 +11,10 @@ import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
+
+// ドラッグ中、ボードの上下この幅に入ったら自動スクロールする（px / 1フレームの最大量）。
+const AUTO_SCROLL_EDGE = 72;
+const AUTO_SCROLL_MAX_STEP = 18;
 
 // One board per project: a swimlane per in-progress story, columns = task status.
 // The project filter (null = all projects) is owned by the caller (kept in the URL).
@@ -51,6 +55,8 @@ export function KanbanView({
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
   const [over, setOver] = useState<{ storyId: string; status: Status } | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const autoScroll = useRef<{ raf: number; step: number } | null>(null);
 
   const visibleProjects = useMemo(
     () => (projectFilter ? projects.filter((p) => p.id === projectFilter) : projects),
@@ -86,7 +92,45 @@ export function KanbanView({
     }
   };
 
+  const stopAutoScroll = () => {
+    if (!autoScroll.current) return;
+    cancelAnimationFrame(autoScroll.current.raf);
+    autoScroll.current = null;
+  };
+
+  // 画面外のストーリーへ運べるよう、ボードの上下端にカードを持っていったらスクロールする。
+  // ドロップ先の判定は列の onDragOver / onDrop がそのまま見るので、ここは位置だけを動かす。
+  const updateAutoScroll = (clientY: number) => {
+    const board = boardRef.current;
+    if (!board) return;
+    const { top, bottom } = board.getBoundingClientRect();
+    const ratio =
+      clientY < top + AUTO_SCROLL_EDGE
+        ? -(top + AUTO_SCROLL_EDGE - clientY) / AUTO_SCROLL_EDGE
+        : clientY > bottom - AUTO_SCROLL_EDGE
+        ? (clientY - (bottom - AUTO_SCROLL_EDGE)) / AUTO_SCROLL_EDGE
+        : 0;
+    if (!ratio) {
+      stopAutoScroll();
+      return;
+    }
+    const step = Math.max(-1, Math.min(1, ratio)) * AUTO_SCROLL_MAX_STEP;
+    if (autoScroll.current) {
+      autoScroll.current.step = step;
+      return;
+    }
+    const tick = () => {
+      const running = autoScroll.current;
+      const node = boardRef.current;
+      if (!running || !node) return;
+      node.scrollTop += running.step;
+      running.raf = requestAnimationFrame(tick);
+    };
+    autoScroll.current = { raf: requestAnimationFrame(tick), step };
+  };
+
   const endDrag = () => {
+    stopAutoScroll();
     setDrag(null);
     setOver(null);
   };
@@ -203,7 +247,12 @@ export function KanbanView({
           </select>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: "auto", boxSizing: "border-box" }}>
+        <div
+          ref={boardRef}
+          onDragOver={(e) => updateAutoScroll(e.clientY)}
+          onDrop={stopAutoScroll}
+          style={{ flex: 1, minHeight: 0, padding: 24, overflow: "auto", boxSizing: "border-box" }}
+        >
           {visibleProjects.length === 0 ? (
             <div style={{ color: "#5f6b7a" }}>
               {projectFilter ? "プロジェクトが見つかりません。" : "プロジェクトがありません。"}
