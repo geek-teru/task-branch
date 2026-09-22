@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState, type CSSProperties } from "react";
-import { listEpics } from "../lib/api";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { listEpics, listProjectStories } from "../lib/api";
 import type { BacklogEpic, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { DetailPanel } from "../components/DetailPanel";
+import { DetailPanel, type StoryGroup } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
@@ -55,6 +55,11 @@ export function KanbanView({
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
   const [over, setOver] = useState<{ storyId: string; status: Status } | null>(null);
+  // ストーリーの変更: 詳細パネルのエピック / ストーリー名を押したときのプルダウンの中身。
+  // 選んだタスクのプロジェクト単位で読み、同じプロジェクトの間は読み直さない。
+  const [storySource, setStorySource] = useState<{ projectId: string; epics: BacklogEpic[]; stories: Task[] } | null>(
+    null
+  );
   const boardRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef<{ raf: number; step: number } | null>(null);
 
@@ -78,9 +83,45 @@ export function KanbanView({
   // or its project is filtered out.
   const selected = useMemo(() => {
     if (!selectedId) return null;
-    const tasks = visibleProjects.flatMap((p) => lanesByProject.get(p.id) ?? []).flatMap((l) => l.tasks);
-    return tasks.find((t) => t.id === selectedId) ?? null;
+    for (const p of visibleProjects)
+      for (const lane of lanesByProject.get(p.id) ?? []) {
+        const task = lane.tasks.find((t) => t.id === selectedId);
+        if (task) return { task, lane };
+      }
+    return null;
   }, [visibleProjects, lanesByProject, selectedId]);
+
+  const selectedProjectId = selected?.task.project_id;
+  useEffect(() => {
+    if (!selectedProjectId || storySource?.projectId === selectedProjectId) return;
+    let cancelled = false;
+    Promise.all([listEpics(selectedProjectId), listProjectStories(selectedProjectId)])
+      .then(([epics, stories]) => {
+        if (!cancelled) setStorySource({ projectId: selectedProjectId, epics, stories });
+      })
+      .catch(() => {
+        // 読めなければプルダウンを出さないだけで、詳細の表示は妨げない。
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId, storySource?.projectId]);
+
+  // エピックごとにまとめた移動先。進行中でないストーリーには状態を添える。
+  const storyOptions = useMemo<StoryGroup[] | undefined>(() => {
+    if (!selectedProjectId || storySource?.projectId !== selectedProjectId) return undefined;
+    return storySource.epics
+      .map((epic) => ({
+        epic: epic.title,
+        stories: storySource.stories
+          .filter((story) => story.parent_id === epic.id)
+          .map((story) => ({
+            id: story.id,
+            label: story.status === "in_progress" ? story.title : `${story.title}（${STATUS_LABEL[story.status]}）`,
+          })),
+      }))
+      .filter((group) => group.stories.length > 0);
+  }, [selectedProjectId, storySource]);
 
   const startAddStory = async (project: Project) => {
     try {
@@ -303,10 +344,17 @@ export function KanbanView({
 
       {selected && (
         <DetailPanel
-          title={selected.title}
-          node={selected}
-          start={toDate(selected.start_date)}
-          end={toDate(selected.due_date)}
+          title={selected.task.title}
+          node={selected.task}
+          start={toDate(selected.task.start_date)}
+          end={toDate(selected.task.due_date)}
+          place={{ epic: selected.lane.epic?.title ?? null, story: selected.lane.story.title }}
+          storyOptions={storyOptions}
+          currentStoryId={selected.task.parent_id}
+          onPickStory={(storyId) => {
+            const target = storySource?.stories.find((story) => story.id === storyId);
+            if (target) setPendingMove({ task: selected.task, status: selected.task.status, targetStory: target });
+          }}
           onClose={() => setSelectedId(null)}
           onEdit={(t) => setEditing(t)}
           onDelete={(t) => {
@@ -419,12 +467,7 @@ export function KanbanView({
 
       {pendingMove && (
         <ConfirmDialog
-          message={
-            pendingMove.targetStory
-              ? `「${pendingMove.task.title}」を\nストーリー「${pendingMove.targetStory.title}」へ移動し、` +
-                `ステータスを『${STATUS_LABEL[pendingMove.status]}』にします。よろしいですか？`
-              : `「${pendingMove.task.title}」のステータスを『${STATUS_LABEL[pendingMove.status]}』に変更します。よろしいですか？`
-          }
+          message={moveMessage(pendingMove)}
           confirmLabel={pendingMove.targetStory ? "移動する" : undefined}
           onConfirm={() => {
             if (pendingMove.targetStory) {
@@ -439,6 +482,24 @@ export function KanbanView({
       )}
     </div>
   );
+}
+
+// 確認モーダルの文面。ステータスが変わらない移動ではその一文を省き、
+// 進行中でないストーリーへ移すときはカンバンから消えることを添える。
+function moveMessage({ task, status, targetStory }: { task: Task; status: Status; targetStory?: Task }): string {
+  if (!targetStory) {
+    return `「${task.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。よろしいですか？`;
+  }
+  const head =
+    status === task.status
+      ? `「${task.title}」を\nストーリー「${targetStory.title}」へ移動します。`
+      : `「${task.title}」を\nストーリー「${targetStory.title}」へ移動し、` +
+        `ステータスを『${STATUS_LABEL[status]}』にします。`;
+  const warn =
+    targetStory.status === "in_progress"
+      ? ""
+      : `\n移動先は${STATUS_LABEL[targetStory.status]}のストーリーのため、移動するとカンバンには出なくなります。`;
+  return `${head}${warn}\nよろしいですか？`;
 }
 
 // 上から ID / エピック - ストーリー / タイトル / 期限。上2行は弱い補助として出す。

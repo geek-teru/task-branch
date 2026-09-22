@@ -165,6 +165,19 @@ export async function listStories(epicId: string): Promise<Task[]> {
   return data ?? [];
 }
 
+// Every story of a project, for pickers that move a task to another story.
+export async function listProjectStories(projectId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_LIST_COLUMNS)
+    .eq("project_id", projectId)
+    .eq("level", "story")
+    .order("sort_order", { ascending: true })
+    .overrideTypes<Task[], { merge: false }>();
+  if (error) throw error;
+  return data ?? [];
+}
+
 // Move a story under another epic of the same project, appended after that epic's stories.
 export async function moveStory(storyId: string, targetEpicId: string): Promise<void> {
   const { data: last, error: lastError } = await supabase

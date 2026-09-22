@@ -7,6 +7,12 @@ import { IdBadge } from "./IdBadge";
 // A story or task shown in the panel; progress is present for graph nodes only.
 export type DetailNode = Task & { progress?: number | null };
 
+// 移動先の候補。エピックごとにまとめて、プルダウンの見出しにする。
+export interface StoryGroup {
+  epic: string;
+  stories: { id: string; label: string }[];
+}
+
 const MS_DAY = 24 * 60 * 60 * 1000;
 function parseDate(s: string): Date {
   return new Date(`${s}T00:00:00`);
@@ -27,6 +33,10 @@ export function DetailPanel<T extends DetailNode>({
   onStart,
   onComplete,
   onChangeStatus,
+  place,
+  storyOptions,
+  currentStoryId,
+  onPickStory,
 }: {
   title: string;
   node: T | null;
@@ -38,6 +48,10 @@ export function DetailPanel<T extends DetailNode>({
   onStart?: (node: T) => void;
   onComplete?: (node: T) => void;
   onChangeStatus?: (node: T, status: Status) => void; // status badge → menu
+  place?: { epic: string | null; story: string | null }; // where the node sits; omitted = not shown
+  storyOptions?: StoryGroup[]; // 候補が無い間は表示だけ（プルダウンを出さない）
+  currentStoryId?: string | null;
+  onPickStory?: (storyId: string) => void; // エピック / ストーリー名のプルダウンで選んだ移動先
 }) {
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
   const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
@@ -95,6 +109,34 @@ export function DetailPanel<T extends DetailNode>({
 
         {node && <Field label="ID"><IdBadge id={node.id} /></Field>}
         <Field label="レベル">{node ? LEVEL_LABEL[node.level] : DASH}</Field>
+        {place && (
+          <>
+            <Field label="エピック">
+              {storyOptions?.length && onPickStory ? (
+                <PlacePicker
+                  text={place.epic}
+                  groups={storyOptions}
+                  currentStoryId={currentStoryId ?? null}
+                  onPick={onPickStory}
+                />
+              ) : (
+                place.epic ?? DASH
+              )}
+            </Field>
+            <Field label="ストーリー">
+              {storyOptions?.length && onPickStory ? (
+                <PlacePicker
+                  text={place.story}
+                  groups={storyOptions}
+                  currentStoryId={currentStoryId ?? null}
+                  onPick={onPickStory}
+                />
+              ) : (
+                place.story ?? DASH
+              )}
+            </Field>
+          </>
+        )}
         <Field label="ステータス">
           {node?.status ? (
             onChangeStatus && node.level !== "epic" ? (
@@ -186,6 +228,104 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </div>
   );
 }
+
+// エピック / ストーリー名をクリックすると開く、移動先ストーリーのメニュー。
+// 見出しはエピック、項目はその配下のストーリー。どちらの名前から開いても中身は同じで、
+// エピックを変えたいときは別のエピックのストーリーを選ぶ。
+function PlacePicker({
+  text,
+  groups,
+  currentStoryId,
+  onPick,
+}: {
+  text: string | null;
+  groups: StoryGroup[];
+  currentStoryId: string | null;
+  onPick: (storyId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "block" }}>
+      <button onClick={() => setOpen((v) => !v)} title="クリックでストーリーを変更" style={placeBtn}>
+        <span style={{ flex: 1, textAlign: "left" }}>{text ?? "-"}</span>
+        <span style={{ fontSize: 10, color: "#5f6b7a" }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
+          <span style={placeMenu}>
+            {groups.map((g) => (
+              <span key={g.epic} style={{ display: "block" }}>
+                <span style={placeMenuHeading}>{g.epic}</span>
+                {g.stories.map((story) => (
+                  <button
+                    key={story.id}
+                    onClick={() => {
+                      setOpen(false);
+                      if (story.id !== currentStoryId) onPick(story.id);
+                    }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "5px 10px",
+                      border: "none",
+                      borderRadius: 4,
+                      background: story.id === currentStoryId ? "#eef1f3" : "transparent",
+                      color: "#1f2933",
+                      fontSize: 12,
+                      fontWeight: story.id === currentStoryId ? 600 : 400,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {story.label}
+                  </button>
+                ))}
+              </span>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+const placeBtn: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  width: "100%",
+  background: "none",
+  border: "none",
+  padding: 0,
+  fontSize: 13,
+  color: "#1f2933",
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const placeMenu: CSSProperties = {
+  position: "absolute",
+  left: 0,
+  top: "calc(100% + 4px)",
+  zIndex: 20,
+  width: 268,
+  maxHeight: 260,
+  overflowY: "auto",
+  background: "#fff",
+  border: "1px solid #cbd2d9",
+  borderRadius: 6,
+  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
+  padding: 4,
+};
+
+const placeMenuHeading: CSSProperties = {
+  display: "block",
+  padding: "6px 10px 2px",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#94a0ad",
+};
 
 // Badge that opens a small menu to pick any status.
 function StatusPicker({ status, onPick }: { status: Status; onPick: (status: Status) => void }) {
