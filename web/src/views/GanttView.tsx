@@ -1,6 +1,6 @@
 // Gantt view: every project's phases/tasks on a shared timeline.
 // Built from start_date/due_date on story-level nodes (epics summarize their children).
-import { useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
@@ -198,6 +198,20 @@ export function GanttView({
   >(null);
   // Pending change awaiting confirmation via the custom modal.
   const [confirm, setConfirm] = useState<{ message: string; label?: string; onConfirm: () => void } | null>(null);
+  // 畳んでいるエピック / ストーリーの id。ストーリーは全部畳んだ状態で始めるので、
+  // タスクは既定で隠れている。エピックは完了したものだけ畳む。
+  // 張り直すのはプロジェクトを変えたときだけ。ステータス変更のたびに走る refreshGraph で
+  // 作り直すと、ユーザーが開いた行が勝手に閉じてしまう。
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const initial = new Set<string>();
+    for (const n of graph.nodes) {
+      if (n.level === "story") initial.add(n.id);
+      else if (n.level === "epic" && n.status === "done") initial.add(n.id);
+    }
+    setCollapsed(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
   const filtered = useMemo(() => [{ project, graph }], [project, graph]);
 
   const model = useMemo(() => {
@@ -269,12 +283,38 @@ export function GanttView({
   }
 
   const { rows, timelineStart, timelineW, months, todayX } = model;
-  const bodyH = rows.length * ROW_H;
+
+  // 配下の数。0 件の行には開閉のトグルを出さない。
+  const childCount = new Map<string, number>();
+  const epicOfStory = new Map<string, string>();
+  for (const r of rows) {
+    if ((r.kind === "story" || r.kind === "task") && r.node?.parent_id) {
+      childCount.set(r.node.parent_id, (childCount.get(r.node.parent_id) ?? 0) + 1);
+      if (r.kind === "story") epicOfStory.set(r.node.id, r.node.parent_id);
+    }
+  }
+  // 畳んだ親の配下を落とす。エピックを畳めば、配下のストーリーもそのタスクも消える。
+  // 期間の計算は rows（全行）のままなので、畳んでもタイムラインの横幅と月の並びは動かない。
+  const hidden = (r: Row): boolean => {
+    const parent = r.node?.parent_id;
+    if (!parent) return false;
+    if (collapsed.has(parent)) return true;
+    return r.kind === "task" && collapsed.has(epicOfStory.get(parent) ?? "");
+  };
+  const visibleRows = rows.filter((r) => !hidden(r));
+  const bodyH = visibleRows.length * ROW_H;
   const totalW = LABEL_W + timelineW;
   const selectedRow = selectedKey ? rows.find((r) => r.key === selectedKey) ?? null : null;
 
   const epicIds = rows.filter((r) => r.kind === "epic").map((r) => r.node!.id);
   const epicTitle = (id: string) => rows.find((r) => r.kind === "epic" && r.node?.id === id)?.label ?? "";
+  const toggleCollapsed = (storyId: string) =>
+    setCollapsed((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(storyId)) next.add(storyId);
+      return next;
+    });
+
   const endDrag = () => {
     setDrag(null);
     setOverKey(null);
@@ -385,7 +425,7 @@ export function GanttView({
             )}
           </div>
 
-          {rows.map((r) => {
+          {visibleRows.map((r) => {
             const storyTarget = storyDropEpicId(r);
             const epicTarget =
               drag?.kind === "epic" && r.kind === "epic" && r.node && r.node.id !== drag.id ? r.node.id : null;
@@ -393,6 +433,9 @@ export function GanttView({
             const isOver = canDrop && overKey === r.key;
             const canDragRow =
               !!r.node && ((r.kind === "epic" && !!onReorderEpics) || (r.kind === "story" && !!onMoveStory));
+            // 子を持つエピック / ストーリーだけ開閉できる。
+            const canToggle =
+              !!r.node && (r.kind === "epic" || r.kind === "story") && !!childCount.get(r.node.id);
             return (
             <div key={r.key} style={{ display: "flex", height: ROW_H, position: "relative" }}>
               <div
@@ -464,6 +507,23 @@ export function GanttView({
                 }
               >
                 <span
+                  onClick={(e) => {
+                    if (!canToggle) return;
+                    e.stopPropagation();
+                    toggleCollapsed(r.node!.id);
+                  }}
+                  title={
+                    canToggle
+                      ? `クリックで${r.kind === "epic" ? "ストーリー" : "タスク"}を${
+                          collapsed.has(r.node!.id) ? "表示" : "隠す"
+                        }`
+                      : undefined
+                  }
+                  style={{ flexShrink: 0, width: 12, color: "#5f6b7a", cursor: canToggle ? "pointer" : "default" }}
+                >
+                  {canToggle ? (collapsed.has(r.node!.id) ? "▸" : "▾") : ""}
+                </span>
+                <span
                   onClick={() => {
                     if (r.node) setSelectedKey(r.key);
                   }}
@@ -477,6 +537,11 @@ export function GanttView({
                   }}
                 >
                   {r.label}
+                  {canToggle && collapsed.has(r.node!.id) && (
+                    <span style={{ color: "#94a0ad", marginLeft: 4, fontWeight: 400 }}>
+                      ({childCount.get(r.node!.id)})
+                    </span>
+                  )}
                 </span>
                 {r.kind === "epic" && r.node && onAddStory && (
                   <button
