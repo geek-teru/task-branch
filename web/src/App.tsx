@@ -205,6 +205,18 @@ export default function App() {
     }
   }, [ganttProjectId]);
 
+  const handleGanttAddTask = useCallback(
+    async (story: GraphNode, values: StoryInput) => {
+      try {
+        await addTask(story, values);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleAddStory = useCallback(
     async (epic: GraphNode, values: StoryInput) => {
       try {
@@ -413,6 +425,7 @@ export default function App() {
           graph={graph.graph}
           onSelectProject={(projectId) => navigate(`/projects/${projectId}/gantt`)}
           onAddStory={handleAddStory}
+          onAddTask={handleGanttAddTask}
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           onStartStory={handleStartStory}
