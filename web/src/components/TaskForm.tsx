@@ -8,6 +8,7 @@ export function TaskForm({
   noun = "ストーリー",
   submitLabel,
   initial,
+  todoHint,
   onSubmit,
   onCancel,
 }: {
@@ -15,6 +16,7 @@ export function TaskForm({
   noun?: string; // used in field labels, e.g. "タスク" → "タスク名"
   submitLabel: string;
   initial: StoryInput;
+  todoHint?: string; // shown under the status select while 未着手 is picked
   onSubmit: (values: StoryInput) => void;
   onCancel: () => void;
 }) {
@@ -63,6 +65,7 @@ export function TaskForm({
             </option>
           ))}
         </select>
+        {todoHint && status === "todo" && <div style={hintText}>{todoHint}</div>}
 
         <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
           <div style={{ flex: 1 }}>
@@ -145,6 +148,12 @@ const fieldLabel: CSSProperties = {
   fontWeight: 600,
   color: "#5f6b7a",
   marginBottom: 6,
+};
+
+const hintText: CSSProperties = {
+  fontSize: 11,
+  color: "#94a0ad",
+  marginTop: 6,
 };
 
 const textInput: CSSProperties = {
