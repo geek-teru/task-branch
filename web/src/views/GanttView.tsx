@@ -1,8 +1,8 @@
 // Gantt view: every project's phases/tasks on a shared timeline.
 // Built from start_date/due_date on story-level nodes (epics summarize their children).
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -44,6 +44,11 @@ function storyInitial(prevEnd: Date | null): StoryInput {
   return { title: "", status: "todo", start_date: isoDate(start), due_date: isoDate(due), description: null };
 }
 
+// タスクは期間を持たないことが多いので、空のまま出して必要なら入れてもらう。
+function taskInitial(): StoryInput {
+  return { title: "", status: "todo", start_date: null, due_date: null, description: null };
+}
+
 function editInitial(node: GraphNode): StoryInput {
   return {
     title: node.title,
@@ -56,7 +61,7 @@ function editInitial(node: GraphNode): StoryInput {
 
 interface Row {
   key: string;
-  kind: "project" | "epic" | "story";
+  kind: "project" | "epic" | "story" | "task";
   label: string;
   start: Date | null;
   end: Date | null;
@@ -82,6 +87,16 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
     const tasksOf = (phaseId: string) =>
       graph.nodes
         .filter((n) => n.level === "story" && n.parent_id === phaseId)
+        .map((t) => ({
+          node: t,
+          start: t.start_date ? parseDate(t.start_date) : null,
+          end: t.due_date ? parseDate(t.due_date) : null,
+        }))
+        .sort((a, b) => byStart(a.start, a.node.sort_order, b.start, b.node.sort_order));
+
+    const childTasks = (storyId: string) =>
+      graph.nodes
+        .filter((n) => n.level === "task" && n.parent_id === storyId)
         .map((t) => ({
           node: t,
           start: t.start_date ? parseDate(t.start_date) : null,
@@ -121,6 +136,18 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
           status: t.node.status,
           node: t.node,
         });
+
+        for (const k of childTasks(t.node.id)) {
+          rows.push({
+            key: `k:${k.node.id}`,
+            kind: "task",
+            label: k.node.title,
+            start: k.start,
+            end: k.end,
+            status: k.node.status,
+            node: k.node,
+          });
+        }
       }
     }
   }
@@ -133,6 +160,7 @@ export function GanttView({
   graph,
   onSelectProject,
   onAddStory,
+  onAddTask,
   onUpdateTask,
   onDeleteTask,
   onStartStory,
@@ -147,6 +175,7 @@ export function GanttView({
   graph: ProjectGraph;
   onSelectProject: (projectId: string) => void;
   onAddStory?: (epic: GraphNode, values: StoryInput) => void;
+  onAddTask?: (story: GraphNode, values: StoryInput) => void;
   onUpdateTask?: (id: string, values: StoryInput) => void;
   onDeleteTask?: (id: string) => void;
   onStartStory?: (id: string) => void;
@@ -162,7 +191,10 @@ export function GanttView({
   const [drag, setDrag] = useState<{ kind: "epic" | "story"; id: string; title: string; parentId: string | null } | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
   const [form, setForm] = useState<
-    { mode: "create"; epic: GraphNode; prevEnd: Date | null } | { mode: "edit"; node: GraphNode } | null
+    | { mode: "create"; epic: GraphNode; prevEnd: Date | null }
+    | { mode: "create-task"; story: GraphNode }
+    | { mode: "edit"; node: GraphNode }
+    | null
   >(null);
   // Pending change awaiting confirmation via the custom modal.
   const [confirm, setConfirm] = useState<{ message: string; label?: string; onConfirm: () => void } | null>(null);
@@ -280,6 +312,7 @@ export function GanttView({
   const submitForm = (values: StoryInput) => {
     if (!form) return;
     if (form.mode === "create") onAddStory?.(form.epic, values);
+    else if (form.mode === "create-task") onAddTask?.(form.story, values);
     else onUpdateTask?.(form.node.id, values);
     setForm(null);
   };
@@ -408,10 +441,17 @@ export function GanttView({
                   borderBottom: "1px solid #f0f2f4",
                   display: "flex",
                   alignItems: "center",
-                  padding: r.kind === "story" ? "0 8px 0 40px" : r.kind === "epic" ? "0 8px 0 22px" : "0 8px",
+                  padding:
+                    r.kind === "task"
+                      ? "0 8px 0 58px"
+                      : r.kind === "story"
+                      ? "0 8px 0 40px"
+                      : r.kind === "epic"
+                      ? "0 8px 0 22px"
+                      : "0 8px",
                   fontSize: r.kind === "project" ? 12 : 11,
-                  fontWeight: r.kind === "story" ? 400 : 700,
-                  color: r.kind === "story" ? "#3b4149" : "#1f2933",
+                  fontWeight: r.kind === "story" || r.kind === "task" ? 400 : 700,
+                  color: r.kind === "story" || r.kind === "task" ? "#3b4149" : "#1f2933",
                   cursor: canDragRow ? "grab" : undefined,
                   gap: 4,
                 }}
@@ -445,19 +485,19 @@ export function GanttView({
                       setForm({ mode: "create", epic: r.node!, prevEnd: r.end });
                     }}
                     title="ストーリーを追加"
-                    style={{
-                      flexShrink: 0,
-                      width: 18,
-                      height: 18,
-                      lineHeight: "16px",
-                      padding: 0,
-                      border: "1px solid #cbd2d9",
-                      borderRadius: 4,
-                      background: "#fff",
-                      color: "#0972d3",
-                      cursor: "pointer",
-                      fontSize: 13,
+                    style={addBtn}
+                  >
+                    +
+                  </button>
+                )}
+                {r.kind === "story" && r.node && onAddTask && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setForm({ mode: "create-task", story: r.node! });
                     }}
+                    title="タスクを追加"
+                    style={addBtn}
                   >
                     +
                   </button>
@@ -465,6 +505,22 @@ export function GanttView({
                 <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
               </div>
               <div style={{ position: "relative", width: timelineW, borderBottom: "1px solid #f0f2f4" }}>
+                {r.kind === "task" && !(r.start && r.end) && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 8,
+                      top: 0,
+                      height: ROW_H,
+                      display: "flex",
+                      alignItems: "center",
+                      fontSize: 10,
+                      color: "#94a0ad",
+                    }}
+                  >
+                    期間未設定
+                  </span>
+                )}
                 {r.start && r.end && (
                   <Bar
                     row={r}
@@ -508,7 +564,9 @@ export function GanttView({
           onDelete={
             onDeleteTask
               ? (node) => {
-                  if (window.confirm(`ストーリー「${node.title}」を削除します。\n配下のタスクも削除されます。よろしいですか？`)) {
+                  const kind = LEVEL_LABEL[node.level];
+                  const extra = node.level === "story" ? "\n配下のタスクも削除されます。" : "";
+                  if (window.confirm(`${kind}「${node.title}」を削除します。${extra}よろしいですか？`)) {
                     onDeleteTask(node.id);
                     setSelectedKey(null);
                   }
@@ -532,9 +590,26 @@ export function GanttView({
 
       {form && (
         <TaskForm
-          heading={form.mode === "create" ? "ストーリーを追加" : "ストーリーを変更"}
-          submitLabel={form.mode === "create" ? "追加" : "保存"}
-          initial={form.mode === "create" ? storyInitial(form.prevEnd) : editInitial(form.node)}
+          heading={
+            form.mode === "create"
+              ? "ストーリーを追加"
+              : form.mode === "create-task"
+              ? `タスクを追加（${form.story.title}）`
+              : `${LEVEL_LABEL[form.node.level]}を変更`
+          }
+          noun={
+            form.mode === "create-task" || (form.mode === "edit" && form.node.level === "task")
+              ? "タスク"
+              : "ストーリー"
+          }
+          submitLabel={form.mode === "edit" ? "保存" : "追加"}
+          initial={
+            form.mode === "create"
+              ? storyInitial(form.prevEnd)
+              : form.mode === "create-task"
+              ? taskInitial()
+              : editInitial(form.node)
+          }
           onSubmit={submitForm}
           onCancel={() => setForm(null)}
         />
@@ -554,6 +629,21 @@ export function GanttView({
     </div>
   );
 }
+
+// エピックの「ストーリーを追加」／ストーリーの「タスクを追加」で共通。
+const addBtn: CSSProperties = {
+  flexShrink: 0,
+  width: 18,
+  height: 18,
+  lineHeight: "16px",
+  padding: 0,
+  border: "1px solid #cbd2d9",
+  borderRadius: 4,
+  background: "#fff",
+  color: "#0972d3",
+  cursor: "pointer",
+  fontSize: 13,
+};
 
 function Bar({
   row,
