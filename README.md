@@ -38,6 +38,25 @@ supabase start                       # Docker で Postgres/API/Studio を起動
 `supabase start` は `migrations/` を適用し、`seed.sql` を投入します。
 （既に起動済みで再適用したい場合は `supabase db reset`。）
 
+Google ログインをローカルで試す場合は、起動前に OAuth クライアントの値を環境変数に入れます
+（`config.toml` は値を直接持たず、この2つを参照します）。
+
+```bash
+export SUPABASE_AUTH_GOOGLE_CLIENT_ID="..."
+export SUPABASE_AUTH_GOOGLE_SECRET="..."
+supabase start
+```
+
+Google Cloud 側の「承認済みのリダイレクト URI」には、本番とローカルの2本を登録しておきます。
+
+```
+https://<project-ref>.supabase.co/auth/v1/callback
+http://localhost:54321/auth/v1/callback
+```
+
+`config.toml` を変えたときは `supabase stop` → `supabase start` で読み直します
+（`db reset` では auth の設定は反映されません）。
+
 ### 2. フロントエンド
 
 ```bash
