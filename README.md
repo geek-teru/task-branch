@@ -38,6 +38,44 @@ supabase start                       # Docker で Postgres/API/Studio を起動
 `supabase start` は `migrations/` を適用し、`seed.sql` を投入します。
 （既に起動済みで再適用したい場合は `supabase db reset`。）
 
+Google ログインをローカルで試す場合は、起動前に OAuth クライアントの値を環境変数に入れます。
+`config.toml` は値を持たず `env(...)` で参照しています。
+
+```bash
+export SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID='...'
+export SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET='...'
+env | grep -c SUPABASE_AUTH_EXTERNAL_GOOGLE   # 2 を確認してから
+supabase stop && supabase start
+```
+
+つまずきやすい点が3つあります。
+
+- **変数が未設定のまま起動しても失敗しません。** `env(...)` が展開されず、その文字列が
+  そのまま auth コンテナへ渡ります。起動前に `env | grep -c` で 2 を確認してください。
+- **`supabase start` だけでは読み直されません。** すでに起動しているスタックには何もしない
+  ので、`stop` を挟みます。
+- **値はシングルクォートで囲みます。** シークレットに `$` が入っているとダブルクォートでは
+  シェルに展開されます。
+
+設定が効いたかは、auth コンテナに渡った値で確認できます（本物なら72文字前後）。
+
+```bash
+docker inspect supabase_auth_task-branch --format '{{range .Config.Env}}{{println .}}{{end}}'   | grep GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID
+```
+
+Google Cloud 側の「承認済みのリダイレクト URI」には、本番とローカルの2本を登録しておきます。
+
+```
+https://<project-ref>.supabase.co/auth/v1/callback
+http://localhost:54321/auth/v1/callback
+```
+
+CLI が既定で作る callback は `127.0.0.1` ですが、Google は `localhost` と別物として扱うため、
+`config.toml` の `redirect_uri` で `localhost` 側に合わせています。
+
+`config.toml` を変えたときは `supabase stop` → `supabase start` で読み直します
+（`db reset` では auth の設定は反映されません）。
+
 ### 2. フロントエンド
 
 ```bash

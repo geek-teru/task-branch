@@ -14,7 +14,7 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+major_version = 17
 
 [studio]
 enabled = true
@@ -26,6 +26,17 @@ site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173"]
 jwt_expiry = 3600
 enable_signup = true
+
+[auth.external.google]
+enabled = true
+# 値は起動時のシェルの環境変数から取る。env(...) の中の名前は任意だが、
+# CLI 自身の上書き用の名前に合わせてある。変数が未設定のまま起動すると、
+# 展開されずこの文字列がそのまま auth コンテナへ渡るので注意。
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# CLI の既定の callback は 127.0.0.1 だが、Google は localhost と別物として
+# 扱うため、Google Cloud に登録済みの localhost 側へ合わせる。
+redirect_uri = "http://localhost:54321/auth/v1/callback"
 
 [db.seed]
 enabled = true
