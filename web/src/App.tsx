@@ -52,18 +52,20 @@ export default function App() {
   const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const session = useSession();
+  // Data is loaded only after sign-in; signed-out visitors are sent to /login below.
+  const userId = session?.user.id;
 
   useEffect(() => {
-    if (!isConfigured) return;
+    if (!isConfigured || !userId) return;
     listProjects()
       .then(setProjects)
       .catch((e) => setError(String(e.message ?? e)))
       .finally(() => setProjectsLoaded(true));
-  }, []);
+  }, [userId]);
 
   // Load only the selected project's graph.
   useEffect(() => {
-    if (!ganttProjectId) return;
+    if (!userId || !ganttProjectId) return;
     let cancelled = false;
     getProjectGraph(ganttProjectId)
       .then((g) => {
@@ -73,13 +75,13 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [ganttProjectId]);
+  }, [userId, ganttProjectId]);
 
   // Backlog page: the project comes from ?project=, defaulting to the first project.
   const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? defaultProjectId : undefined;
   const [backlog, setBacklog] = useState<{ projectId: string; epics: BacklogEpic[] } | null>(null);
   useEffect(() => {
-    if (!backlogProjectId) return;
+    if (!userId || !backlogProjectId) return;
     let cancelled = false;
     listEpics(backlogProjectId)
       .then((epics) => {
@@ -89,7 +91,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [backlogProjectId]);
+  }, [userId, backlogProjectId]);
 
   // Add a backlog item (inactive epic) to the selected project, then reload the list.
   const handleAddBacklog = useCallback(
@@ -122,12 +124,12 @@ export default function App() {
 
   const [lanes, setLanes] = useState<KanbanLane[] | null>(null);
   useEffect(() => {
-    if (!isKanban) return;
+    if (!userId || !isKanban) return;
     setLanes(null);
     getKanbanLanes()
       .then(setLanes)
       .catch((e) => setError(String(e.message ?? e)));
-  }, [isKanban]);
+  }, [userId, isKanban]);
 
   // Move a card: update locally first so the drop feels instant, then persist and resync.
   const handleKanbanStatus = useCallback(async (taskId: string, status: Status) => {
@@ -418,6 +420,11 @@ export default function App() {
         {session === undefined ? null : session ? <Navigate to="/projects" replace /> : <LoginPage />}
       </Shell>
     );
+  }
+
+  // Every other page needs a signed-in user. Render nothing while the session is still being read.
+  if (!session) {
+    return <Shell>{session === null && <Navigate to="/login" replace />}</Shell>;
   }
 
   // Archived projects stay reachable by URL but drop out of the pickers.
