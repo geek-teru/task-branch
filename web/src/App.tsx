@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
+import { signOut, useSession } from "./lib/useSession";
 import {
   addStory,
   addTask,
@@ -31,6 +32,7 @@ import { GanttView } from "./views/GanttView";
 import { KanbanView } from "./views/KanbanView";
 import { BacklogView } from "./views/BacklogView";
 import { EpicDetailPage } from "./views/EpicDetailPage";
+import { LoginPage } from "./views/LoginPage";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -49,6 +51,7 @@ export default function App() {
   const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? defaultProjectId : undefined;
   const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const session = useSession();
 
   useEffect(() => {
     if (!isConfigured) return;
@@ -381,6 +384,12 @@ export default function App() {
     }
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    const { error } = await signOut();
+    if (error) setError(error.message);
+    else navigate("/login");
+  }, [navigate]);
+
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
     else if (key === "gantt") navigate("/gantt");
@@ -398,6 +407,15 @@ export default function App() {
             ローカルは <code>supabase start</code> が値を表示します。
           </p>
         </div>
+      </Shell>
+    );
+  }
+
+  // The login page stands alone, without the sidebar. Signed-in users go straight to the app.
+  if (pathname === "/login") {
+    return (
+      <Shell>
+        {session === undefined ? null : session ? <Navigate to="/projects" replace /> : <LoginPage />}
       </Shell>
     );
   }
@@ -444,6 +462,9 @@ export default function App() {
       <Sidebar
         active={isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
         onNavigate={onNavigate}
+        userEmail={session?.user.email ?? null}
+        onLogin={() => navigate("/login")}
+        onLogout={handleLogout}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
