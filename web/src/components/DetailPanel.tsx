@@ -3,6 +3,7 @@ import type { Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { IdBadge } from "./IdBadge";
+import { TaskComments } from "./TaskComments";
 
 // A story or task shown in the panel; progress is present for graph nodes only.
 export type DetailNode = Task & { progress?: number | null };
@@ -164,6 +165,7 @@ export function DetailPanel<T extends DetailNode>({
         <Field label="作成日時">{node?.created_at ? fmtDateTime(node.created_at) : DASH}</Field>
         <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
+        {node?.level === "task" && <TaskComments taskId={node.id} />}
       </div>
 
       {canEdit && node && (
