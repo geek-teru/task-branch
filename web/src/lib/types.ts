@@ -68,6 +68,17 @@ export interface ContextRevision {
   created_at: string;
 }
 
+// A comment on a task (level = task only). author_* default to the caller on insert.
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_type: AssigneeType;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // predecessor (前提) → successor (後続), between tasks of the same story.
 export interface TaskDependency {
   id: string;

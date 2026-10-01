@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./types";
+import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -151,6 +151,24 @@ export async function getLatestContextRevision(epicId: string): Promise<ContextR
     .maybeSingle();
   if (error) throw error;
   return data as ContextRevision | null;
+}
+
+// Comments on a task, oldest first.
+export async function listTaskComments(taskId: string): Promise<TaskComment[]> {
+  const { data, error } = await supabase
+    .from("task_comments")
+    .select("*")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as TaskComment[];
+}
+
+// author_type / author_id are left to the DB defaults (current_actor_type / current_actor_id).
+export async function addTaskComment(taskId: string, body: string): Promise<TaskComment> {
+  const { data, error } = await supabase.from("task_comments").insert({ task_id: taskId, body }).select().single();
+  if (error) throw error;
+  return data as TaskComment;
 }
 
 export async function listStories(epicId: string): Promise<Task[]> {
