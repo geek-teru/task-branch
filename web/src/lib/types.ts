@@ -1,7 +1,7 @@
 // Shared domain types. Every view is a projection over these — see DESIGN.md §5.4.
 
 export type Level = "epic" | "story" | "task";
-export type Status = "todo" | "in_progress" | "done";
+export type Status = "todo" | "in_progress" | "done" | "closed";
 export type AssigneeType = "human" | "ai";
 
 export interface Project {
@@ -33,7 +33,8 @@ export interface Task {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
-  completed_at: string | null;
+  completed_at: string | null; // set while done / closed
+  closed_at: string | null; // set while closed (approved and taken off the board)
 }
 
 // Editable fields of a project, shared by the create/edit form and the API.
@@ -103,9 +104,17 @@ export const STATUS_LABEL: Record<Status, string> = {
   todo: "未着手",
   in_progress: "進行中",
   done: "完了",
+  closed: "クローズ",
 };
 
-export const STATUS_ORDER: Status[] = ["todo", "in_progress", "done"];
+// Every status, in workflow order (status pickers and forms).
+export const STATUS_ORDER: Status[] = ["todo", "in_progress", "done", "closed"];
+
+// Kanban columns. closed is not a column: those cards are hidden unless the toolbar toggle is on.
+export const BOARD_STATUSES: Status[] = ["todo", "in_progress", "done"];
+
+// done and closed both count as finished (same rule as get_progress).
+export const isFinished = (status: Status) => status === "done" || status === "closed";
 
 export const LEVEL_LABEL: Record<Level, string> = {
   epic: "エピック",

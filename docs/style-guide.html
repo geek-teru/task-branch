@@ -64,6 +64,7 @@
   .badge-todo { background: #e2f4fb; color: #0b5e73; border-color: #33a9c9; }
   .badge-doing { background: #eaf2fc; color: #0b4a8a; border-color: #0972d3; }
   .badge-done { background: #eaf6ec; color: #12652b; border-color: #1a7f37; }
+  .badge-closed { background: #f4f5f6; color: #5f6b7a; border-color: #8d99a8; }
   .pill { font-size: 11px; border-radius: 999px; padding: 2px 10px; border: 1px solid; white-space: nowrap; }
   .pill-active { background: #e8f3ff; color: #0972d3; border-color: #b5d6f7; }
   .pill-inactive { background: #f2f3f4; color: #5f6b7a; border-color: #d5dbdb; }
@@ -169,9 +170,11 @@
     <tr><td>未着手 todo</td><td><span class="badge badge-todo">未着手</span></td><td class="mono">#e2f4fb</td><td class="mono">#33a9c9</td><td class="mono">#0b5e73</td></tr>
     <tr><td>進行中 in_progress</td><td><span class="badge badge-doing">進行中</span></td><td class="mono">#eaf2fc</td><td class="mono">#0972d3</td><td class="mono">#0b4a8a</td></tr>
     <tr><td>完了 done</td><td><span class="badge badge-done">完了</span></td><td class="mono">#eaf6ec</td><td class="mono">#1a7f37</td><td class="mono">#12652b</td></tr>
+    <tr><td>クローズ closed</td><td><span class="badge badge-closed">クローズ</span></td><td class="mono">#f4f5f6</td><td class="mono">#8d99a8</td><td class="mono">#5f6b7a</td></tr>
   </tbody>
 </table>
-<p class="note">ガントのバーとカンバンのカードも同じ3色。バーは <code>border</code> 色で塗り、カードは左端 3px の線に使う。</p>
+<p class="note">クローズはカンバンの列にしない。ツールバーの「クローズしたタスクも表示」を入れたときだけ、完了列の下に不透明度 0.6 のカードと右上の小さなバッジ（同じ色）で出す。</p>
+<p class="note">ガントのバーとカンバンのカードも同じ色。バーは <code>border</code> 色で塗り、カードは左端 3px の線に使う。</p>
 
 <h3>危険・注意</h3>
 <div class="swatches">

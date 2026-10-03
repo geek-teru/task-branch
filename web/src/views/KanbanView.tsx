@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { listEpics, listProjectStories } from "../lib/api";
 import type { BacklogEpic, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -15,6 +15,9 @@ const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
 // ドラッグ中、ボードの上下この幅に入ったら自動スクロールする（px / 1フレームの最大量）。
 const AUTO_SCROLL_EDGE = 72;
 const AUTO_SCROLL_MAX_STEP = 18;
+
+// 「クローズしたタスクも表示」の状態。ブラウザごとに覚える（列幅と同じ扱い）。
+const SHOW_CLOSED_KEY = "kanban.showClosed";
 
 // One board per project: a swimlane per in-progress story, columns = task status.
 // The project filter (null = all projects) is owned by the caller (kept in the URL).
@@ -45,6 +48,22 @@ export function KanbanView({
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("kanban.labelWidth", 280, 160, 640);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showClosed, setShowClosed] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_CLOSED_KEY) === "1";
+    } catch {
+      // Storage can be unavailable (private mode); fall back to hidden.
+      return false;
+    }
+  });
+  const toggleShowClosed = (on: boolean) => {
+    setShowClosed(on);
+    try {
+      localStorage.setItem(SHOW_CLOSED_KEY, on ? "1" : "0");
+    } catch {
+      // Ignore: the toggle still applies for this session.
+    }
+  };
   const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<Task | null>(null);
   // ストーリー追加: エピックを選んでから、いつもの TaskForm で名前と期間を入れる
@@ -177,7 +196,8 @@ export function KanbanView({
   };
 
   const renderLane = ({ story, epic, tasks }: KanbanLane) => {
-    const done = tasks.filter((t) => t.status === "done").length;
+    // クローズも完了として数える。トグルで隠していても数は変えない。
+    const done = tasks.filter((t) => isFinished(t.status)).length;
     return (
       <div key={story.id} style={{ display: "flex", borderBottom: "1px solid #e5e8eb" }}>
         <div style={{ width: LABEL_W, flex: "none", padding: "10px 12px", boxSizing: "border-box", position: "relative" }}>
@@ -195,7 +215,7 @@ export function KanbanView({
           <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
         </div>
 
-        {STATUS_ORDER.map((s) => {
+        {BOARD_STATUSES.map((s) => {
           // 同じプロジェクト内なら、同じストーリーの同じ列以外どこへでも落とせる
           // （別ストーリーなら移動になる）。プロジェクトをまたぐ移動は許さない。
           const canDrop =
@@ -238,7 +258,9 @@ export function KanbanView({
               }}
             >
               {tasks
-                .filter((t) => t.status === s)
+                // クローズは列を持たない。トグルが入っているときだけ完了列の下に薄く出す。
+                .filter((t) => t.status === s || (s === "done" && showClosed && t.status === "closed"))
+                .sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
                 .map((t) => (
                   <Card
                     key={t.id}
@@ -286,6 +308,10 @@ export function KanbanView({
               </option>
             ))}
           </select>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, fontSize: 12, color: "#5f6b7a" }}>
+            <input type="checkbox" checked={showClosed} onChange={(e) => toggleShowClosed(e.target.checked)} />
+            クローズしたタスクも表示
+          </label>
         </div>
 
         <div
@@ -325,7 +351,7 @@ export function KanbanView({
                         エピック / ストーリー
                         <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
                       </div>
-                        {STATUS_ORDER.map((s) => (
+                        {BOARD_STATUSES.map((s) => (
                           <div key={s} style={{ ...headerCell, flex: 1, minWidth: 0, borderLeft: "1px solid #e5e8eb" }}>
                             <span style={{ ...dot, background: STATUS_COLOR[s].border }} />
                             {STATUS_LABEL[s]}
@@ -523,6 +549,7 @@ function Card({
   onDragEnd: () => void;
 }) {
   const place = [epicTitle, storyTitle].filter(Boolean).map((t) => clip(t as string)).join(" - ");
+  const closed = task.status === "closed";
   return (
     <div
       draggable
@@ -544,12 +571,13 @@ function Card({
         cursor: "pointer",
         outline: selected ? "2px solid #1f2933" : "none",
         outlineOffset: 1,
-        opacity: dragging ? 0.4 : 1,
+        opacity: dragging ? 0.4 : closed ? 0.6 : 1,
         boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
       }}
     >
-      <div style={{ fontSize: 11, color: "#94a0ad", lineHeight: 1.6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a0ad", lineHeight: 1.6 }}>
         <IdBadge id={task.id} />
+        {closed && <span style={closedTag}>{STATUS_LABEL.closed}</span>}
       </div>
       <div style={placeStyle} title={[epicTitle, storyTitle].filter(Boolean).join(" - ")}>
         {place}
@@ -570,6 +598,18 @@ const placeStyle: CSSProperties = {
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
+};
+
+// クローズしたカード（トグルで出したとき）の印。ステータスバッジと同じ色。
+const closedTag: CSSProperties = {
+  marginLeft: "auto",
+  padding: "0 6px",
+  borderRadius: 8,
+  fontSize: 10,
+  lineHeight: "16px",
+  background: STATUS_COLOR.closed.bg,
+  color: STATUS_COLOR.closed.fg,
+  border: `1px solid ${STATUS_COLOR.closed.border}`,
 };
 
 const weak: CSSProperties = {

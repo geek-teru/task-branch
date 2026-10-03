@@ -2,7 +2,7 @@
 // Built from start_date/due_date on story-level nodes (epics summarize their children).
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, isFinished } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -199,7 +199,7 @@ export function GanttView({
   // Pending change awaiting confirmation via the custom modal.
   const [confirm, setConfirm] = useState<{ message: string; label?: string; onConfirm: () => void } | null>(null);
   // 畳んでいるエピック / ストーリーの id。ストーリーは全部畳んだ状態で始めるので、
-  // タスクは既定で隠れている。エピックは完了したものだけ畳む。
+  // タスクは既定で隠れている。エピックは完了・クローズしたものだけ畳む。
   // 張り直すのはプロジェクトを変えたときだけ。ステータス変更のたびに走る refreshGraph で
   // 作り直すと、ユーザーが開いた行が勝手に閉じてしまう。
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -207,7 +207,7 @@ export function GanttView({
     const initial = new Set<string>();
     for (const n of graph.nodes) {
       if (n.level === "story") initial.add(n.id);
-      else if (n.level === "epic" && n.status === "done") initial.add(n.id);
+      else if (n.level === "epic" && isFinished(n.status)) initial.add(n.id);
     }
     setCollapsed(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps

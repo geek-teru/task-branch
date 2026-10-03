@@ -1,5 +1,6 @@
 -- task-branch 自体の開発管理プロジェクト（プロジェクト → エピック → ストーリー → タスク）。
 -- ストーリーは 1 週間単位。2026-09-19 時点の状態（終わった作業は done、残りは todo / in_progress）。
+-- カンバン画面のストーリーには、承認済みとして closed のタスクも置く（「クローズしたタスクも表示」の確認用）。
 -- 単独で再実行可能: このプロジェクト名の既存行を先に削除してから再投入する。
 -- 実行例: docker exec -i supabase_db_task-branch psql -U postgres -d postgres < supabase/task-branch.sql
 
@@ -96,9 +97,9 @@ epic > story > task の 3 階層と依存関係を DB で持ち、AI と画面�
             'feat/kanban（feat/page-routing の上に作成）')
     returning id into s;
   insert into tasks(project_id, parent_id, level, title, status, sort_order) values
-    (p, s, 'task', '進行中ストーリー × status 列のボード', 'done', 1),
-    (p, s, 'task', 'ドラッグで status 変更（確認モーダル付き）', 'done', 2),
-    (p, s, 'task', 'ストーリーの行からタスクを追加', 'done', 3),
+    (p, s, 'task', '進行中ストーリー × status 列のボード', 'closed', 1),
+    (p, s, 'task', 'ドラッグで status 変更（確認モーダル付き）', 'closed', 2),
+    (p, s, 'task', 'ストーリーの行からタスクを追加', 'closed', 3),
     (p, s, 'task', 'カードクリックで詳細パネル（ガントチャートと共通化）', 'done', 4),
     (p, s, 'task', 'プロジェクトごとの表とプロジェクト絞り込み', 'done', 5),
     (p, s, 'task', 'コミットと PR 作成', 'todo', 6);
