@@ -72,7 +72,7 @@ AI（Claude Code の `plan` スキル）が今後のタスクを洗い出し・�
 | 粒度 | 1つのコンテキスト | 1〜2週間（1スプリント） | 数時間 |
 | 役割 | 課題・問題点・改善点などの**コンテキスト（要件）**を持ち、ストーリー・タスクを洗い出す元になる | エピックの実現に必要なことを洗い出したもの。1スプリントで完了させる | ストーリーをさらに細分化した作業 |
 | 作り方 | 人が作るか、AI と壁打ちしながら作る。壁打ちの結論はドキュメント（`context`）に書く | エピックを active にしてから洗い出す（AI と壁打ちしてもよい）。バックログのエピックの下には、アイデアのメモとして**ラフなストーリー**を置ける | ストーリーから洗い出す |
-| 状態 | **バックログ（inactive）/ 進行中（active）/ 完了**。完了は配下の進捗率 100% で**自動**（手で閉じる操作は持たない） | `todo` / `in_progress` / `done` を手で動かす | `todo` / `in_progress` / `done` を手で動かす |
+| 状態 | **バックログ（inactive）/ 進行中（active）/ 完了**。完了は配下の進捗率 100% で**自動**（手で閉じる操作は持たない） | `todo` / `in_progress` / `done` / `closed` を手で動かす | `todo` / `in_progress` / `done` / `closed` を手で動かす |
 | 管理のしかた | 作成後はあまり手を入れない。status ではなく、配下のストーリーから算出した**進捗率**で見る | スプリントごとの振り返り、日々の進捗確認 | 日々の進捗確認 |
 | 情報の持ち方 | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）＋ **コメント**（補足・意見を追記）。ドキュメントは更新履歴を持つ | 短い説明（`description`） | 短い説明（`description`）＋ コメント |
 | 依存関係・クリティカルパス | 持たない | 持たない（ストーリー間の順序は §9 Q2） | 前提タスク → 後続タスク。張れるのは**同じストーリー内のタスク間**だけ。クリティカルパスはストーリー内で求める |
@@ -204,7 +204,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | title | text | not null | 名称 |
 | description | text | | 短い説明（一覧やカードに出す 1〜2 行） |
 | context | text | null可 | **epic のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `epic_context_revisions` に残す（最新版も含む） |
-| status | text | not null, default 'todo' | `todo` / `in_progress` / `done`（作業の進み具合）。エピックは手で動かさない（§1.3） |
+| status | text | not null, default 'todo' | `todo` / `in_progress` / `done` / `closed`（作業の進み具合）。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える。エピックは手で動かさない（§1.3） |
 | activated_at | timestamptz | null可 | **epic のみ**。null ＝ inactive（バックログ）、日時あり ＝ active（エピック）。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける。完了は列で持たず、active かつ配下の進捗率 100% から導出する |
 | assignee_type | text | null可 | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9 |
 | assignee_id | uuid | null可 | **task のみ**。人が担当する場合の担当者（ユーザー） |
@@ -214,7 +214,8 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | metadata | jsonb | not null, default '{}' | 将来拡張用の自由属性（色・タグ・外部ID等）。スキーマ変更なしで拡張 |
 | created_at | timestamptz | default now() | |
 | updated_at | timestamptz | default now() | |
-| completed_at | timestamptz | | done 遷移時刻 |
+| completed_at | timestamptz | | done 遷移時刻。`done` / `closed` の間は保持する |
+| closed_at | timestamptz | | closed 遷移時刻（承認した日時）。`closed` 以外では null |
 
 制約・ルール:
 - `level` は CHECK で3値に固定。
@@ -302,7 +303,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 - **rank（列／並列レーン）**: ストーリー内で前提タスクのない task を rank 0 とし、`rank(t)=max(rank(前提))+1`。同 rank のタスクは並列に進められる（R5）。
 - **クリティカルパス**: ストーリー内のタスク依存 DAG の **最長経路（各 task の重み=1、ホップ数）**（R6）。将来 `estimate` 追加時は重み付き最長経路へ拡張。
-- **着手可能**: 前提タスクがすべて `done` の task。status としては持たず、依存から導出する（R2）。
+- **着手可能**: 前提タスクがすべて `done` か `closed` の task。status としては持たず、依存から導出する（R2）。
 
 ### 3.4 進捗の集約（ロールアップ）
 
@@ -364,7 +365,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 ### 5.2 表現
 
-- **色**: status（todo=水色 / in_progress=青 / done=緑）。
+- **色**: status（todo=水色 / in_progress=青 / done=緑 / closed=グレー）。
 - **level で形状/サイズ**: epic=大, story=中, task=小（チェックボックス）。
 - **枠強調**: クリティカルパス上の task。
 - **アイコン**: task の担当（人 / AI）。
@@ -483,7 +484,7 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 |---|---|---|
 | **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は `task_dependencies`。期間は将来 `estimate` |
 | **カレンダー** | 日付（期限 / 予定日） | `start_date` / `due_date` を用意済 |
-| **カンバン** | 列（status）とカード、列内の並び順 | `status`（既存）＋ `sort_order`（列内順）。列 = status 値 |
+| **カンバン** | 列（status）とカード、列内の並び順 | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `done`。`closed` は列にしない） |
 
 ### 8.2 拡張ポイントと方針
 
