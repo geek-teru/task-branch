@@ -61,7 +61,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 | **依存（順序）** | DAG | 「Aが終わってからB」という実行順序 | 「OAuth クライアント作成」→「Supabase 設定」→「ログイン画面作成」 |
 
 - 階層は **`parent_id` によるツリー**。
-- 依存は **`task_dependencies` による有向辺**（**同じストーリー内のタスク間**で張る）。
+- 依存のデータの持ち方（テーブル・検証・RPC）は未設計。クリティカルパス・並列レーン・着手可能の判定を実装するときに設計する。
 
 ### 1.3 3つの粒度（level）
 
@@ -144,7 +144,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 ┌─────────────────────────────┐
 │  Supabase                    │
 │  ├─ PostgREST (自動REST API) │  ← CRUD の主経路
-│  ├─ RPC 関数 (Postgres)      │  ← 依存追加(循環検査) / CP / rank
+│  ├─ RPC 関数 (Postgres)      │  ← グラフ取得 / 進捗集約 / エクスポート
 │  ├─ Postgres (データ本体)     │
 │  └─ Auth (APIキー / 将来JWT)  │
 └─────────────────────────────┘
@@ -173,7 +173,6 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 ```
 projects 1 ──< tasks(自己参照ツリー parent_id)
-                 ├──< task_dependencies (同じストーリー内の task 間の有向辺)
                  ├──< epic_context_revisions (epic のドキュメントの更新履歴)
                  ├──< task_comments (task へのコメント。本文は編集できる)
                  └──> 担当者（人の場合。ユーザー）
@@ -265,24 +264,9 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
 - 人か AI かは、リクエストの JWT の `app_metadata.actor_type`（`ai` なら AI）で判定する（`current_actor_type()`）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
 
-#### task_dependencies
-
-`task` レベル間の有向辺（`predecessor`（前提タスク）完了後に `successor`（後続タスク）実行）。
-
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| id | uuid | PK, default gen_random_uuid() | |
-| project_id | uuid | FK→projects.id, not null | |
-| predecessor_id | uuid | FK→tasks.id, not null | 前提タスク（level=task） |
-| successor_id | uuid | FK→tasks.id, not null | 後続タスク（level=task） |
-| created_at | timestamptz | default now() | |
-
-- UNIQUE(predecessor_id, successor_id)、CHECK(predecessor_id <> successor_id)。
-- 両端が `level='task'` で、**同じストーリー（同じ parent_id）に属する**ことを **RPC `add_dependency` で検証**。
-- **循環（サイクル）防止**も同 RPC 内で検査し DAG を保証。
-- 前提タスクが未完了のまま後続タスクを進行中にすることは**禁止しない**（UI で警告のみ）。
-
 ### 3.3 派生概念（計算で導出）
+
+いずれも依存から導出する。依存のデータの持ち方は未設計で、実装時に設計する（§1.2）。
 
 - **rank（列／並列レーン）**: ストーリー内で前提タスクのない task を rank 0 とし、`rank(t)=max(rank(前提))+1`。同 rank のタスクは並列に進められる（R5）。
 - **クリティカルパス**: ストーリー内のタスク依存 DAG の **最長経路（各 task の重み=1、ホップ数）**（R6）。将来 `estimate` 追加時は重み付き最長経路へ拡張。
@@ -307,7 +291,6 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | オブジェクト作成（全level共通） | `POST /rest/v1/tasks`（level と parent_id を指定） |
 | ツリー取得 | `GET /rest/v1/tasks?project_id=eq.<id>&order=sort_order` |
 | 状態更新 | `PATCH /rest/v1/tasks?id=eq.<id>` |
-| 依存の閲覧 | `GET /rest/v1/task_dependencies?project_id=eq.<id>` |
 
 ヘッダ: `apikey: <key>`, `Authorization: Bearer <key>`。
 
@@ -315,8 +298,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 | 関数 | 用途 | 概要 |
 |---|---|---|
-| `add_dependency(pred uuid, succ uuid)` | 依存追加 | 両端が task かつ同じストーリー内か検証。循環になるならエラー（DAG保証） |
-| `get_task_graph(project uuid)` | 可視化用 | tasks（階層・担当込）+ edges + rank をまとめて返す（R4/R5） |
+| `get_task_graph(project uuid)` | 可視化用 | tasks（階層・担当・進捗込）を `{nodes}` で返す。依存（edges）と rank は依存の設計時に足す（R4/R5） |
 | `get_critical_path(story uuid)` | CP 抽出 | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6） |
 | `get_progress(project uuid)` | 進捗集約 | epic/story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 
@@ -341,7 +323,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 2. 決まった仕様はタスクの詳細に、進捗・課題・PR のリンクはタスクのコメントに残す。
 3. PR を作ったらタスクを `done` にする（親ストーリーの進捗が上がる）。承認を得たら `closed` にする（進捗は下がらない）。
 
-- タスク間の依存（`add_dependency`）は、画面に登録する手段が無いため、今はどちらのスキルも登録しない。
+- タスク間の依存は未設計のため、今はどちらのスキルも登録しない。
 ---
 
 ## 5. 可視化 UI 設計
@@ -477,7 +459,7 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 
 | ビュー | 必要データ | 本設計での準備状況 |
 |---|---|---|
-| **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は `task_dependencies`。期間は将来 `estimate` |
+| **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は未設計（§1.2）。期間は将来 `estimate` |
 | **カレンダー** | 日付（期限 / 予定日） | `start_date` / `due_date` を用意済 |
 | **カンバン** | 列（status）とカード、列内の並び順 | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `done`。`closed` は列にしない） |
 
