@@ -74,7 +74,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 | 作り方 | 人が作るか、AI と壁打ちしながら作る。壁打ちの結論はドキュメント（`context`）に書く | エピックを active にしてから洗い出す（AI と壁打ちしてもよい）。バックログのエピックの下には、アイデアのメモとして**ラフなストーリー**を置ける | ストーリーから洗い出す |
 | 状態 | **バックログ（inactive）/ 進行中（active）/ 完了**。完了は配下の進捗率 100% で**自動**（手で閉じる操作は持たない） | `todo` / `in_progress` / `done` / `closed` を手で動かす | `todo` / `in_progress` / `done` / `closed` を手で動かす |
 | 管理のしかた | 作成後はあまり手を入れない。status ではなく、配下のストーリーから算出した**進捗率**で見る | スプリントごとの振り返り、日々の進捗確認 | 日々の進捗確認 |
-| 情報の持ち方 | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）＋ **コメント**（補足・意見を追記）。ドキュメントは更新履歴を持つ | 短い説明（`description`） | 短い説明（`description`）＋ コメント |
+| 情報の持ち方 | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）。ドキュメントは更新履歴を持つ | 短い説明（`description`） | 短い説明（`description`）＋ コメント |
 | 依存関係・クリティカルパス | 持たない | 持たない（ストーリー間の順序は §9 Q2） | 前提タスク → 後続タスク。張れるのは**同じストーリー内のタスク間**だけ。クリティカルパスはストーリー内で求める |
 | 担当 | 持たない | 持たない | 人か AI か。人の場合は誰か |
 | 見える場所 | バックログ：バックログの一覧だけ／進行中：ガントチャート・カンバン・マップ／完了：完了として表示 | 親のエピックが進行中のときに、実行中のビューに出る（ラフなストーリーはバックログの一覧だけ） | 親のストーリーと同じ |
@@ -174,7 +174,6 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 ```
 projects 1 ──< tasks(自己参照ツリー parent_id)
                  ├──< task_dependencies (同じストーリー内の task 間の有向辺)
-                 ├──< epic_comments (epic へのコメント。追記のみ)
                  ├──< epic_context_revisions (epic のドキュメントの更新履歴)
                  ├──< task_comments (task へのコメント。本文は編集できる)
                  └──> 担当者（人の場合。ユーザー）
@@ -227,22 +226,6 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - 見積り（`estimate`）は未導入。導入時は `estimate_value numeric` + `estimate_unit text` を追加する想定（§10）。
 - `context` は長文になるため、一覧系の取得（カンバン・ガントチャート・`get_task_graph` など）では読み込まない。詳細・バックログの画面と、AI にエピックの文脈を渡すときだけ取得する。
 
-#### epic_comments
-
-エピックへのコメント。ドキュメント（`context`）を正の情報とし、コメントは補足・意見・壁打ちの経緯を**追記**していく。
-
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| id | uuid | PK, default gen_random_uuid() | |
-| epic_id | uuid | FK→tasks.id, not null | 対象のエピック（level=epic） |
-| author_type | text | not null | `human` / `ai` |
-| author_id | uuid | null可 | 人の場合の投稿者（ユーザー） |
-| body | text | not null | 本文（Markdown） |
-| created_at | timestamptz | default now() | |
-
-- 追記のみで、編集・削除はしない（経緯を残すため）。
-- コメントで決まったことは、ドキュメントに反映して正の情報にする。
-
 #### task_comments
 
 タスクへのコメント。作業メモ・確認したこと・やりとりを残す。
@@ -262,7 +245,6 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - 編集・削除できるのは、書いた本人とその持ち主（§7.1 の実効の所有者）。変えられるのは本文だけで、`task_id` / `author_type` / `author_id` / `created_at` は変えさせない。更新時に `updated_at` を now() にする。
 - 削除は物理削除。編集履歴は持たない。
 - 本文はプレーンテキスト（Markdown は解釈しない）。
-- `epic_comments`（追記のみ、経緯を残す）とは方針が違う。タスクのコメントは作業中のメモなので、書き間違いを直せることを優先する。
 - RLS は「タスクコメントの編集・削除」のストーリーで入れる。それまでは既存テーブルと同じ状態。
 
 #### epic_context_revisions
