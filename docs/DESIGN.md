@@ -24,7 +24,7 @@ AI がプランニングしたタスクを **粒度の異なる3階層のツリ�
 - [4. API 設計（AI / フロント共通）](#4-api-設計ai--フロント共通)
   - [4.1 CRUD（PostgREST 自動生成）](#41-crudpostgrest-自動生成)
   - [4.2 RPC 関数（ロジックを DB に集約）](#42-rpc-関数ロジックを-db-に集約)
-  - [4.3 `plan` スキルの動作イメージ](#43-plan-スキルの動作イメージ)
+  - [4.3 `planning` / `do` スキルの動作イメージ](#43-planning--do-スキルの動作イメージ)
 - [5. 可視化 UI 設計](#5-可視化-ui-設計)
   - [5.1 画面構成](#51-画面構成)
   - [5.2 表現](#52-表現)
@@ -49,7 +49,7 @@ AI がプランニングしたタスクを **粒度の異なる3階層のツリ�
 
 ### 1.1 背景・狙い
 
-AI（Claude Code の `plan` スキル）が今後のタスクを洗い出し・優先順位付けし、その結果を構造化データとして蓄積・可視化する。人間はブラウザで進捗・階層構造・依存関係（枝分かれ）・クリティカルパスを確認する。
+AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し・優先順位付けし、その結果を構造化データとして蓄積・可視化する。実装と進捗の更新は `do` スキルが行う。どちらのスキルもリポジトリの外（`~/.claude/skills/`）に置き、今は task-branch の画面を操作して読み書きする（§4.3）。人間はブラウザで進捗・階層構造・依存関係（枝分かれ）・クリティカルパスを確認する。
 
 ### 1.2 中核となる2つの関係（重要）
 
@@ -101,8 +101,8 @@ AI（Claude Code の `plan` スキル）が今後のタスクを洗い出し・�
 
 | # | 要件 | 対応方針 |
 |---|---|---|
-| R1 | AI がプランニングしたタスクを管理 | `plan` スキルが REST/RPC で CRUD |
-| R2 | 並列度を上げたい | 依存のない `task` を並列レーンに。着手可能かどうか（前提タスクがすべて done か）は依存から導出 |
+| R1 | AI がプランニングしたタスクを管理 | `planning` スキルが画面を操作して登録（将来は MCP サーバー経由で REST/RPC） |
+| R2 | 並列度を上げたい | 依存のない `task` を並列レーンに。着手可能かどうか（前提タスクがすべて `done` か `closed` か）は依存から導出 |
 | R3 | 終わった / これから進めるタスクを見れる | status フィルタ・ビュー |
 | R4 | マインドマップ / Git ブランチ状に可視化 | 階層ツリー + タスクの依存DAG（ブランチ図） |
 | R5 | 依存は直列、非依存は並列で配置 | トポロジカル順で rank 配置。前後関係は横、同 rank（並列）は縦に並べる |
@@ -130,22 +130,23 @@ AI（Claude Code の `plan` スキル）が今後のタスクを洗い出し・�
 
 ```
 ┌─────────────────────────────┐
-│  Claude Code / plan スキル    │  タスク洗い出し・階層化・優先順位付け
+│  Claude Code                 │  planning スキル: 計画を登録 / do スキル: 実装・進捗の更新
+│  planning / do スキル         │
 └───────────────┬─────────────┘
-                │ HTTPS (REST / RPC, apikey)
-                ▼
-┌─────────────────────────────┐
-│  Supabase                    │
-│  ├─ PostgREST (自動REST API) │  ← AI からの CRUD 主経路
-│  ├─ RPC 関数 (Postgres)      │  ← 依存追加(循環検査) / CP / rank
-│  ├─ Postgres (データ本体)     │
-│  └─ Auth (APIキー / 将来JWT)  │
-└───────────────┬─────────────┘
-                │ supabase-js
+                │ Playwright MCP で画面を操作（将来は MCP サーバー経由で REST / RPC）
                 ▼
 ┌─────────────────────────────┐
 │  Web UI (React + Vite)       │  階層ツリー・ブランチ図・CP・進捗
 │  └─ React Flow + dagre       │
+└───────────────┬─────────────┘
+                │ supabase-js
+                ▼
+┌─────────────────────────────┐
+│  Supabase                    │
+│  ├─ PostgREST (自動REST API) │  ← CRUD の主経路
+│  ├─ RPC 関数 (Postgres)      │  ← 依存追加(循環検査) / CP / rank
+│  ├─ Postgres (データ本体)     │
+│  └─ Auth (APIキー / 将来JWT)  │
 └─────────────────────────────┘
 ```
 
@@ -307,7 +308,8 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 ### 3.4 進捗の集約（ロールアップ）
 
-- `task` の done 数 / 総数 → 親 `story` の進捗率。
+- `task` の完了数 / 総数 → 親 `story` の進捗率。完了数は `done` と `closed` の合計（クローズしても進捗が下がらないように）。
+- task が1件もない `story` は、自身の status が `done` か `closed` なら 1、それ以外は 0。
 - `story` の進捗率の平均 → 親 `epic` の進捗率。**エピックはこの進捗率で管理し、status を手で動かす運用はしない**（§1.3）。
 - 集約は RPC / ビューで計算し、UI に返す。ストーリー・タスクの手動 status 変更は許容。
 
@@ -334,19 +336,30 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | `add_dependency(pred uuid, succ uuid)` | 依存追加 | 両端が task かつ同じストーリー内か検証。循環になるならエラー（DAG保証） |
 | `get_task_graph(project uuid)` | 可視化用 | tasks（階層・担当込）+ edges + rank をまとめて返す（R4/R5） |
 | `get_critical_path(story uuid)` | CP 抽出 | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6） |
-| `get_progress(project uuid)` | 進捗集約 | epic/story の進捗率を返す（§3.4） |
+| `get_progress(project uuid)` | 進捗集約 | epic/story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
 - AI・UI が同じ RPC を使い、計算結果を一致させる。
 
-### 4.3 `plan` スキルの動作イメージ
+### 4.3 `planning` / `do` スキルの動作イメージ
 
-1. ユーザー要望を分解し、`epic`（数ヶ月）→ `story`（週）→ `task`（細目）に階層化。
-2. `projects` を作成 or 選択。
-3. 各オブジェクトを `tasks` に登録（level / parent_id / title / description、task は担当も）。
-4. ストーリー内のタスク間の依存を `add_dependency` で登録（循環はエラーで弾かれる）。
-5. 進行に応じ `PATCH` で status 更新（task を done にすると親の進捗が上がる）。
+スキルはリポジトリの外（`~/.claude/skills/planning`、`~/.claude/skills/do`）に置く。今は API を直接呼ばず、Playwright MCP で task-branch の画面（<https://task-branch.vercel.app>）を操作して読み書きする。将来は MCP サーバー経由で REST / RPC を呼ぶ形に切り替える。
 
+**`planning` スキル（計画の登録）**
+
+1. 作りたいものを壁打ちし、目的・スコープ・技術スタックを決める。
+2. プロジェクトを作成（`/projects`）or 選択。既存なら、バックログ・ガント・カンバンで現状を把握してから足す。
+3. エピックを登録し（`/backlog`）、決めた内容をエピックのコンテキストに書く。
+4. エピック詳細からストーリーを登録する（開始日・期限つき）。
+5. カンバン（`/kanban`）の進行中ストーリーの行からタスクを登録する。
+
+**`do` スキル（実装と進捗の更新）**
+
+1. カンバンでタスクを選び、`in_progress` にして着手する。
+2. 決まった仕様はタスクの詳細に、進捗・課題・PR のリンクはタスクのコメントに残す。
+3. PR を作ったらタスクを `done` にする（親ストーリーの進捗が上がる）。承認を得たら `closed` にする（進捗は下がらない）。
+
+- タスク間の依存（`add_dependency`）は、画面に登録する手段が無いため、今はどちらのスキルも登録しない。
 ---
 
 ## 5. 可視化 UI 設計
@@ -360,7 +373,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - ビュー切替:
   - **階層ツリー（マインドマップ）**: epic → story → task を展開。React Flow で放射状/ツリー。
   - **ブランチ図（DAG）**: ストーリー配下のタスクを、依存で結んだ Git ブランチ状に表示。rank を軸に**前後関係は横（左→右）、並列（同 rank）は縦**（R4/R5）。担当（人 / AI）はアイコンで表す。
-  - **リスト**: status 別（done / in_progress / todo）。これから進める・終わったを一覧（R3）。
+  - **リスト**: status 別（closed / done / in_progress / todo）。これから進める・終わったを一覧（R3）。
   - **クリティカルパス**: ストーリー内の CP 上の task を太線・強調色でハイライト、直列連鎖長を表示（R6）。
 
 ### 5.2 表現
@@ -401,7 +414,7 @@ ProjectGraph(正規化) ─┼── DAG      ┼─ 各ビューは読み取り
 ```bash
 npx supabase init          # supabase/ 生成
 npx supabase start         # ローカル Supabase 起動 (Docker)
-# → API URL / anon key が発行される。フロント & plan スキルはこれを使う
+# → API URL / anon key が発行される。フロントはこれを使う
 ```
 
 - マイグレーションは `supabase/migrations/*.sql` に記述しバージョン管理。
@@ -442,7 +455,7 @@ task-branch/
 │  ├─ src/
 │  └─ package.json
 └─ .claude/
-   └─ skills/plan/         # plan スキル定義（後続）
+   └─ launch.json          # 開発サーバーの起動設定（planning / do スキルはリポジトリ外）
 ```
 
 ---
@@ -488,7 +501,7 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 
 ### 8.2 拡張ポイントと方針
 
-- **日付**: `start_date` / `due_date` は初期未使用。ガント/カレンダー導入時に `plan` スキル・UI が埋める。
+- **日付**: `start_date` / `due_date` は初期未使用。ガント/カレンダー導入時に `planning` スキル・UI が埋める。
   依存から自動スケジューリング（先行の due の翌日を後続の start に）する RPC を後付け可能。
 - **見積り/期間**: 導入時に `estimate_value numeric` + `estimate_unit text`（`day`/`week`/`point`）を追加。
   クリティカルパスをホップ数から**重み付き最長経路**へ差し替える（RPC 内部のみ変更、IF 不変）。
@@ -530,4 +543,4 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 1. 本 DD のレビュー・確定（特に §9）。
 2. `supabase init` + スキーマ/RPC のマイグレーション作成。
 3. React + Vite + React Flow の UI 雛形（初期4ビュー + §5.4 のビュー層）。
-4. `plan` スキルの定義（Supabase REST/RPC を叩く手順）。
+4. `planning` / `do` スキルの定義（リポジトリ外。今は画面操作、将来は MCP サーバー経由で REST/RPC）。
