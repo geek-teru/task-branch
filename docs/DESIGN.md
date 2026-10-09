@@ -21,6 +21,8 @@ AI がプランニングしたタスクを **粒度の異なる3階層のツリ�
   - [3.2 テーブル定義](#32-テーブル定義)
   - [3.3 派生概念（計算で導出）](#33-派生概念計算で導出)
   - [3.4 進捗の集約（ロールアップ）](#34-進捗の集約ロールアップ)
+  - [3.5 関数](#35-関数)
+  - [3.6 RLS ポリシー](#36-rls-ポリシー)
 - [4. API 設計（AI / フロント共通）](#4-api-設計ai--フロント共通)
   - [4.1 CRUD（PostgREST 自動生成）](#41-crudpostgrest-自動生成)
   - [4.2 RPC 関数（ロジックを DB に集約）](#42-rpc-関数ロジックを-db-に集約)
@@ -172,6 +174,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 ### 3.1 ER 概要
 
 ```
+所有者（ユーザー） 1 ──< projects
 projects 1 ──< tasks(自己参照ツリー parent_id)
                  ├──< epic_context_revisions (epic のドキュメントの更新履歴)
                  ├──< task_comments (task へのコメント。本文は編集できる)
@@ -189,8 +192,12 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | id | uuid | PK, default gen_random_uuid() | |
 | name | text | not null | プロジェクト名 |
 | description | text | | 概要 |
+| owner_id | uuid | FK→auth.users.id, not null, default current_owner_id() | 所有者（人のユーザー）。AI が作っても持ち主の人になる。付け替えはできない（§3.6） |
 | created_at | timestamptz | default now() | |
 | updated_at | timestamptz | default now() | |
+
+- インデックス：(owner_id)。
+- 所有者の列を持つのは projects だけ。tasks・task_comments・epic_context_revisions は、属するプロジェクトの所有者をたどって判定する（§3.6）。
 
 #### tasks
 
@@ -241,10 +248,10 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 - インデックス：(task_id, created_at)。
 - 対象は `level = 'task'` のみ。ストーリー・エピックには付けられない（トリガ `check_task_comment()` で弾く）。
-- 編集・削除できるのは、書いた本人とその持ち主（§7.1 の実効の所有者）。変えられるのは本文だけで、`task_id` / `author_type` / `author_id` / `created_at` は変えさせない。更新時に `updated_at` を now() にする。
+- 編集・削除できるのは、書いた本人だけ（§3.6）。人と AI は別の投稿者として扱い、人も AI のコメントは編集・削除できない。変えられるのは本文だけで、`task_id` / `author_type` / `author_id` / `created_at` は変えさせない。更新時に `updated_at` を now() にする。
 - 削除は物理削除。編集履歴は持たない。
 - 本文はプレーンテキスト（Markdown は解釈しない）。
-- RLS は「タスクコメントの編集・削除」のストーリーで入れる。それまでは既存テーブルと同じ状態。
+- RLS は §3.6。
 
 #### epic_context_revisions
 
@@ -278,6 +285,59 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - task が1件もない `story` は、自身の status が `done` か `closed` なら 1、それ以外は 0。
 - `story` の進捗率の平均 → 親 `epic` の進捗率。**エピックはこの進捗率で管理し、status を手で動かす運用はしない**（§1.3）。
 - 集約は RPC / ビューで計算し、UI に返す。ストーリー・タスクの手動 status 変更は許容。
+
+### 3.5 関数
+
+列の既定値と RLS ポリシーから呼ぶ関数。どれもリクエストの JWT（PostgREST が `request.jwt.claims` にセットしたもの）を読むだけで、表は読まない。アプリからは呼ばない。
+
+| 関数 | 返すもの | 使う場所 |
+|---|---|---|
+| `current_actor_type()` | `ai`（JWT の `app_metadata.actor_type` が `ai`）／ それ以外は `human` | `task_comments.author_type`・`epic_context_revisions.edited_by_type` の既定値 |
+| `current_actor_id()` | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null | `task_comments.author_id`・`epic_context_revisions.edited_by_id` の既定値 |
+| `current_owner_id()` | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人は本人、AI は持ち主の人になる | `projects.owner_id` の既定値、§3.6 のポリシー |
+
+```sql
+create or replace function current_owner_id() returns uuid as $$
+  select coalesce(
+    (auth.jwt() -> 'app_metadata' ->> 'owner_id')::uuid,  -- AI なら持ち主の id
+    auth.uid()                                              -- 人なら自分の id
+  );
+$$ language sql stable;
+```
+
+- 所有者の決め方はこの関数1か所にまとめる。ポリシーには同じ式を書かない。
+- `app_metadata` は service_role でしか書けないため、AI が `owner_id` を書き換えて他人のデータに入ることはできない（§7.1）。
+- どれも security invoker（既定）。security definer にはしない。
+
+### 3.6 RLS ポリシー
+
+全テーブルで RLS を有効にする。ポリシーはすべて `to authenticated` に対して作り、`anon` 向けは作らない（未ログインでは何もできない）。
+ポリシーを作らない操作は RLS で拒否される。画面に機能が無くても API（PostgREST）から直接呼べるため、させない操作はポリシーを作らないことで止める。
+
+| テーブル | insert | select | update | delete |
+|---|---|---|---|---|
+| projects | ログイン済みなら誰でも。`owner_id` は自分に固定 | 所有者 | 所有者。`owner_id` の付け替えは不可 | 所有者 |
+| tasks | 所有者 | 所有者 | 所有者 | 所有者 |
+| epic_context_revisions | 所有者 | 所有者 | 不可 | 不可 |
+| task_comments | 所有者 | 所有者 | 書いた本人 | 書いた本人 |
+
+- 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
+- 「書いた本人」は `author_id = auth.uid()`。人と AI は別の投稿者として扱う。
+- 「不可」はポリシーを作らない。
+
+条件式:
+
+| テーブル | 所有者の判定 |
+|---|---|
+| projects | `owner_id = current_owner_id()`（insert・update は `with check` にも同じ式を書き、他人名義での作成と付け替えを弾く） |
+| tasks | `exists (select 1 from projects p where p.id = tasks.project_id and p.owner_id = current_owner_id())`（update は `with check` にも書き、他人のプロジェクトへの移動を弾く） |
+| epic_context_revisions | `epic_id` の tasks → projects をたどり、`owner_id = current_owner_id()` |
+| task_comments | `task_id` の tasks → projects をたどり、`owner_id = current_owner_id()`。update / delete は `author_id = auth.uid()` |
+
+- `epic_context_revisions` の insert は、エピックの保存時にトリガ（`save_epic_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
+- RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
+- `parent_id` に他人のタスクを指定することは、トリガ `check_task_hierarchy()` が「親は同じプロジェクト」を確かめるため起きない。
+- 未決：既存の projects に入れる `owner_id` の決め方（移行方法）。
 
 ---
 
@@ -426,8 +486,8 @@ task-branch/
 
 ## 7. セキュリティ（個人用の割り切り）
 
-- 初期（ローカル）: anon key で全操作。RLS はローカルでは緩め。
-- 本番（クラウド）: anon key を秘匿し RLS を有効化。個人用のため「authenticated 全許可」から開始し、必要に応じ強化。
+- ローカル: 本番と同じマイグレーションで同じ RLS が入る。psql（postgres ロール）からの操作は RLS を受けない。
+- 本番（クラウド）: RLS を有効化し、本人と本人の AI だけがデータに触れるようにする（§3.6）。
 - AI が使う認証情報は MCP サーバーの設定（リポジトリ外の env ファイル）にだけ置き、リポジトリにも AI の会話にも出さない（§7.1）。
 
 ### 7.1 AI 専用アカウントとトークン
@@ -444,7 +504,7 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 | 新規登録 | Email プロバイダは新規登録を無効にし、ログインだけ許す（本番・ローカルとも） |
 | 止め方 | パスワードの変更か、ユーザーの無効化 |
 
-- RLS では「実効の所有者 = JWT の `app_metadata.owner_id` があればそれ、なければ `auth.uid()`」として扱う。これで本人と本人の AI だけがデータに触れる。
+- RLS では「実効の所有者 = JWT の `app_metadata.owner_id` があればそれ、なければ `auth.uid()`」として扱う（`current_owner_id()`、§3.5）。これで本人と本人の AI だけがデータに触れる。
 - service_role キーは MCP サーバーに持たせない（RLS を素通りするため）。
 - 長期の JWT を自分で署名する方式と、独自の API トークン表は採らない。前者は個別に失効できず、後者は作るものが増えるため。
 
