@@ -309,6 +309,47 @@ $$ language sql stable;
 - `app_metadata` は service_role でしか書けないため、AI が `owner_id` を書き換えて他人のデータに入ることはできない（§7.1）。
 - どれも security invoker（既定）。security definer にはしない。
 
+#### 想定する JWT と関数の結果
+
+`app_metadata` は Supabase Auth が JWT に自動で入れる項目（実体は `auth.users.raw_app_meta_data`）。`provider` / `providers` は Supabase が入れ、`actor_type` / `owner_id` は AI 専用アカウントの作成時に service_role で入れる（§7.1）。人のアカウントには何も足さない。
+本人が書き換えられる `user_metadata` は権限の判定に使わない。
+
+人（Google でログイン。uid = `aaaa`）:
+
+```json
+{
+  "sub": "aaaa",
+  "role": "authenticated",
+  "app_metadata": { "provider": "google", "providers": ["google"] }
+}
+```
+
+AI（AI 専用アカウント。uid = `cccc`、持ち主 = `aaaa`）:
+
+```json
+{
+  "sub": "cccc",
+  "role": "authenticated",
+  "app_metadata": {
+    "provider": "email",
+    "providers": ["email"],
+    "actor_type": "ai",
+    "owner_id": "aaaa"
+  }
+}
+```
+
+| 関数 | 人 | AI | JWT なし（psql・シード） |
+|---|---|---|---|
+| `current_actor_type()` | `human` | `ai` | `human` |
+| `current_actor_id()` | `aaaa` | `cccc` | null |
+| `auth.uid()` | `aaaa` | `cccc` | null |
+| `current_owner_id()` | `aaaa`（`owner_id` が無いので `auth.uid()`） | `aaaa`（`owner_id`） | null |
+
+- `current_owner_id()` は人と AI で同じ値になる。所有者の判定（§3.6）に使う。
+- `auth.uid()` / `current_actor_id()` は人と AI で別の値になる。投稿者の記録と「書いた本人」の判定（§3.6）に使う。
+- JWT なしは postgres ロールでの接続で、RLS を受けない。`projects.owner_id` の既定値が null になるため、psql やシードでプロジェクトを作るときは `owner_id` を明示する。
+
 ### 3.6 RLS ポリシー
 
 全テーブルで RLS を有効にする。ポリシーはすべて `to authenticated` に対して作り、`anon` 向けは作らない（未ログインでは何もできない）。
