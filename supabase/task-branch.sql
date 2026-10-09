@@ -13,10 +13,14 @@ declare
   p uuid;
   e uuid;
   s uuid;
+  -- 所有者: 最古のユーザー（ダミーを除く）。いなければダミー（seed.sql）
+  owner uuid := coalesce(
+    (select id from auth.users where id <> '00000000-0000-0000-0000-000000000001' order by created_at limit 1),
+    '00000000-0000-0000-0000-000000000001');
 begin
-  insert into projects(name, description, url, repository_url)
+  insert into projects(name, description, url, repository_url, owner_id)
     values ('task-branch', 'AI で使うことを前提にしたタスク管理ツール自体の開発',
-            'https://task-branch.vercel.app', 'https://github.com/geek-teru/task-branch')
+            'https://task-branch.vercel.app', 'https://github.com/geek-teru/task-branch', owner)
     returning id into p;
 
   -- ===== epic 1: 基盤（DB・API） =====
