@@ -17,16 +17,9 @@ const COLLAPSE_KEY = "sidebar.collapsed";
 export function Sidebar({
   active,
   onNavigate,
-  userEmail,
-  onLogin,
-  onLogout,
 }: {
   active: MenuKey | null;
   onNavigate: (key: MenuKey) => void;
-  // null when signed out.
-  userEmail: string | null;
-  onLogin: () => void;
-  onLogout: () => void;
 }) {
   const { width, startResize } = useResizableWidth("sidebar.width", 220, 160, 480);
   const [collapsed, setCollapsed] = useState(() => {
@@ -58,34 +51,8 @@ export function Sidebar({
         color: "#e5e8eb",
         display: "flex",
         flexDirection: "column",
-        height: "100vh",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: collapsed ? "14px 0" : "14px 8px 14px 16px",
-          justifyContent: collapsed ? "center" : undefined,
-          borderBottom: "1px solid #2f3b46",
-        }}
-      >
-        {!collapsed && (
-          <span style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 16, whiteSpace: "nowrap", overflow: "hidden" }}>
-            task-branch
-          </span>
-        )}
-        <button
-          onClick={toggle}
-          title={collapsed ? "サイドナビを開く" : "サイドナビを閉じる"}
-          aria-label={collapsed ? "サイドナビを開く" : "サイドナビを閉じる"}
-          style={toggleBtn}
-        >
-          {collapsed ? "»" : "«"}
-        </button>
-      </div>
-
       <nav style={{ flex: 1, padding: 8, overflowY: "auto", overflowX: "hidden" }}>
         {MENU.map((m) => {
           const isActive = m.key === active;
@@ -104,28 +71,21 @@ export function Sidebar({
 
       <div
         style={{
-          borderTop: "1px solid #2f3b46",
-          padding: collapsed ? "10px 0" : "10px 8px 12px",
           display: "flex",
-          flexDirection: "column",
-          alignItems: collapsed ? "center" : "stretch",
+          alignItems: "center",
           gap: 6,
+          borderTop: "1px solid #2f3b46",
+          padding: collapsed ? "10px 0" : "10px 8px",
+          justifyContent: collapsed ? "center" : "flex-end",
         }}
       >
-        {userEmail && !collapsed && (
-          <div
-            title={userEmail}
-            style={{ padding: "0 10px", fontSize: 12, color: "#9aa5b1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-          >
-            {userEmail}
-          </div>
-        )}
         <button
-          onClick={userEmail ? onLogout : onLogin}
-          title={userEmail ? "ログアウト" : "ログイン"}
-          style={menuBtn(false, collapsed)}
+          onClick={toggle}
+          title={collapsed ? "サイドナビを開く" : "サイドナビを閉じる"}
+          aria-label={collapsed ? "サイドナビを開く" : "サイドナビを閉じる"}
+          style={toggleBtn}
         >
-          {collapsed ? (userEmail ? "⇥" : "⇤") : userEmail ? "ログアウト" : "ログイン"}
+          {collapsed ? "»" : "«"}
         </button>
       </div>
 

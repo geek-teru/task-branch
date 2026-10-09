@@ -26,6 +26,7 @@ import {
 } from "./lib/api";
 import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
+import { GlobalHeader } from "./components/GlobalHeader";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
@@ -431,6 +432,10 @@ export default function App() {
   const pickerProjects = (currentId: string | null | undefined) =>
     projects.filter((p) => p.is_active || p.id === currentId);
 
+  // Google sign-in fills full_name / name; fall back to the email.
+  const meta = session.user.user_metadata ?? {};
+  const userName: string = meta.full_name ?? meta.name ?? session.user.email ?? "";
+
   const detailProject = projects.find((p) => p.id === projectMatch?.params.projectId);
   const ganttProject = projects.find((p) => p.id === ganttProjectId);
   const ganttPage = (
@@ -465,127 +470,127 @@ export default function App() {
   );
 
   return (
-    <Shell>
-      <Sidebar
-        active={isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
-        onNavigate={onNavigate}
-        userEmail={session?.user.email ?? null}
-        onLogin={() => navigate("/login")}
-        onLogout={handleLogout}
-      />
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+      <GlobalHeader userName={userName} userEmail={session.user.email ?? null} onLogout={handleLogout} />
+      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+        <Sidebar
+          active={isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
+          onNavigate={onNavigate}
+        />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        {error && (
-          <div style={{ background: "#fdeceb", color: "#a3210b", padding: "6px 12px", fontSize: 13 }}>
-            {error} <button onClick={() => setError(null)}>×</button>
-          </div>
-        )}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {error && (
+            <div style={{ background: "#fdeceb", color: "#a3210b", padding: "6px 12px", fontSize: 13 }}>
+              {error} <button onClick={() => setError(null)}>×</button>
+            </div>
+          )}
 
-        <Routes>
-          <Route path="/" element={<Navigate to="/projects" replace />} />
-          <Route
-            path="/projects"
-            element={
-              <main style={{ flex: 1, minHeight: 0 }}>
-                <ProjectsListPage
-                  projects={projects}
-                  onCreate={handleCreateProject}
-                  onShowDetail={(projectId) => navigate(`/projects/${projectId}`)}
-                  onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
-                  onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
-                  onShowKanban={(projectId) => navigate(`/kanban?project=${projectId}`)}
-                />
-              </main>
-            }
-          />
-          <Route
-            path="/projects/:projectId"
-            element={
-              <main style={{ flex: 1, minHeight: 0 }}>
-                {!projectsLoaded ? (
-                  <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
-                ) : !detailProject ? (
-                  <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
-                ) : (
-                  <ProjectDetailPage
-                    project={detailProject}
-                    onUpdate={handleUpdateProject}
-                    onDelete={(id) => {
-                      handleDeleteProject(id);
-                      navigate("/projects");
-                    }}
-                    onSetActive={handleSetProjectActive}
-                    onExport={handleExportProject}
+          <Routes>
+            <Route path="/" element={<Navigate to="/projects" replace />} />
+            <Route
+              path="/projects"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  <ProjectsListPage
+                    projects={projects}
+                    onCreate={handleCreateProject}
+                    onShowDetail={(projectId) => navigate(`/projects/${projectId}`)}
                     onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
                     onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
                     onShowKanban={(projectId) => navigate(`/kanban?project=${projectId}`)}
                   />
-                )}
-              </main>
-            }
-          />
-          <Route path="/projects/:projectId/gantt" element={ganttPage} />
-          <Route path="/gantt" element={ganttPage} />
-          <Route
-            path="/backlog"
-            element={
-              <main style={{ flex: 1, minHeight: 0 }}>
-                {!projectsLoaded ? (
-                  <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
-                ) : projects.length === 0 ? (
-                  <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
-                ) : !projects.some((p) => p.id === backlogProjectId) ? (
-                  <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
-                ) : (
-                  <BacklogView
-                    projects={pickerProjects(backlogProjectId)}
-                    projectId={backlogProjectId!}
-                    epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
-                    onSelectProject={(id) => setSearchParams({ project: id })}
-                    onAddBacklog={handleAddBacklog}
-                    onSetActive={handleSetEpicActive}
-                  />
-                )}
-              </main>
-            }
-          />
-          <Route
-            path="/epics/:epicId"
-            element={
-              <main style={{ flex: 1, minHeight: 0 }}>
-                {epicMatch?.params.epicId && (
-                  <EpicDetailPage epicId={epicMatch.params.epicId} projects={projects} onError={setError} />
-                )}
-              </main>
-            }
-          />
-          <Route
-            path="/kanban"
-            element={
-              <main style={{ flex: 1, minHeight: 0 }}>
-                {!lanes ? (
-                  <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
-                ) : (
-                  <KanbanView
-                    projects={pickerProjects(searchParams.get("project"))}
-                    lanes={lanes}
-                    projectFilter={searchParams.get("project")}
-                    onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
-                    onChangeStatus={handleKanbanStatus}
-                    onMoveTask={handleKanbanMove}
-                    onAddStory={handleKanbanAddStory}
-                    onAddTask={handleAddTask}
-                    onUpdateTask={handleKanbanUpdate}
-                    onDeleteTask={handleKanbanDelete}
-                  />
-                )}
-              </main>
-            }
-          />
-          <Route path="*" element={<Navigate to="/projects" replace />} />
-        </Routes>
+                </main>
+              }
+            />
+            <Route
+              path="/projects/:projectId"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {!projectsLoaded ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                  ) : !detailProject ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                  ) : (
+                    <ProjectDetailPage
+                      project={detailProject}
+                      onUpdate={handleUpdateProject}
+                      onDelete={(id) => {
+                        handleDeleteProject(id);
+                        navigate("/projects");
+                      }}
+                      onSetActive={handleSetProjectActive}
+                      onExport={handleExportProject}
+                      onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
+                      onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
+                      onShowKanban={(projectId) => navigate(`/kanban?project=${projectId}`)}
+                    />
+                  )}
+                </main>
+              }
+            />
+            <Route path="/projects/:projectId/gantt" element={ganttPage} />
+            <Route path="/gantt" element={ganttPage} />
+            <Route
+              path="/backlog"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {!projectsLoaded ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                  ) : projects.length === 0 ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+                  ) : !projects.some((p) => p.id === backlogProjectId) ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                  ) : (
+                    <BacklogView
+                      projects={pickerProjects(backlogProjectId)}
+                      projectId={backlogProjectId!}
+                      epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
+                      onSelectProject={(id) => setSearchParams({ project: id })}
+                      onAddBacklog={handleAddBacklog}
+                      onSetActive={handleSetEpicActive}
+                    />
+                  )}
+                </main>
+              }
+            />
+            <Route
+              path="/epics/:epicId"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {epicMatch?.params.epicId && (
+                    <EpicDetailPage epicId={epicMatch.params.epicId} projects={projects} onError={setError} />
+                  )}
+                </main>
+              }
+            />
+            <Route
+              path="/kanban"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {!lanes ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                  ) : (
+                    <KanbanView
+                      projects={pickerProjects(searchParams.get("project"))}
+                      lanes={lanes}
+                      projectFilter={searchParams.get("project")}
+                      onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
+                      onChangeStatus={handleKanbanStatus}
+                      onMoveTask={handleKanbanMove}
+                      onAddStory={handleKanbanAddStory}
+                      onAddTask={handleAddTask}
+                      onUpdateTask={handleKanbanUpdate}
+                      onDeleteTask={handleKanbanDelete}
+                    />
+                  )}
+                </main>
+              }
+            />
+            <Route path="*" element={<Navigate to="/projects" replace />} />
+          </Routes>
+        </div>
       </div>
-    </Shell>
+    </div>
   );
 }
 
