@@ -56,10 +56,10 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 本アプリのデータは **直交する2種類の関係** を同時に持つ。
 
-| 関係 | 形 | 何を表すか | 例 |
-|---|---|---|---|
+| 関係             | 形     | 何を表すか                         | 例                                                                               |
+| ---------------- | ------ | ---------------------------------- | -------------------------------------------------------------------------------- |
 | **階層（分解）** | ツリー | 粒度の粗いオブジェクトを細かく分解 | 「決済基盤刷新(epic/数ヶ月)」→「認証移行(story/1週)」→「テストケース作成(task)」 |
-| **依存（順序）** | DAG | 「Aが終わってからB」という実行順序 | 「OAuth クライアント作成」→「Supabase 設定」→「ログイン画面作成」 |
+| **依存（順序）** | DAG    | 「Aが終わってからB」という実行順序 | 「OAuth クライアント作成」→「Supabase 設定」→「ログイン画面作成」                |
 
 - 階層は **`parent_id` によるツリー**。
 - 依存のデータの持ち方（テーブル・検証・RPC）は未設計。クリティカルパス・並列レーン・着手可能の判定を実装するときに設計する。
@@ -68,17 +68,17 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 原則 `epic > story > task` の順にネストする（3段）。
 
-| 観点 | エピック（`epic`） | ストーリー（`story`） | タスク（`task`） |
-|---|---|---|---|
-| 粒度 | 1つのコンテキスト | 1〜2週間（1スプリント） | 数時間 |
-| 役割 | 課題・問題点・改善点などの**コンテキスト（要件）**を持ち、ストーリー・タスクを洗い出す元になる | エピックの実現に必要なことを洗い出したもの。1スプリントで完了させる | ストーリーをさらに細分化した作業 |
-| 作り方 | 人が作るか、AI と壁打ちしながら作る。壁打ちの結論はドキュメント（`context`）に書く | エピックを active にしてから洗い出す（AI と壁打ちしてもよい）。バックログのエピックの下には、アイデアのメモとして**ラフなストーリー**を置ける | ストーリーから洗い出す |
-| 状態 | **バックログ（inactive）/ 進行中（active）/ 完了**。完了は配下の進捗率 100% で**自動**（手で閉じる操作は持たない） | `todo` / `in_progress` / `done` / `closed` を手で動かす | `todo` / `in_progress` / `done` / `closed` を手で動かす |
-| 管理のしかた | 作成後はあまり手を入れない。status ではなく、配下のストーリーから算出した**進捗率**で見る | スプリントごとの振り返り、日々の進捗確認 | 日々の進捗確認 |
-| 情報の持ち方 | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）。ドキュメントは更新履歴を持つ | 短い説明（`description`） | 短い説明（`description`）＋ コメント |
-| 依存関係・クリティカルパス | 持たない | 持たない（ストーリー間の順序は §9 Q2） | 前提タスク → 後続タスク。張れるのは**同じストーリー内のタスク間**だけ。クリティカルパスはストーリー内で求める |
-| 担当 | 持たない | 持たない | 人か AI か。人の場合は誰か |
-| 見える場所 | バックログ：バックログの一覧だけ／進行中：ガントチャート・カンバン・マップ／完了：完了として表示 | 親のエピックが進行中のときに、実行中のビューに出る（ラフなストーリーはバックログの一覧だけ） | 親のストーリーと同じ |
+| 観点                       | エピック（`epic`）                                                                                                 | ストーリー（`story`）                                                                                                                         | タスク（`task`）                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 粒度                       | 1つのコンテキスト                                                                                                  | 1〜2週間（1スプリント）                                                                                                                       | 数時間                                                                                                        |
+| 役割                       | 課題・問題点・改善点などの**コンテキスト（要件）**を持ち、ストーリー・タスクを洗い出す元になる                     | エピックの実現に必要なことを洗い出したもの。1スプリントで完了させる                                                                           | ストーリーをさらに細分化した作業                                                                              |
+| 作り方                     | 人が作るか、AI と壁打ちしながら作る。壁打ちの結論はドキュメント（`context`）に書く                                 | エピックを active にしてから洗い出す（AI と壁打ちしてもよい）。バックログのエピックの下には、アイデアのメモとして**ラフなストーリー**を置ける | ストーリーから洗い出す                                                                                        |
+| 状態                       | **バックログ（inactive）/ 進行中（active）/ 完了**。完了は配下の進捗率 100% で**自動**（手で閉じる操作は持たない） | `todo` / `in_progress` / `done` / `closed` を手で動かす                                                                                       | `todo` / `in_progress` / `done` / `closed` を手で動かす                                                       |
+| 管理のしかた               | 作成後はあまり手を入れない。status ではなく、配下のストーリーから算出した**進捗率**で見る                          | スプリントごとの振り返り、日々の進捗確認                                                                                                      | 日々の進捗確認                                                                                                |
+| 情報の持ち方               | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）。ドキュメントは更新履歴を持つ    | 短い説明（`description`）                                                                                                                     | 短い説明（`description`）＋ コメント                                                                          |
+| 依存関係・クリティカルパス | 持たない                                                                                                           | 持たない（ストーリー間の順序は §9 Q2）                                                                                                        | 前提タスク → 後続タスク。張れるのは**同じストーリー内のタスク間**だけ。クリティカルパスはストーリー内で求める |
+| 担当                       | 持たない                                                                                                           | 持たない                                                                                                                                      | 人か AI か。人の場合は誰か                                                                                    |
+| 見える場所                 | バックログ：バックログの一覧だけ／進行中：ガントチャート・カンバン・マップ／完了：完了として表示                   | 親のエピックが進行中のときに、実行中のビューに出る（ラフなストーリーはバックログの一覧だけ）                                                  | 親のストーリーと同じ                                                                                          |
 
 **補足：エピックの状態の移り変わり**
 
@@ -90,28 +90,28 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
     └──────────棚上げする（inactive に戻す）──┘
 ```
 
-| 状態 | 決め方 |
-|---|---|
-| バックログ（inactive） | `activated_at` が空 |
-| 進行中（active） | `activated_at` あり、進捗率 100% 未満 |
-| 完了 | `activated_at` あり、進捗率 100% |
+| 状態                   | 決め方                                |
+| ---------------------- | ------------------------------------- |
+| バックログ（inactive） | `activated_at` が空                   |
+| 進行中（active）       | `activated_at` あり、進捗率 100% 未満 |
+| 完了                   | `activated_at` あり、進捗率 100%      |
 
 - 着手してからストーリー・タスクへ分解する。細分化を着手の直前まで遅らせることで、計画が古くなるのを防ぐ。
 
 ### 1.4 満たすべき要件
 
-| # | 要件 | 対応方針 |
-|---|---|---|
-| R1 | AI がプランニングしたタスクを管理 | `planning` スキルが画面を操作して登録（将来は MCP サーバー経由で REST/RPC） |
-| R2 | 並列度を上げたい | 依存のない `task` を並列レーンに。着手可能かどうか（前提タスクがすべて `done` か `closed` か）は依存から導出 |
-| R3 | 終わった / これから進めるタスクを見れる | status フィルタ・ビュー |
-| R4 | マインドマップ / Git ブランチ状に可視化 | 階層ツリー + タスクの依存DAG（ブランチ図） |
-| R5 | 依存は直列、非依存は並列で配置 | トポロジカル順で rank 配置。前後関係は横、同 rank（並列）は縦に並べる |
-| R6 | クリティカルパスがわかる | タスクの依存チェーンの **最長経路（ホップ数, 重み1）** を強調 |
-| R7 | プロジェクト単位で管理 | `projects` でスコープ分離 |
-| R8 | 誰がやるかを管理 | タスクに担当（人 / AI、人の場合は誰か）を持たせる |
-| R9 | 安価・最速 | Supabase（無料枠）+ 自動生成 API。専用バックエンドを作らない |
-| R10 | どこからでも編集可能 | Supabase Cloud にホスト（初期はローカル Supabase で開発） |
+| #   | 要件                                    | 対応方針                                                                                                     |
+| --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| R1  | AI がプランニングしたタスクを管理       | `planning` スキルが画面を操作して登録（将来は MCP サーバー経由で REST/RPC）                                  |
+| R2  | 並列度を上げたい                        | 依存のない `task` を並列レーンに。着手可能かどうか（前提タスクがすべて `done` か `closed` か）は依存から導出 |
+| R3  | 終わった / これから進めるタスクを見れる | status フィルタ・ビュー                                                                                      |
+| R4  | マインドマップ / Git ブランチ状に可視化 | 階層ツリー + タスクの依存DAG（ブランチ図）                                                                   |
+| R5  | 依存は直列、非依存は並列で配置          | トポロジカル順で rank 配置。前後関係は横、同 rank（並列）は縦に並べる                                        |
+| R6  | クリティカルパスがわかる                | タスクの依存チェーンの **最長経路（ホップ数, 重み1）** を強調                                                |
+| R7  | プロジェクト単位で管理                  | `projects` でスコープ分離                                                                                    |
+| R8  | 誰がやるかを管理                        | タスクに担当（人 / AI、人の場合は誰か）を持たせる                                                            |
+| R9  | 安価・最速                              | Supabase（無料枠）+ 自動生成 API。専用バックエンドを作らない                                                 |
+| R10 | どこからでも編集可能                    | Supabase Cloud にホスト（初期はローカル Supabase で開発）                                                    |
 
 ### 1.5 スコープの段階（初期 / 将来）
 
@@ -121,6 +121,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 これらは **コアモデルへの読み取りビュー（射影）として追加**でき、スキーマの破壊的変更を伴わない。
 
 **当面の非スコープ**:
+
 - 見積り時間 / 工数（`estimate` は将来拡張。初期は持たない → CP はホップ数で算出）
 - 権限・コラボ機能の詳細（担当として人を割り当てることは行う。ユーザー登録・共有の範囲は §9）
 - 外部カレンダー（Google Calendar 等）双方向同期
@@ -157,14 +158,14 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 ### 2.1 技術スタック（推奨）
 
-| 層 | 技術 | 理由 |
-|---|---|---|
-| DB / API / 認証 | Supabase (Postgres 15 + PostgREST + GoTrue) | 無料枠、自動 REST、ローカル↔クラウド同一構成 |
-| マイグレーション | Supabase CLI (`supabase/migrations`) | 再現可能なスキーマ管理 |
-| フロント | React 18 + TypeScript + Vite | 軽量・高速・無料デプロイ可 |
-| グラフ描画 | React Flow + dagre | 階層ツリー / DAG / CP 強調に最適 |
-| Supabase 接続 | `@supabase/supabase-js` | 標準クライアント |
-| デプロイ(将来) | Vercel / Cloudflare Pages + Supabase Cloud | 無料枠 |
+| 層               | 技術                                        | 理由                                         |
+| ---------------- | ------------------------------------------- | -------------------------------------------- |
+| DB / API / 認証  | Supabase (Postgres 15 + PostgREST + GoTrue) | 無料枠、自動 REST、ローカル↔クラウド同一構成 |
+| マイグレーション | Supabase CLI (`supabase/migrations`)        | 再現可能なスキーマ管理                       |
+| フロント         | React 18 + TypeScript + Vite                | 軽量・高速・無料デプロイ可                   |
+| グラフ描画       | React Flow + dagre                          | 階層ツリー / DAG / CP 強調に最適             |
+| Supabase 接続    | `@supabase/supabase-js`                     | 標準クライアント                             |
+| デプロイ(将来)   | Vercel / Cloudflare Pages + Supabase Cloud  | 無料枠                                       |
 
 ---
 
@@ -186,43 +187,44 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 #### projects
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| id | uuid | PK, default gen_random_uuid() | |
-| name | text | not null | プロジェクト名 |
-| description | text | | 概要 |
-| owner_id | uuid | FK→auth.users.id, not null, default current_owner_id() | 所有者（人のユーザー）。AI が作っても持ち主の人になる。付け替えはできない（§3.5） |
-| created_at | timestamptz | default now() | |
-| updated_at | timestamptz | default now() | |
+| カラム      | 型          | 制約                                                   | 説明                                                                              |
+| ----------- | ----------- | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| id          | uuid        | PK, default gen_random_uuid()                          |                                                                                   |
+| name        | text        | not null                                               | プロジェクト名                                                                    |
+| description | text        |                                                        | 概要                                                                              |
+| owner_id    | uuid        | FK→auth.users.id, not null, default current_owner_id() | 所有者（人のユーザー）。AI が作っても持ち主の人になる。付け替えはできない（§3.5） |
+| created_at  | timestamptz | default now()                                          |                                                                                   |
+| updated_at  | timestamptz | default now()                                          |                                                                                   |
 
 - インデックス：(owner_id)。
 - 所有者の列を持つのは projects だけ。tasks・task_comments・epic_context_revisions は、属するプロジェクトの所有者をたどって判定する（§3.5）。
 
 #### tasks
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| id | uuid | PK, default gen_random_uuid() | |
-| project_id | uuid | FK→projects.id, not null | |
-| parent_id | uuid | FK→tasks.id, null可 | 親（階層）。null はルート(epic想定) |
-| level | text | not null | `epic` / `story` / `task` |
-| title | text | not null | 名称 |
-| description | text | | 短い説明（一覧やカードに出す 1〜2 行） |
-| context | text | null可 | **epic のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `epic_context_revisions` に残す（最新版も含む） |
-| status | text | not null, default 'todo' | `todo` / `in_progress` / `done` / `closed`（作業の進み具合）。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える。エピックは手で動かさない（§1.3） |
-| activated_at | timestamptz | null可 | **epic のみ**。null ＝ inactive（バックログ）、日時あり ＝ active（エピック）。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける。完了は列で持たず、active かつ配下の進捗率 100% から導出する |
-| assignee_type | text | null可 | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9 |
-| assignee_id | uuid | null可 | **task のみ**。人が担当する場合の担当者（ユーザー） |
-| sort_order | int | not null, default 0 | 同階層内 / カンバン列内の表示順 |
-| start_date | date | null可 | 開始予定日（**ガント/カレンダー用**。初期は未使用） |
-| due_date | date | null可 | 期限日（**ガント/カレンダー用**。初期は未使用） |
-| metadata | jsonb | not null, default '{}' | 将来拡張用の自由属性（色・タグ・外部ID等）。スキーマ変更なしで拡張 |
-| created_at | timestamptz | default now() | |
-| updated_at | timestamptz | default now() | |
-| completed_at | timestamptz | | done 遷移時刻。`done` / `closed` の間は保持する |
-| closed_at | timestamptz | | closed 遷移時刻（承認した日時）。`closed` 以外では null |
+| カラム        | 型          | 制約                          | 説明                                                                                                                                                                                                                                                                                                                 |
+| ------------- | ----------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id            | uuid        | PK, default gen_random_uuid() |                                                                                                                                                                                                                                                                                                                      |
+| project_id    | uuid        | FK→projects.id, not null      |                                                                                                                                                                                                                                                                                                                      |
+| parent_id     | uuid        | FK→tasks.id, null可           | 親（階層）。null はルート(epic想定)                                                                                                                                                                                                                                                                                  |
+| level         | text        | not null                      | `epic` / `story` / `task`                                                                                                                                                                                                                                                                                            |
+| title         | text        | not null                      | 名称                                                                                                                                                                                                                                                                                                                 |
+| description   | text        |                               | 短い説明（一覧やカードに出す 1〜2 行）                                                                                                                                                                                                                                                                               |
+| context       | text        | null可                        | **epic のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `epic_context_revisions` に残す（最新版も含む）                                                                                    |
+| status        | text        | not null, default 'todo'      | `todo` / `in_progress` / `done` / `closed`（作業の進み具合）。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える。エピックは手で動かさない（§1.3） |
+| activated_at  | timestamptz | null可                        | **epic のみ**。null ＝ inactive（バックログ）、日時あり ＝ active（エピック）。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける。完了は列で持たず、active かつ配下の進捗率 100% から導出する                                                                                                     |
+| assignee_type | text        | null可                        | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9                                                                                                                                                                                                                                                                |
+| assignee_id   | uuid        | null可                        | **task のみ**。人が担当する場合の担当者（ユーザー）                                                                                                                                                                                                                                                                  |
+| sort_order    | int         | not null, default 0           | 同階層内 / カンバン列内の表示順                                                                                                                                                                                                                                                                                      |
+| start_date    | date        | null可                        | 開始予定日（**ガント/カレンダー用**。初期は未使用）                                                                                                                                                                                                                                                                  |
+| due_date      | date        | null可                        | 期限日（**ガント/カレンダー用**。初期は未使用）                                                                                                                                                                                                                                                                      |
+| metadata      | jsonb       | not null, default '{}'        | 将来拡張用の自由属性（色・タグ・外部ID等）。スキーマ変更なしで拡張                                                                                                                                                                                                                                                   |
+| created_at    | timestamptz | default now()                 |                                                                                                                                                                                                                                                                                                                      |
+| updated_at    | timestamptz | default now()                 |                                                                                                                                                                                                                                                                                                                      |
+| completed_at  | timestamptz |                               | done 遷移時刻。`done` / `closed` の間は保持する                                                                                                                                                                                                                                                                      |
+| closed_at     | timestamptz |                               | closed 遷移時刻（承認した日時）。`closed` 以外では null                                                                                                                                                                                                                                                              |
 
 制約・ルール:
+
 - `level` は CHECK で3値に固定。
 - 階層整合性（`epic > story > task` 以外の親子を禁止）は **トリガ or RPC** で担保。
 - `task` は葉。子を持たない。
@@ -235,15 +237,15 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 タスクへのコメント。作業メモ・確認したこと・やりとりを残す。
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| id | uuid | PK, default gen_random_uuid() | |
-| task_id | uuid | FK→tasks.id, not null, on delete cascade | 対象のタスク（level=task） |
-| author_type | text | not null, default current_actor_type() | `human` / `ai` |
-| author_id | uuid | null可, default current_actor_id() | 投稿者（ユーザー） |
-| body | text | not null, check (length(btrim(body)) > 0) | 本文（プレーンテキスト） |
-| created_at | timestamptz | not null, default now() | |
-| updated_at | timestamptz | not null, default now() | |
+| カラム      | 型          | 制約                                      | 説明                       |
+| ----------- | ----------- | ----------------------------------------- | -------------------------- |
+| id          | uuid        | PK, default gen_random_uuid()             |                            |
+| task_id     | uuid        | FK→tasks.id, not null, on delete cascade  | 対象のタスク（level=task） |
+| author_type | text        | not null, default current_actor_type()    | `human` / `ai`             |
+| author_id   | uuid        | null可, default current_actor_id()        | 投稿者（ユーザー）         |
+| body        | text        | not null, check (length(btrim(body)) > 0) | 本文（プレーンテキスト）   |
+| created_at  | timestamptz | not null, default now()                   |                            |
+| updated_at  | timestamptz | not null, default now()                   |                            |
 
 - インデックス：(task_id, created_at)。
 - 対象は `level = 'task'` のみ。ストーリー・エピックには付けられない（トリガ `check_task_comment()` で弾く）。
@@ -256,15 +258,15 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 エピックのドキュメント（`context`）の更新履歴。差分の確認と巻き戻しに使う。
 
-| カラム | 型 | 制約 | 説明 |
-|---|---|---|---|
-| id | uuid | PK, default gen_random_uuid() | |
-| epic_id | uuid | FK→tasks.id, not null | 対象のエピック |
-| version | int | not null | 版番号（エピックごとに 1 から） |
-| context | text | not null | その版の本文 |
-| edited_by_type | text | not null | `human` / `ai` |
-| edited_by_id | uuid | null可 | 人の場合の更新者 |
-| created_at | timestamptz | default now() | |
+| カラム         | 型          | 制約                          | 説明                            |
+| -------------- | ----------- | ----------------------------- | ------------------------------- |
+| id             | uuid        | PK, default gen_random_uuid() |                                 |
+| epic_id        | uuid        | FK→tasks.id, not null         | 対象のエピック                  |
+| version        | int         | not null                      | 版番号（エピックごとに 1 から） |
+| context        | text        | not null                      | その版の本文                    |
+| edited_by_type | text        | not null                      | `human` / `ai`                  |
+| edited_by_id   | uuid        | null可                        | 人の場合の更新者                |
+| created_at     | timestamptz | default now()                 |                                 |
 
 - UNIQUE(epic_id, version)。
 - `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
@@ -290,8 +292,6 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 本人と本人の AI だけがデータに触れるようにする。人か AI か・誰のデータかは、リクエストの JWT から判定する。
 
 #### JWT 形式
-
-PostgREST は、リクエストの JWT の中身を `request.jwt.claims` にセットしてから SQL を実行する。下の関数とポリシーはこれを読む。
 
 `app_metadata` は Supabase Auth が JWT に自動で入れる項目（実体は `auth.users.raw_app_meta_data`）。`provider` / `providers` は Supabase が入れ、`actor_type` / `owner_id` は AI 専用アカウントの作成時に service_role で入れる（§7.1）。人のアカウントには何も足さない。
 本人が書き換えられる `user_metadata` は権限の判定に使わない。
@@ -325,13 +325,15 @@ AI（AI 専用アカウント。uid = `cccc`、持ち主 = `aaaa`）:
 
 #### 関数
 
+PostgREST は、リクエストの JWT の中身を `request.jwt.claims` にセットしてから SQL を実行する。下の関数とポリシーはこれを読む。
+
 列の既定値とポリシーから呼ぶ。どれも JWT を読むだけで、表は読まない。アプリからは呼ばない。
 
-| 関数 | 返すもの | 使う場所 |
-|---|---|---|
-| `current_actor_type()` | `ai`（JWT の `app_metadata.actor_type` が `ai`）／ それ以外は `human` | `task_comments.author_type`・`epic_context_revisions.edited_by_type` の既定値 |
-| `current_actor_id()` | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null | `task_comments.author_id`・`epic_context_revisions.edited_by_id` の既定値 |
-| `current_owner_id()` | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人は本人、AI は持ち主の人になる | `projects.owner_id` の既定値、ポリシー |
+| 関数                   | 返すもの                                                                                                          | 使う場所                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `current_actor_type()` | `ai`（JWT の `app_metadata.actor_type` が `ai`）／ それ以外は `human`                                             | `task_comments.author_type`・`epic_context_revisions.edited_by_type` の既定値 |
+| `current_actor_id()`   | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null                                                          | `task_comments.author_id`・`epic_context_revisions.edited_by_id` の既定値     |
+| `current_owner_id()`   | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人は本人、AI は持ち主の人になる | `projects.owner_id` の既定値、ポリシー                                        |
 
 ```sql
 create or replace function current_owner_id() returns uuid as $$
@@ -344,12 +346,12 @@ $$ language sql stable;
 
 上の JWT での結果:
 
-| 関数 | 人 | AI | JWT なし（psql・シード） |
-|---|---|---|---|
-| `current_actor_type()` | `human` | `ai` | `human` |
-| `current_actor_id()` | `aaaa` | `cccc` | null |
-| `auth.uid()` | `aaaa` | `cccc` | null |
-| `current_owner_id()` | `aaaa`（`owner_id` が無いので `auth.uid()`） | `aaaa`（`owner_id`） | null |
+| 関数                   | 人                                           | AI                   | JWT なし（psql・シード） |
+| ---------------------- | -------------------------------------------- | -------------------- | ------------------------ |
+| `current_actor_type()` | `human`                                      | `ai`                 | `human`                  |
+| `current_actor_id()`   | `aaaa`                                       | `cccc`               | null                     |
+| `auth.uid()`           | `aaaa`                                       | `cccc`               | null                     |
+| `current_owner_id()`   | `aaaa`（`owner_id` が無いので `auth.uid()`） | `aaaa`（`owner_id`） | null                     |
 
 - 所有者の決め方は `current_owner_id()` 1か所にまとめる。ポリシーには同じ式を書かない。
 - `current_owner_id()` は人と AI で同じ値になる。所有者の判定に使う。
@@ -363,52 +365,149 @@ $$ language sql stable;
 全テーブルで RLS を有効にする。ポリシーはすべて `to authenticated` に対して作り、`anon` 向けは作らない（未ログインでは何もできない）。
 ポリシーを作らない操作は RLS で拒否される。画面に機能が無くても API（PostgREST）から直接呼べるため、させない操作はポリシーを作らないことで止める。
 
-| テーブル | insert | select | update | delete |
-|---|---|---|---|---|
-| projects | ログイン済みなら誰でも。`owner_id` は自分に固定 | 所有者 | 所有者。`owner_id` の付け替えは不可 | 所有者 |
-| tasks | 所有者 | 所有者 | 所有者 | 所有者 |
-| epic_context_revisions | 所有者 | 所有者 | 不可 | 不可 |
-| task_comments | 所有者 | 所有者 | 書いた本人 | 書いた本人 |
+| テーブル               | insert                                          | select | update                              | delete     |
+| ---------------------- | ----------------------------------------------- | ------ | ----------------------------------- | ---------- |
+| projects               | ログイン済みなら誰でも。`owner_id` は自分に固定 | 所有者 | 所有者。`owner_id` の付け替えは不可 | 所有者     |
+| tasks                  | 所有者                                          | 所有者 | 所有者                              | 所有者     |
+| epic_context_revisions | 所有者                                          | 所有者 | 不可                                | 不可       |
+| task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
 - 「書いた本人」は `author_id = auth.uid()`。人と AI は別の投稿者として扱う。
 - 「不可」はポリシーを作らない。
 
-条件式:
+ポリシー定義:
 
-| テーブル | 所有者の判定 |
-|---|---|
-| projects | `owner_id = current_owner_id()`（insert・update は `with check` にも同じ式を書き、他人名義での作成と付け替えを弾く） |
-| tasks | `exists (select 1 from projects p where p.id = tasks.project_id and p.owner_id = current_owner_id())`（update は `with check` にも書き、他人のプロジェクトへの移動を弾く） |
-| epic_context_revisions | `epic_id` の tasks → projects をたどり、`owner_id = current_owner_id()` |
-| task_comments | `task_id` の tasks → projects をたどり、`owner_id = current_owner_id()`。update / delete は `author_id = auth.uid()` |
+##### projects
+
+所有者だけが読み書きできる。どの操作も条件が同じなので `for all` の1本にする。`with check` にも同じ条件を書き、他人名義での作成と所有者の付け替えを弾く。
+
+```sql
+alter table projects enable row level security;
+
+create policy projects_owner on projects
+  for all to authenticated
+  using      (owner_id = current_owner_id())
+  with check (owner_id = current_owner_id());
+```
+
+##### tasks
+
+属するプロジェクトの所有者だけが読み書きできる。`with check` にも書き、他人のプロジェクトへの作成・移動を弾く。
+
+```sql
+alter table tasks enable row level security;
+
+create policy tasks_owner on tasks
+  for all to authenticated
+  using (exists (
+    select 1 from projects p
+     where p.id = tasks.project_id
+       and p.owner_id = current_owner_id()
+  ))
+  with check (exists (
+    select 1 from projects p
+     where p.id = tasks.project_id
+       and p.owner_id = current_owner_id()
+  ));
+```
+
+##### epic_context_revisions
+
+エピック → プロジェクトをたどって所有者だけが読み、足せる。足すときは更新者が自分であることも確かめる（トリガが入れる値と一致する）。update / delete はポリシーを作らない。
+
+```sql
+alter table epic_context_revisions enable row level security;
+
+create policy epic_context_revisions_select on epic_context_revisions
+  for select to authenticated
+  using (exists (
+    select 1 from tasks t
+      join projects p on p.id = t.project_id
+     where t.id = epic_context_revisions.epic_id
+       and p.owner_id = current_owner_id()
+  ));
+
+create policy epic_context_revisions_insert on epic_context_revisions
+  for insert to authenticated
+  with check (
+    edited_by_id = auth.uid()
+    and edited_by_type = current_actor_type()
+    and exists (
+      select 1 from tasks t
+        join projects p on p.id = t.project_id
+       where t.id = epic_context_revisions.epic_id
+         and p.owner_id = current_owner_id()
+    )
+  );
+```
+
+##### task_comments
+
+タスク → プロジェクトをたどって所有者だけが読み、投稿できる。投稿は投稿者が自分であることも確かめ、なりすましを弾く。編集・削除は書いた本人だけ。
+
+```sql
+alter table task_comments enable row level security;
+
+create policy task_comments_select on task_comments
+  for select to authenticated
+  using (exists (
+    select 1 from tasks t
+      join projects p on p.id = t.project_id
+     where t.id = task_comments.task_id
+       and p.owner_id = current_owner_id()
+  ));
+
+create policy task_comments_insert on task_comments
+  for insert to authenticated
+  with check (
+    author_id = auth.uid()
+    and author_type = current_actor_type()
+    and exists (
+      select 1 from tasks t
+        join projects p on p.id = t.project_id
+       where t.id = task_comments.task_id
+         and p.owner_id = current_owner_id()
+    )
+  );
+
+create policy task_comments_update on task_comments
+  for update to authenticated
+  using      (author_id = auth.uid())
+  with check (author_id = auth.uid());
+
+create policy task_comments_delete on task_comments
+  for delete to authenticated
+  using (author_id = auth.uid());
+```
 
 - `epic_context_revisions` の insert は、エピックの保存時にトリガ（`save_epic_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
 - RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
 - `parent_id` に他人のタスクを指定することは、トリガ `check_task_hierarchy()` が「親は同じプロジェクト」を確かめるため起きない。
 - 未決：既存の projects に入れる `owner_id` の決め方（移行方法）。
+
 ---
 
 ## 4. API 設計（AI / フロント共通）
 
 ### 4.1 CRUD（PostgREST 自動生成）
 
-| 操作 | メソッド / エンドポイント |
-|---|---|
-| プロジェクト作成 | `POST /rest/v1/projects` |
-| オブジェクト作成（全level共通） | `POST /rest/v1/tasks`（level と parent_id を指定） |
-| ツリー取得 | `GET /rest/v1/tasks?project_id=eq.<id>&order=sort_order` |
-| 状態更新 | `PATCH /rest/v1/tasks?id=eq.<id>` |
+| 操作                            | メソッド / エンドポイント                                |
+| ------------------------------- | -------------------------------------------------------- |
+| プロジェクト作成                | `POST /rest/v1/projects`                                 |
+| オブジェクト作成（全level共通） | `POST /rest/v1/tasks`（level と parent_id を指定）       |
+| ツリー取得                      | `GET /rest/v1/tasks?project_id=eq.<id>&order=sort_order` |
+| 状態更新                        | `PATCH /rest/v1/tasks?id=eq.<id>`                        |
 
 ヘッダ: `apikey: <key>`, `Authorization: Bearer <key>`。
 
 ### 4.2 RPC 関数（ロジックを DB に集約）
 
-| 関数 | 用途 | 概要 |
-|---|---|---|
-| `get_task_graph(project uuid)` | 可視化用 | tasks（階層・担当・進捗込）を `{nodes}` で返す。依存（edges）と rank は依存の設計時に足す（R4/R5） |
-| `get_critical_path(story uuid)` | CP 抽出 | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6） |
-| `get_progress(project uuid)` | 進捗集約 | epic/story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
+| 関数                            | 用途     | 概要                                                                                                             |
+| ------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `get_task_graph(project uuid)`  | 可視化用 | tasks（階層・担当・進捗込）を `{nodes}` で返す。依存（edges）と rank は依存の設計時に足す（R4/R5）               |
+| `get_critical_path(story uuid)` | CP 抽出  | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6）                                        |
+| `get_progress(project uuid)`    | 進捗集約 | epic/story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
 - AI・UI が同じ RPC を使い、計算結果を一致させる。
@@ -432,6 +531,7 @@ $$ language sql stable;
 3. PR を作ったらタスクを `done` にする（親ストーリーの進捗が上がる）。承認を得たら `closed` にする（進捗は下がらない）。
 
 - タスク間の依存は未設計のため、今はどちらのスキルも登録しない。
+
 ---
 
 ## 5. 可視化 UI 設計
@@ -495,11 +595,11 @@ npx supabase start         # ローカル Supabase 起動 (Docker)
 
 本番は Supabase Cloud（DB・API）＋ Vercel（画面）。マイグレーションは GitHub Actions で適用する。
 
-| ワークフロー | 起動 | やること |
-|---|---|---|
-| `release.yml` | `main` への push（手動実行も可） | 本番に `supabase db push`。将来、画面のデプロイをこの後ろに足す |
-| `pull-request.yml` | `main` 向けの PR | `supabase db push --dry-run` で、マージ時に適用される migration を一覧にする（何も変更しない） |
-| `supabase-migrations.yml` | 上の 2 つから呼ばれる部品 | `link` → `db push`（`dry_run` 入力で切り替え） |
+| ワークフロー              | 起動                             | やること                                                                                       |
+| ------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `release.yml`             | `main` への push（手動実行も可） | 本番に `supabase db push`。将来、画面のデプロイをこの後ろに足す                                |
+| `pull-request.yml`        | `main` 向けの PR                 | `supabase db push --dry-run` で、マージ時に適用される migration を一覧にする（何も変更しない） |
+| `supabase-migrations.yml` | 上の 2 つから呼ばれる部品        | `link` → `db push`（`dry_run` 入力で切り替え）                                                 |
 
 - 必要な Secrets：`SUPABASE_ACCESS_TOKEN` / `SUPABASE_DB_PASSWORD` / `SUPABASE_PROJECT_ID`。GitHub の **Environment `prd`** に登録する（リポジトリ全体ではなく環境ごとに持たせ、あとから承認ルールやブランチ制限を付けられるようにする）。
 - **`--include-seed` は使わない**：seed のサンプル SQL は「同名のプロジェクトを消してから入れ直す」ため、本番のデータが初期化される。
@@ -542,15 +642,15 @@ task-branch/
 
 AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS の下で動く。
 
-| 項目 | 決定 |
-|---|---|
-| アカウント | Supabase Auth の Email プロバイダ（メール＋パスワード）で作る AI 専用ユーザー。Google アカウントは作らない |
-| 作り方 | 人が管理画面か管理用スクリプト（service_role）で作る。作成時にメール確認済みにし、メールは送らない。パスワードはランダムな長い文字列 |
-| `app_metadata` | `actor_type = "ai"`（`current_actor_type()` の判定に使う）と `owner_id = <持ち主の人のユーザー id>`。`app_metadata` は service_role でしか書けないため、AI 自身は書き換えられない |
-| トークン | MCP サーバーが起動時に `signInWithPassword` で JWT を取り、以後は自動更新する |
-| 認証情報の置き場所 | MCP サーバーの設定（リポジトリ外の env ファイル）だけ |
-| 新規登録 | Email プロバイダは新規登録を無効にし、ログインだけ許す（本番・ローカルとも） |
-| 止め方 | パスワードの変更か、ユーザーの無効化 |
+| 項目               | 決定                                                                                                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| アカウント         | Supabase Auth の Email プロバイダ（メール＋パスワード）で作る AI 専用ユーザー。Google アカウントは作らない                                                                        |
+| 作り方             | 人が管理画面か管理用スクリプト（service_role）で作る。作成時にメール確認済みにし、メールは送らない。パスワードはランダムな長い文字列                                              |
+| `app_metadata`     | `actor_type = "ai"`（`current_actor_type()` の判定に使う）と `owner_id = <持ち主の人のユーザー id>`。`app_metadata` は service_role でしか書けないため、AI 自身は書き換えられない |
+| トークン           | MCP サーバーが起動時に `signInWithPassword` で JWT を取り、以後は自動更新する                                                                                                     |
+| 認証情報の置き場所 | MCP サーバーの設定（リポジトリ外の env ファイル）だけ                                                                                                                             |
+| 新規登録           | Email プロバイダは新規登録を無効にし、ログインだけ許す（本番・ローカルとも）                                                                                                      |
+| 止め方             | パスワードの変更か、ユーザーの無効化                                                                                                                                              |
 
 - RLS では「実効の所有者 = JWT の `app_metadata.owner_id` があればそれ、なければ `auth.uid()`」として扱う（`current_owner_id()`、§3.5）。これで本人と本人の AI だけがデータに触れる。
 - service_role キーは MCP サーバーに持たせない（RLS を素通りするため）。
@@ -565,11 +665,11 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 
 ### 8.1 各ビューが必要とするもの
 
-| ビュー | 必要データ | 本設計での準備状況 |
-|---|---|---|
-| **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は未設計（§1.2）。期間は将来 `estimate` |
-| **カレンダー** | 日付（期限 / 予定日） | `start_date` / `due_date` を用意済 |
-| **カンバン** | 列（status）とカード、列内の並び順 | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `done`。`closed` は列にしない） |
+| ビュー             | 必要データ                               | 本設計での準備状況                                                                                                  |
+| ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は未設計（§1.2）。期間は将来 `estimate`                         |
+| **カレンダー**     | 日付（期限 / 予定日）                    | `start_date` / `due_date` を用意済                                                                                  |
+| **カンバン**       | 列（status）とカード、列内の並び順       | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `done`。`closed` は列にしない） |
 
 ### 8.2 拡張ポイントと方針
 
@@ -595,18 +695,18 @@ AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS �
 
 ## 9. 未決事項 / 要確認
 
-| # | 項目 | メモ |
-|---|---|---|
-| Q1 | level の呼称 | `epic` / `story` / `task` で確定（表示名は日本語可） |
-| Q2 | ストーリー間の順序 | 依存は同じストーリー内のタスク間のみ。ストーリーをまたぐ順序（例: 認証 → RLS）を依存で表すか、期間の並びだけで表すか |
-| Q3 | 見積りの再導入 | 初期はホップ数 CP。時間見積りが要るなら `estimate` 追加で重み付き CP へ |
-| Q4 | 階層の段数固定 | 3段（epic/story/task）固定でよいか。可変ネストにするか |
-| Q5 | フロントのデプロイ先 | Vercel / Cloudflare Pages（未定） |
-| Q6 | 担当の既定値 | 新規タスクの `assignee_type` を人 / AI のどちらにするか。AI が起票するときの判断基準 |
-| Q7 | AI 担当の識別 | AI の場合もどのエージェント（Devin / Claude Code 等）かを持つか |
-| Q8 | 人の作業待ちの知らせ方 | 次に着手できるのが人の担当タスクだけになったとき、どう知らせるか |
-| Q9 | 担当者（人）の範囲 | 自分専用か、チームで共有するか。ユーザー登録・RLS の設計に影響 |
-| Q10 | 前提待ちの見せ方 | 前提が未完了の task に印（鍵アイコン等）を付けるか |
+| #   | 項目                   | メモ                                                                                                                 |
+| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Q1  | level の呼称           | `epic` / `story` / `task` で確定（表示名は日本語可）                                                                 |
+| Q2  | ストーリー間の順序     | 依存は同じストーリー内のタスク間のみ。ストーリーをまたぐ順序（例: 認証 → RLS）を依存で表すか、期間の並びだけで表すか |
+| Q3  | 見積りの再導入         | 初期はホップ数 CP。時間見積りが要るなら `estimate` 追加で重み付き CP へ                                              |
+| Q4  | 階層の段数固定         | 3段（epic/story/task）固定でよいか。可変ネストにするか                                                               |
+| Q5  | フロントのデプロイ先   | Vercel / Cloudflare Pages（未定）                                                                                    |
+| Q6  | 担当の既定値           | 新規タスクの `assignee_type` を人 / AI のどちらにするか。AI が起票するときの判断基準                                 |
+| Q7  | AI 担当の識別          | AI の場合もどのエージェント（Devin / Claude Code 等）かを持つか                                                      |
+| Q8  | 人の作業待ちの知らせ方 | 次に着手できるのが人の担当タスクだけになったとき、どう知らせるか                                                     |
+| Q9  | 担当者（人）の範囲     | 自分専用か、チームで共有するか。ユーザー登録・RLS の設計に影響                                                       |
+| Q10 | 前提待ちの見せ方       | 前提が未完了の task に印（鍵アイコン等）を付けるか                                                                   |
 
 ---
 
