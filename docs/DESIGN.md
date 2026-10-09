@@ -197,7 +197,6 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | updated_at  | timestamptz | default now()                                          |                                                                                   |
 
 - インデックス：(owner_id)。
-- `not null` は既存行を埋めたあとに付ける。それまでは nullable（§3.5 の末尾）。
 - 所有者の列を持つのは projects だけ。tasks・task_comments・epic_context_revisions は、属するプロジェクトの所有者をたどって判定する（§3.5）。
 
 #### tasks
@@ -485,7 +484,7 @@ create policy task_comments_delete on task_comments
 - `epic_context_revisions` の insert は、エピックの保存時にトリガ（`save_epic_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
 - RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
 - `parent_id` に他人のタスクを指定することは、トリガ `check_task_hierarchy()` が「親は同じプロジェクト」を確かめるため起きない。
-- 既存の projects の `owner_id` はマイグレーションでは埋めず、本番で手動の update で埋める（利用者の uid をリポジトリに残さないため）。埋めるまでは `owner_id` が null で、その行は RLS で誰からも見えない。そのため `not null` は埋めたあとのマイグレーションで付ける（それまでは nullable）。
+- 既存の projects の `owner_id` はマイグレーションでは埋めず、本番で手動の update で埋める（利用者の uid をリポジトリに残さないため）。埋めたあと、`0013_projects_owner_not_null.sql` で `not null` を付けた。
 
 ---
 
