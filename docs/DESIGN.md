@@ -36,7 +36,8 @@ AI がプランニングしたタスクを **粒度の異なる3階層のツリ�
   - [6.2 本番（将来）](#62-本番将来)
   - [6.3 リポジトリ構成（予定）](#63-リポジトリ構成予定)
 - [7. セキュリティ（個人用の割り切り）](#7-セキュリティ個人用の割り切り)
-  - [7.1 AI 専用アカウントとトークン](#71-ai-専用アカウントとトークン)
+  - [7.1 AI のトークン](#71-ai-のトークン)
+  - [7.2 MCP の OAuth 2.1 認可（動的クライアント登録）](#72-mcp-の-oauth-21-認可動的クライアント登録)
 - [8. 拡張性設計（将来ビュー: ガント / カレンダー / カンバン）](#8-拡張性設計将来ビュー-ガント--カレンダー--カンバン)
   - [8.1 各ビューが必要とするもの](#81-各ビューが必要とするもの)
   - [8.2 拡張ポイントと方針](#82-拡張ポイントと方針)
@@ -270,7 +271,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 - UNIQUE(epic_id, version)。
 - `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
-- 人か AI かは、リクエストの JWT の `app_metadata.actor_type`（`ai` なら AI）で判定する（`current_actor_type()`）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
+- 人か AI かは、リクエストの JWT の `client_id`（あれば AI）で判定する（`current_actor_type()`、§3.5）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
 
 ### 3.3 派生概念（計算で導出）
 
@@ -293,8 +294,10 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 
 #### JWT 形式
 
-`app_metadata` は Supabase Auth が JWT に自動で入れる項目（実体は `auth.users.raw_app_meta_data`）。`provider` / `providers` は Supabase が入れ、`actor_type` / `owner_id` は AI 専用アカウントの作成時に service_role で入れる（§7.1）。人のアカウントには何も足さない。
+`app_metadata` は Supabase Auth が JWT に自動で入れる項目（実体は `auth.users.raw_app_meta_data`）。`provider` / `providers` は Supabase が入れる。こちらからは何も足さない。
 本人が書き換えられる `user_metadata` は権限の判定に使わない。
+
+AI は AI 専用アカウントを持たず、人が自分のアカウントで OAuth 2.1 の同意をして得たトークンを使う（§7.1）。そのため `sub` は人と同じで、AI のトークンにだけ `client_id`（Supabase が動的登録で発行したクライアントの id）が入る。
 
 人（Google でログイン。uid = `aaaa`）:
 
@@ -306,22 +309,20 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 }
 ```
 
-AI（AI 専用アカウント。uid = `cccc`、持ち主 = `aaaa`）:
+AI（`aaaa` が Claude Code に同意して得た OAuth のトークン。client_id = `kkkk`）:
 
 ```json
 {
-  "sub": "cccc",
+  "sub": "aaaa",
   "role": "authenticated",
-  "app_metadata": {
-    "provider": "email",
-    "providers": ["email"],
-    "actor_type": "ai",
-    "owner_id": "aaaa"
-  }
+  "aud": "authenticated",
+  "client_id": "kkkk",
+  "app_metadata": { "provider": "google", "providers": ["google"] }
 }
 ```
 
-- AI の例は AI 専用アカウントを作る前提。MCP の認証を OAuth 2.1 にし、人のアカウントで同意する形にする場合は、`sub` が人になり、AI はトークンの `client_id` で見分ける。そのときはストーリー「MCP 向け OAuth 認可の構築」でこの節を書き直す。
+- ヘッダの `alg` はどちらも `ES256`（§7.1）。
+- AI のトークンの `app_metadata` は人と同じ。`actor_type` / `owner_id` は入らない。
 
 #### 関数
 
@@ -331,32 +332,41 @@ PostgREST は、リクエストの JWT の中身を `request.jwt.claims` にセ�
 
 | 関数                   | 返すもの                                                                                                          | 使う場所                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `current_actor_type()` | `ai`（JWT の `app_metadata.actor_type` が `ai`）／ それ以外は `human`                                             | `task_comments.author_type`・`epic_context_revisions.edited_by_type` の既定値 |
+| `current_actor_type()` | `ai`（JWT に `client_id` がある）／ それ以外は `human`                                                            | `task_comments.author_type`・`epic_context_revisions.edited_by_type` の既定値 |
 | `current_actor_id()`   | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null                                                          | `task_comments.author_id`・`epic_context_revisions.edited_by_id` の既定値     |
-| `current_owner_id()`   | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人は本人、AI は持ち主の人になる | `projects.owner_id` の既定値、ポリシー                                        |
+| `current_owner_id()`   | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人も AI も本人になる           | `projects.owner_id` の既定値、ポリシー                                        |
 
 ```sql
+create or replace function current_actor_type() returns text as $$
+  select case
+    when nullif(
+           coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb ->> 'client_id', ''
+         ) is not null then 'ai'
+    else 'human'
+  end;
+$$ language sql stable;
+
 create or replace function current_owner_id() returns uuid as $$
   select coalesce(
-    (auth.jwt() -> 'app_metadata' ->> 'owner_id')::uuid,  -- AI なら持ち主の id
-    auth.uid()                                              -- 人なら自分の id
+    (auth.jwt() -> 'app_metadata' ->> 'owner_id')::uuid,  -- 今は使わない（入れる経路が無い）
+    auth.uid()                                              -- 人も AI も自分の id
   );
 $$ language sql stable;
 ```
 
 上の JWT での結果:
 
-| 関数                   | 人                                           | AI                   | JWT なし（psql・シード） |
-| ---------------------- | -------------------------------------------- | -------------------- | ------------------------ |
-| `current_actor_type()` | `human`                                      | `ai`                 | `human`                  |
-| `current_actor_id()`   | `aaaa`                                       | `cccc`               | null                     |
-| `auth.uid()`           | `aaaa`                                       | `cccc`               | null                     |
-| `current_owner_id()`   | `aaaa`（`owner_id` が無いので `auth.uid()`） | `aaaa`（`owner_id`） | null                     |
+| 関数                   | 人                                           | AI                                           | JWT なし（psql・シード） |
+| ---------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------ |
+| `current_actor_type()` | `human`                                      | `ai`（`client_id` がある）                   | `human`                  |
+| `current_actor_id()`   | `aaaa`                                       | `aaaa`                                       | null                     |
+| `auth.uid()`           | `aaaa`                                       | `aaaa`                                       | null                     |
+| `current_owner_id()`   | `aaaa`（`owner_id` が無いので `auth.uid()`） | `aaaa`（`owner_id` が無いので `auth.uid()`） | null                     |
 
 - 所有者の決め方は `current_owner_id()` 1か所にまとめる。ポリシーには同じ式を書かない。
 - `current_owner_id()` は人と AI で同じ値になる。所有者の判定に使う。
-- `auth.uid()` / `current_actor_id()` は人と AI で別の値になる。投稿者の記録と「書いた本人」の判定に使う。
-- `app_metadata` は service_role でしか書けないため、AI が `owner_id` を書き換えて他人のデータに入ることはできない（§7.1）。
+- `auth.uid()` / `current_actor_id()` も人と AI で同じ値になる。投稿者の判定は `author_id`（`edited_by_id`）と `author_type`（`edited_by_type`）の組で行う。
+- `current_owner_id()` の `app_metadata.owner_id` の分岐は今は使わない（AI 専用アカウントを作らないため、入れる経路が無い）。`app_metadata` は service_role でしか書けないため、利用者が `owner_id` を書き換えて他人のデータに入ることはできない。
 - どれも security invoker（既定）。security definer にはしない。
 - JWT なしは postgres ロールでの接続で、RLS を受けない。`projects.owner_id` の既定値が null になるため、psql やシードでプロジェクトを作るときは `owner_id` を明示する。
 
@@ -373,7 +383,7 @@ $$ language sql stable;
 | task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
-- 「書いた本人」は `author_id = auth.uid()`。人と AI は別の投稿者として扱う。
+- 「書いた本人」は `author_id = auth.uid() and author_type = current_actor_type()`。人と AI は uid が同じなので、種別も合わせて別の投稿者として扱う（AI は人のコメントを、人は AI のコメントを編集・削除できない）。
 - 「不可」はポリシーを作らない。
 
 ポリシー定義:
@@ -444,7 +454,7 @@ create policy epic_context_revisions_insert on epic_context_revisions
 
 ##### task_comments
 
-タスク → プロジェクトをたどって所有者だけが読み、投稿できる。投稿は投稿者が自分であることも確かめ、なりすましを弾く。編集・削除は書いた本人だけ。
+タスク → プロジェクトをたどって所有者だけが読み、投稿できる。投稿は投稿者が自分であることも確かめ、なりすましを弾く。編集・削除は書いた本人（uid と種別が一致する）だけ。
 
 ```sql
 alter table task_comments enable row level security;
@@ -473,16 +483,17 @@ create policy task_comments_insert on task_comments
 
 create policy task_comments_update on task_comments
   for update to authenticated
-  using      (author_id = auth.uid())
-  with check (author_id = auth.uid());
+  using      (author_id = auth.uid() and author_type = current_actor_type())
+  with check (author_id = auth.uid() and author_type = current_actor_type());
 
 create policy task_comments_delete on task_comments
   for delete to authenticated
-  using (author_id = auth.uid());
+  using (author_id = auth.uid() and author_type = current_actor_type());
 ```
 
 - `epic_context_revisions` の insert は、エピックの保存時にトリガ（`save_epic_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
 - RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
+- `current_actor_type()` の `client_id` 判定と、task_comments の update / delete で種別も見る条件は `0014_actor_type_oauth_client.sql` で入れた（それまでは `app_metadata.actor_type` で判定し、update / delete は `author_id` だけを見ていた）。
 - `parent_id` に他人のタスクを指定することは、トリガ `check_task_hierarchy()` が「親は同じプロジェクト」を確かめるため起きない。
 - 既存の projects の `owner_id` はマイグレーションでは埋めず、本番で手動の update で埋める（利用者の uid をリポジトリに残さないため）。埋めたあと、`0013_projects_owner_not_null.sql` で `not null` を付けた。
 
@@ -636,25 +647,43 @@ task-branch/
 
 - ローカル: 本番と同じマイグレーションで同じ RLS が入る。psql（postgres ロール）からの操作は RLS を受けない。
 - 本番（クラウド）: RLS を有効化し、本人と本人の AI だけがデータに触れるようにする（§3.5）。
-- AI が使う認証情報は MCP サーバーの設定（リポジトリ外の env ファイル）にだけ置き、リポジトリにも AI の会話にも出さない（§7.1）。
+- AI が使うトークンは Claude Code が持ち、自動で更新する。リポジトリにも AI の会話にも出さない（§7.1）。
 
-### 7.1 AI 専用アカウントとトークン
+### 7.1 AI のトークン
 
-AI は人と同じ Supabase Auth のユーザーとしてログインし、RLS の下で動く。
+AI（Claude Code）は MCP の OAuth 2.1 認可（§7.2）で、人のアカウントのトークンを得て RLS の下で動く。
 
-| 項目               | 決定                                                                                                                                                                              |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| アカウント         | Supabase Auth の Email プロバイダ（メール＋パスワード）で作る AI 専用ユーザー。Google アカウントは作らない                                                                        |
-| 作り方             | 人が管理画面か管理用スクリプト（service_role）で作る。作成時にメール確認済みにし、メールは送らない。パスワードはランダムな長い文字列                                              |
-| `app_metadata`     | `actor_type = "ai"`（`current_actor_type()` の判定に使う）と `owner_id = <持ち主の人のユーザー id>`。`app_metadata` は service_role でしか書けないため、AI 自身は書き換えられない |
-| トークン           | MCP サーバーが起動時に `signInWithPassword` で JWT を取り、以後は自動更新する                                                                                                     |
-| 認証情報の置き場所 | MCP サーバーの設定（リポジトリ外の env ファイル）だけ                                                                                                                             |
-| 新規登録           | Email プロバイダは新規登録を無効にし、ログインだけ許す（本番・ローカルとも）                                                                                                      |
-| 止め方             | パスワードの変更か、ユーザーの無効化                                                                                                                                              |
+| 項目       | 決定                                                                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| アカウント | AI 専用のアカウントは作らない。人が Google でログインした自分のアカウントで同意する。AI はトークンの `client_id` で見分ける（`current_actor_type()`、§3.5） |
+| トークン   | Claude Code が持ち、自動で更新する（refresh_token）。AI の会話には出ない                                                                                    |
+| 署名鍵     | ES256。MCP サーバーは JWKS（`/auth/v1/.well-known/jwks.json` の公開鍵）で検証し、service_role キーも JWT secret も持たない                                   |
+| 止め方     | 人のセッションで `DELETE /auth/v1/user/oauth/grants?client_id=<client_id>` を呼び、同意を取り消す（一覧は同じパスの GET）                                     |
 
-- RLS では「実効の所有者 = JWT の `app_metadata.owner_id` があればそれ、なければ `auth.uid()`」として扱う（`current_owner_id()`、§3.5）。これで本人と本人の AI だけがデータに触れる。
+- 人と AI は同じ uid になる。所有者の判定（`current_owner_id()`）は人と同じ範囲になり、投稿者は `author_id` と `author_type` の組で見分ける（§3.5）。
 - service_role キーは MCP サーバーに持たせない（RLS を素通りするため）。
 - 長期の JWT を自分で署名する方式と、独自の API トークン表は採らない。前者は個別に失効できず、後者は作るものが増えるため。
+
+### 7.2 MCP の OAuth 2.1 認可（動的クライアント登録）
+
+Claude Code は MCP の仕様に沿って、Supabase Auth の OAuth 2.1 サーバーから認可を得る。クライアントは動的登録で作るため、事前の設定は要らない。
+
+![MCP の OAuth 2.1 認可（動的クライアント登録）のシーケンス図](mcp-oauth-dcr.drawio.png)
+
+| 手順    | 内容                                                                                                                                                                                                                       |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1〜6   | 発見。Claude Code がトークンなしで MCP サーバーを呼ぶと 401。`/.well-known/oauth-protected-resource` で認可サーバー（`<Supabase>/auth/v1`）を知り、`/.well-known/oauth-authorization-server/auth/v1` でエンドポイントを得る |
+| 7〜9   | 動的登録（初回だけ）。`POST /auth/v1/oauth/clients/register`（戻り先は `http://localhost:<任意のポート>/callback`、`token_endpoint_auth_method = none`）で Supabase が `client_id` を発行・記録し、Claude Code が保存する |
+| 10〜16 | 同意。ブラウザで `/auth/v1/oauth/authorize`（PKCE S256）を開くと同意画面 `/oauth/consent` へ 302。未ログインなら Google でログインして同じ画面に戻り、「許可」で `approveAuthorization` → localhost の戻り先に `code`   |
+| 17〜19 | トークン。`POST /auth/v1/oauth/token`（`code` と `code_verifier`）で access_token（`sub` = 人、`client_id` 入り）と refresh_token を得て、Bearer で MCP のツールを呼ぶ                                                      |
+
+- 動的登録を有効にする（`allow_dynamic_registration = true`）。運営者がダッシュボードでクライアントを作る必要も、利用者が `client_id` を設定する必要もない（2026-10-14 決定）。
+- `client_id` が表すのはアプリ（Claude Code）で、利用者ではない。利用者は Google ログインで Supabase Auth のユーザーになる。
+- 誰でもクライアントを登録できるが、トークンを得るには本人のログインと同意が要るため、登録だけではデータに触れない。
+- 2 回目以降は保存済みの `client_id` を使い、7〜9 を省く。
+- 戻り先 `http://localhost:8976/callback`（Claude Code と同じ形）は登録・認可とも通ることを、ローカルで `scripts/oauth-flow-check.sh` を使って確かめた。
+- ローカルの Supabase（Kong）では 6 のパスが 404 になり、メタデータは `/.well-known/oauth-authorization-server` と `/auth/v1/.well-known/oauth-authorization-server` で返る。issuer は `http://127.0.0.1:54321/auth/v1`。
+- 図のソースは PNG に埋め込んである（draw.io で開いて編集する）。
 
 ---
 
