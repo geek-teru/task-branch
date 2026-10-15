@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
+import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 import { IdBadge } from "./IdBadge";
 import { TaskComments } from "./TaskComments";
 
@@ -61,11 +62,14 @@ export function DetailPanel<T extends DetailNode>({
   const canStart = canEdit && node != null && node.status === "todo";
   const canComplete = canEdit && node != null && node.status === "in_progress";
   const DASH = <span style={{ color: "#94a0ad" }}>-</span>;
+  // 左端のハンドルで幅を変える。右へドラッグすると狭くなる。
+  const { width, startResize } = useResizableWidth("detailPanel.width", 320, 280, 800, { invert: true });
 
   return (
     <div
       style={{
-        width: 320,
+        position: "relative",
+        width,
         flexShrink: 0,
         borderLeft: "1px solid #cbd2d9",
         background: "#fff",
@@ -74,6 +78,7 @@ export function DetailPanel<T extends DetailNode>({
         flexDirection: "column",
       }}
     >
+      <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: 0 }} />
       <div
         style={{
           display: "flex",
