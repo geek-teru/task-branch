@@ -19,11 +19,11 @@ export function useSession(): Session | null | undefined {
   return session;
 }
 
-// Back to the app origin; it must be in Supabase's allowed redirect URLs.
-export function signInWithGoogle() {
+// Back to the app origin unless redirectTo is given; it must be in Supabase's allowed redirect URLs.
+export function signInWithGoogle(redirectTo: string = window.location.origin) {
   return supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo },
   });
 }
 
