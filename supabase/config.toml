@@ -23,9 +23,19 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173"]
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/oauth/consent"]
 jwt_expiry = 3600
 enable_signup = true
+# JWT を ES256 の非対称鍵で署名する（MCP クライアントが JWKS で検証するため）。
+# 鍵は `make signing-key` で作る。秘密鍵なのでコミットしない。
+signing_keys_path = "./signing_keys.json"
+
+# MCP クライアント向けの OAuth 2.1 認可サーバー。
+# 同意画面はフロントの /oauth/consent。クライアントは動的登録で受け付ける。
+[auth.oauth_server]
+enabled = true
+authorization_url_path = "/oauth/consent"
+allow_dynamic_registration = true
 
 [auth.external.google]
 enabled = true

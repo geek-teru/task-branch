@@ -10,3 +10,6 @@ supabase/.temp/
 
 # TS build info
 *.tsbuildinfo
+
+# Supabase の JWT 署名鍵（秘密鍵）
+supabase/signing_keys.json

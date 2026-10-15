@@ -4,21 +4,28 @@
 WEB := web
 SKILL_SRC := plan-skill/SKILL.md
 SKILL_DST := .claude/skills/plan
+SIGNING_KEYS := supabase/signing_keys.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup install-cli up down reset status web-install env dev build preview skill clean
+.PHONY: help setup install-cli signing-key up down reset status web-install env dev build preview skill clean
 
 help: ## このヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-setup: env web-install skill ## 初期セットアップ（.env作成 + 依存導入 + スキル配置）
+setup: env signing-key web-install skill ## 初期セットアップ（.env作成 + 署名鍵生成 + 依存導入 + スキル配置）
 	@echo "✅ setup 完了。'make up' で Supabase を起動し、'make dev' でフロントを起動してください。"
 
 ## --- Supabase (ローカル / Docker) ---
 install-cli: ## Supabase CLI を Homebrew で導入
 	brew install supabase/tap/supabase
+
+signing-key: $(SIGNING_KEYS) ## JWT 署名鍵（ES256）を生成（既存は保持）
+
+$(SIGNING_KEYS):
+	echo "[]" > $@
+	supabase gen signing-key --algorithm ES256 --append
 
 up: ## ローカル Supabase を起動（migrations 適用 + seed 投入）
 	supabase start

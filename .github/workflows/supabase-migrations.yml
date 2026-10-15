@@ -65,6 +65,14 @@ jobs:
         with:
           version: 2.117.0 # same as local development; bump together
 
+      # config.toml の signing_keys_path はローカル用だが、CLI は設定を読むたびに
+      # そのファイルを読み、無いと失敗する。リモートへの push では使わないので使い捨ての鍵を置く。
+      - name: Generate throwaway signing key
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          echo "[]" > supabase/signing_keys.json
+          supabase gen signing-key --algorithm ES256 --append
+
       - name: Link project
         if: steps.secrets.outputs.configured == 'true'
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"

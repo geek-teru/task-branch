@@ -31,6 +31,7 @@ task-branch/
 brew install supabase/tap/supabase   # または npm i -g supabase
 
 cd task-branch
+make signing-key                     # JWT 署名鍵（ES256）を supabase/signing_keys.json に生成（初回のみ）
 supabase start                       # Docker で Postgres/API/Studio を起動
 # 起動後に表示される API URL / anon key を控える
 ```
@@ -85,6 +86,10 @@ cp .env.example .env
 npm install
 npm run dev                          # http://localhost:5173
 ```
+
+JWT は `supabase/signing_keys.json` の ES256 鍵で署名されるため、anon key もこの鍵で署名したものになります
+（鍵ごとに値が変わる）。署名鍵を作り直したときや、署名鍵を入れる前の `.env` を使っているときは、
+`supabase status -o env` の `ANON_KEY` を `VITE_SUPABASE_ANON_KEY` に入れ直してください。
 
 ### 3. plan スキルの配置
 
