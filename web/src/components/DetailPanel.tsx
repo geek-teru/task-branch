@@ -3,6 +3,7 @@ import type { Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { IdBadge } from "./IdBadge";
+import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
 
 // A story or task shown in the panel; progress is present for graph nodes only.
@@ -157,7 +158,7 @@ export function DetailPanel<T extends DetailNode>({
         </Field>
         <Field label="詳細">
           {node?.description ? (
-            <span style={{ whiteSpace: "pre-wrap", color: "#3b4149" }}>{node.description}</span>
+            <Markdown>{node.description}</Markdown>
           ) : (
             DASH
           )}
