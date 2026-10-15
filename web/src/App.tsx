@@ -34,6 +34,7 @@ import { KanbanView } from "./views/KanbanView";
 import { BacklogView } from "./views/BacklogView";
 import { EpicDetailPage } from "./views/EpicDetailPage";
 import { LoginPage } from "./views/LoginPage";
+import { OAuthConsentPage } from "./views/OAuthConsentPage";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -421,6 +422,12 @@ export default function App() {
         {session === undefined ? null : session ? <Navigate to="/projects" replace /> : <LoginPage />}
       </Shell>
     );
+  }
+
+  // The OAuth consent page also stands alone, and handles sign-in itself: a detour via /login
+  // would drop the authorization_id from the URL.
+  if (pathname === "/oauth/consent") {
+    return <Shell>{session !== undefined && <OAuthConsentPage session={session} />}</Shell>;
   }
 
   // Every other page needs a signed-in user. Render nothing while the session is still being read.
