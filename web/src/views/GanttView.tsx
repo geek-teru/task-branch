@@ -1,6 +1,6 @@
 // Gantt view: a project's stories and their tasks on a shared timeline.
 // Built from start_date/due_date on the story and task nodes.
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
@@ -137,6 +137,8 @@ export function GanttView({
   onCompleteStory,
   onChangeStatus,
   onResizeStory,
+  onShiftStory,
+  onMoveTask,
 }: {
   projects: Project[];
   project: Project;
@@ -152,6 +154,8 @@ export function GanttView({
   onResizeStory?: (id: string, startDate: string, dueDate: string) => void;
   // Move a story and its tasks by the same number of days.
   onShiftStory?: (id: string, days: number) => void;
+  // Move one task's start and due dates (its bar is dragged by the middle).
+  onMoveTask?: (id: string, startDate: string, dueDate: string) => void;
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -467,6 +471,33 @@ export function GanttView({
                           }
                         : undefined
                     }
+                    onMove={
+                      r.kind === "story" && r.node && onShiftStory
+                        ? (days) => {
+                            const node = r.node!;
+                            const f = (d: Date) => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+                            setConfirm({
+                              message: `「${r.label}」の期間を
+${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
+に変更します。配下のタスクも ${Math.abs(days)} 日${days > 0 ? "後ろ" : "前"}へずらします。よろしいですか？`,
+                              onConfirm: () => onShiftStory(node.id, days),
+                            });
+                          }
+                        : r.kind === "task" && r.node && onMoveTask
+                          ? (days) => {
+                              const node = r.node!;
+                              const startDate = isoDate(addDays(r.start!, days));
+                              const dueDate = isoDate(addDays(r.end!, days));
+                              const f = (d: Date) => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+                              setConfirm({
+                                message: `「${r.label}」の期間を
+${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
+に変更します。よろしいですか？`,
+                                onConfirm: () => onMoveTask(node.id, startDate, dueDate),
+                              });
+                            }
+                          : undefined
+                    }
                   />
                 )}
               </div>
@@ -576,19 +607,24 @@ function Bar({
   selected,
   onSelect,
   onResize,
+  onMove,
 }: {
   row: Row;
   timelineStart: Date;
   selected: boolean;
   onSelect: () => void;
   onResize?: (startDate: string, dueDate: string) => void;
+  // Called with the number of days the whole bar was dragged (never 0).
+  onMove?: (days: number) => void;
 }) {
   const start = row.start as Date;
   const end = row.end as Date;
   const c = row.status ? STATUS_COLOR[row.status] : null;
 
-  // Live drag offset (in whole days) while an edge is being dragged; null otherwise.
-  const [drag, setDrag] = useState<{ edge: "start" | "end"; days: number } | null>(null);
+  // Live drag offset (in whole days) while an edge or the whole bar is being dragged; null otherwise.
+  const [drag, setDrag] = useState<{ edge: "start" | "end" | "move"; days: number } | null>(null);
+  // The click that follows a bar drag must not open the detail panel.
+  const draggedRef = useRef(false);
 
   // Preview dates reflect the in-progress drag so the bar tracks the cursor.
   const span = diffDays(start, end); // inclusive span minus 1; keeps at least 1 day when clamped
@@ -596,7 +632,11 @@ function Bar({
   let pEnd = end;
   if (drag) {
     if (drag.edge === "start") pStart = addDays(start, Math.min(drag.days, span));
-    else pEnd = addDays(end, Math.max(drag.days, -span));
+    else if (drag.edge === "end") pEnd = addDays(end, Math.max(drag.days, -span));
+    else {
+      pStart = addDays(start, drag.days);
+      pEnd = addDays(end, drag.days);
+    }
   }
   const left = diffDays(timelineStart, pStart) * PX_PER_DAY;
   const width = Math.max((diffDays(pStart, pEnd) + 1) * PX_PER_DAY, 4);
@@ -626,13 +666,39 @@ function Bar({
     window.addEventListener("mouseup", onUp);
   };
 
+  const beginMove = (e: ReactMouseEvent) => {
+    if (!onMove || e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const toDays = (clientX: number) => Math.round((clientX - startX) / PX_PER_DAY);
+    const onMouseMove = (ev: MouseEvent) => {
+      setDrag({ edge: "move", days: toDays(ev.clientX) });
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onUp);
+      setDrag(null);
+      const days = toDays(ev.clientX);
+      if (days === 0) return;
+      draggedRef.current = true;
+      onMove(days);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   const showHandles = !!onResize;
   const HANDLE_W = 7;
 
   return (
     <>
       <div
+        onMouseDown={beginMove}
         onClick={() => {
+          if (draggedRef.current) {
+            draggedRef.current = false;
+            return;
+          }
           if (drag) return;
           onSelect();
         }}
@@ -645,7 +711,7 @@ function Bar({
           height: ROW_H - 10,
           borderRadius: 4,
           background: c?.border ?? "#94a0ad",
-          cursor: "pointer",
+          cursor: drag?.edge === "move" ? "grabbing" : onMove ? "grab" : "pointer",
           outline: selected || drag ? "2px solid #1f2933" : "none",
           outlineOffset: 1,
         }}

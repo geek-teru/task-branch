@@ -310,6 +310,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  const handleMoveTaskDates = useCallback(
+    async (id: string, startDate: string, dueDate: string) => {
+      try {
+        await updateTaskDates(id, startDate, dueDate);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleShiftStory = useCallback(
     async (id: string, days: number) => {
       try {
@@ -460,6 +472,7 @@ export default function App() {
           onChangeStatus={handleChangeStatus}
           onResizeStory={handleResizeStory}
           onShiftStory={handleShiftStory}
+          onMoveTask={handleMoveTaskDates}
         />
       )}
     </main>
