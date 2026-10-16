@@ -20,6 +20,7 @@ import {
   updateProject,
   updateTask,
   updateTaskDates,
+  shiftStoryDates,
   updateTaskStatus,
 } from "./lib/api";
 import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
@@ -309,6 +310,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  const handleShiftStory = useCallback(
+    async (id: string, days: number) => {
+      try {
+        await shiftStoryDates(id, days);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleCreateProject = useCallback(async (input: ProjectInput) => {
     try {
       const p = await createProject(input);
@@ -446,6 +459,7 @@ export default function App() {
           onCompleteStory={handleCompleteStory}
           onChangeStatus={handleChangeStatus}
           onResizeStory={handleResizeStory}
+          onShiftStory={handleShiftStory}
         />
       )}
     </main>
