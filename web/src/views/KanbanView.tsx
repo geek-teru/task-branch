@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { listEpics, listProjectStories } from "../lib/api";
-import type { BacklogEpic, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
+import { listProjectStories } from "../lib/api";
+import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { DetailPanel, type StoryGroup } from "../components/DetailPanel";
+import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
@@ -72,11 +72,9 @@ export function KanbanView({
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
   const [over, setOver] = useState<{ storyId: string; status: Status } | null>(null);
-  // ストーリーの変更: 詳細パネルのエピック / ストーリー名を押したときのプルダウンの中身。
+  // ストーリーの変更: 詳細パネルのストーリー名を押したときのプルダウンの中身。
   // 選んだタスクのプロジェクト単位で読み、同じプロジェクトの間は読み直さない。
-  const [storySource, setStorySource] = useState<{ projectId: string; epics: BacklogEpic[]; stories: Task[] } | null>(
-    null
-  );
+  const [storySource, setStorySource] = useState<{ projectId: string; stories: Task[] } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef<{ raf: number; step: number } | null>(null);
 
@@ -108,9 +106,9 @@ export function KanbanView({
   useEffect(() => {
     if (!selectedProjectId || storySource?.projectId === selectedProjectId) return;
     let cancelled = false;
-    Promise.all([listEpics(selectedProjectId), listProjectStories(selectedProjectId)])
-      .then(([epics, stories]) => {
-        if (!cancelled) setStorySource({ projectId: selectedProjectId, epics, stories });
+    listProjectStories(selectedProjectId)
+      .then((stories) => {
+        if (!cancelled) setStorySource({ projectId: selectedProjectId, stories });
       })
       .catch(() => {
         // 読めなければプルダウンを出さないだけで、詳細の表示は妨げない。
@@ -120,20 +118,13 @@ export function KanbanView({
     };
   }, [selectedProjectId, storySource?.projectId]);
 
-  // エピックごとにまとめた移動先。進行中でないストーリーには状態を添える。
-  const storyOptions = useMemo<StoryGroup[] | undefined>(() => {
+  // 移動先のストーリー（バックログと同じ並び）。進行中でないストーリーには状態を添える。
+  const storyOptions = useMemo<StoryOption[] | undefined>(() => {
     if (!selectedProjectId || storySource?.projectId !== selectedProjectId) return undefined;
-    return storySource.epics
-      .map((epic) => ({
-        epic: epic.title,
-        stories: storySource.stories
-          .filter((story) => story.parent_id === epic.id)
-          .map((story) => ({
-            id: story.id,
-            label: story.status === "in_progress" ? story.title : `${story.title}（${STATUS_LABEL[story.status]}）`,
-          })),
-      }))
-      .filter((group) => group.stories.length > 0);
+    return storySource.stories.map((story) => ({
+      id: story.id,
+      label: story.status === "in_progress" ? story.title : `${story.title}（${STATUS_LABEL[story.status]}）`,
+    }));
   }, [selectedProjectId, storySource]);
 
   const stopAutoScroll = () => {
@@ -356,7 +347,7 @@ export function KanbanView({
           node={selected.task}
           start={toDate(selected.task.start_date)}
           end={toDate(selected.task.due_date)}
-          place={{ epic: null, story: selected.lane.story.title }}
+          place={{ story: selected.lane.story.title }}
           storyOptions={storyOptions}
           currentStoryId={selected.task.parent_id}
           onPickStory={(storyId) => {

@@ -59,9 +59,6 @@ export interface GraphNode extends Task {
   progress: number | null;
 }
 
-// An epic as listed on the backlog page (no context document).
-export type BacklogEpic = Pick<Task, "id" | "title" | "description" | "activated_at" | "sort_order">;
-
 // A row of the backlog page (stories of a project, without the context document).
 export type BacklogStory = Pick<
   Task,

@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { BacklogEpic, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
+import type { BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -69,16 +69,19 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
-// Epics of a project (active and inactive), without the context document. Used by the kanban's story pickers.
-export async function listEpics(projectId: string): Promise<BacklogEpic[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("id, title, description, activated_at, sort_order")
-    .eq("project_id", projectId)
-    .eq("level", "epic")
-    .order("sort_order", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+// Stories in the order the epics had them: epic order, then story order within the epic;
+// stories without a parent come last. epicOrder maps an epic id to its sort_order.
+function sortStoriesLikeEpics<S extends Pick<Task, "parent_id" | "sort_order">>(
+  stories: S[],
+  epicOrder: Map<string, number>
+): S[] {
+  const groupOrder = (s: S) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
+  return [...stories].sort(
+    (a, b) =>
+      groupOrder(a) - groupOrder(b) ||
+      (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
+      a.sort_order - b.sort_order
+  );
 }
 
 // Backlog page: stories of a project (active and inactive), without the context document.
@@ -95,13 +98,7 @@ export async function listBacklogStories(projectId: string): Promise<BacklogStor
   if (storiesRes.error) throw storiesRes.error;
   if (epicsRes.error) throw epicsRes.error;
   const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
-  const groupOrder = (s: BacklogStory) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
-  return [...((storiesRes.data ?? []) as BacklogStory[])].sort(
-    (a, b) =>
-      groupOrder(a) - groupOrder(b) ||
-      (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
-      a.sort_order - b.sort_order
-  );
+  return sortStoriesLikeEpics((storiesRes.data ?? []) as BacklogStory[], epicOrder);
 }
 
 // Backlog page: add a backlog item, i.e. an inactive story without a parent (activated_at stays null).
@@ -215,16 +212,21 @@ export async function listStoryTasks(storyId: string): Promise<Task[]> {
 }
 
 // Every story of a project, for pickers that move a task to another story.
+// Ordered like the backlog (see sortStoriesLikeEpics).
 export async function listProjectStories(projectId: string): Promise<Task[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_LIST_COLUMNS)
-    .eq("project_id", projectId)
-    .eq("level", "story")
-    .order("sort_order", { ascending: true })
-    .overrideTypes<Task[], { merge: false }>();
-  if (error) throw error;
-  return data ?? [];
+  const [storiesRes, epicsRes] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select(TASK_LIST_COLUMNS)
+      .eq("project_id", projectId)
+      .eq("level", "story")
+      .overrideTypes<Task[], { merge: false }>(),
+    supabase.from("tasks").select("id, sort_order").eq("project_id", projectId).eq("level", "epic"),
+  ]);
+  if (storiesRes.error) throw storiesRes.error;
+  if (epicsRes.error) throw epicsRes.error;
+  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
+  return sortStoriesLikeEpics(storiesRes.data ?? [], epicOrder);
 }
 
 // Kanban: every in-progress story across projects, with its child tasks.
@@ -255,18 +257,10 @@ export async function getKanbanLanes(): Promise<KanbanLane[]> {
   if (tasksRes.error) throw tasksRes.error;
 
   const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
-  const groupOrder = (s: Task) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
-  return [...stories]
-    .sort(
-      (a, b) =>
-        groupOrder(a) - groupOrder(b) ||
-        (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
-        a.sort_order - b.sort_order
-    )
-    .map((story: Task) => ({
-      story,
-      tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
-    }));
+  return sortStoriesLikeEpics(stories, epicOrder).map((story: Task) => ({
+    story,
+    tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
+  }));
 }
 
 export async function updateTaskStatus(id: string, status: Status): Promise<void> {
