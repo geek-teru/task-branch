@@ -58,7 +58,9 @@ export async function getProjectGraph(projectId: string): Promise<ProjectGraph> 
   const { data, error } = await supabase.rpc("get_task_graph", { project: projectId });
   if (error) throw error;
   const raw = (data ?? {}) as Partial<ProjectGraph>;
-  return { nodes: raw.nodes ?? [], edges: raw.edges ?? [] };
+  // story_groups のマイグレーション適用前の DB は group_id / groups を返さないので、グループなしとして扱う。
+  const nodes = (raw.nodes ?? []).map((n) => ({ ...n, group_id: n.group_id ?? null }));
+  return { nodes, edges: raw.edges ?? [], groups: raw.groups ?? [] };
 }
 
 // One project as a nested JSON document (export_project RPC).

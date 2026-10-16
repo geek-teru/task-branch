@@ -57,6 +57,14 @@ export interface StoryInput {
 // A task enriched with derived fields from get_task_graph().
 export interface GraphNode extends Task {
   progress: number | null;
+  group_id: string | null; // story only: the story_groups row it belongs to. null = no group
+}
+
+// A group of stories (story_groups). Shown on the gantt only; its period comes from its stories.
+export interface StoryGroup {
+  id: string;
+  name: string;
+  sort_order: number;
 }
 
 // A row of the backlog page (stories of a project, without the context document).
@@ -94,6 +102,7 @@ export interface TaskDependency {
 export interface ProjectGraph {
   nodes: GraphNode[];
   edges: TaskDependency[];
+  groups: StoryGroup[];
 }
 
 // One kanban swimlane: an in-progress story with its child tasks.
