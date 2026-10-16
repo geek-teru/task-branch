@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchP
 import { isConfigured } from "./lib/supabase";
 import { signOut, useSession } from "./lib/useSession";
 import {
+  addRootStory,
   addStory,
   addTask,
   createProject,
@@ -15,9 +16,7 @@ import {
   setActive,
   getProjectGraph,
   listProjects,
-  moveStory,
   moveTask,
-  reorderEpics,
   setProjectActive,
   updateProject,
   updateTask,
@@ -224,16 +223,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  // Gantt: add a story without a parent to the shown project.
   const handleAddStory = useCallback(
-    async (epic: GraphNode, values: StoryInput) => {
+    async (values: StoryInput) => {
+      if (!ganttProjectId) return;
       try {
-        await addStory(epic, values);
+        await addRootStory(ganttProjectId, values);
         await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshGraph]
+    [ganttProjectId, refreshGraph]
   );
 
   const handleUpdateTask = useCallback(
@@ -300,30 +301,6 @@ export default function App() {
     async (id: string, startDate: string, dueDate: string) => {
       try {
         await updateTaskDates(id, startDate, dueDate);
-        await refreshGraph();
-      } catch (e: any) {
-        setError(String(e.message ?? e));
-      }
-    },
-    [refreshGraph]
-  );
-
-  const handleMoveStory = useCallback(
-    async (storyId: string, targetEpicId: string) => {
-      try {
-        await moveStory(storyId, targetEpicId);
-        await refreshGraph();
-      } catch (e: any) {
-        setError(String(e.message ?? e));
-      }
-    },
-    [refreshGraph]
-  );
-
-  const handleReorderEpics = useCallback(
-    async (orderedIds: string[]) => {
-      try {
-        await reorderEpics(orderedIds);
         await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
@@ -469,8 +446,6 @@ export default function App() {
           onCompleteStory={handleCompleteStory}
           onChangeStatus={handleChangeStatus}
           onResizeStory={handleResizeStory}
-          onReorderEpics={handleReorderEpics}
-          onMoveStory={handleMoveStory}
         />
       )}
     </main>

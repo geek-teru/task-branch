@@ -104,9 +104,14 @@ export async function listBacklogStories(projectId: string): Promise<BacklogStor
   );
 }
 
-// Backlog page: add a backlog item, i.e. an inactive story without a parent (activated_at stays null),
-// appended after the project's other stories without a parent.
+// Backlog page: add a backlog item, i.e. an inactive story without a parent (activated_at stays null).
 export async function createBacklogStory(projectId: string, title: string, description: string | null): Promise<void> {
+  await addRootStory(projectId, { title, description, status: "todo", start_date: null, due_date: null });
+}
+
+// Create a story without a parent, appended after the project's other stories without a parent.
+// activated_at is left null.
+export async function addRootStory(projectId: string, input: StoryInput): Promise<Task> {
   const { data: last, error: lastError } = await supabase
     .from("tasks")
     .select("sort_order")
@@ -116,14 +121,13 @@ export async function createBacklogStory(projectId: string, title: string, descr
     .order("sort_order", { ascending: false })
     .limit(1);
   if (lastError) throw lastError;
-  const { error } = await supabase.from("tasks").insert({
-    project_id: projectId,
-    level: "story",
-    title,
-    description,
-    sort_order: (last?.[0]?.sort_order ?? 0) + 1,
-  });
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({ ...input, project_id: projectId, level: "story", sort_order: (last?.[0]?.sort_order ?? 0) + 1 })
+    .select()
+    .single();
   if (error) throw error;
+  return data;
 }
 
 // Story detail page: the story including its context document.
@@ -217,23 +221,6 @@ export async function listProjectStories(projectId: string): Promise<Task[]> {
   return data ?? [];
 }
 
-// Move a story under another epic of the same project, appended after that epic's stories.
-export async function moveStory(storyId: string, targetEpicId: string): Promise<void> {
-  const { data: last, error: lastError } = await supabase
-    .from("tasks")
-    .select("sort_order")
-    .eq("parent_id", targetEpicId)
-    .eq("level", "story")
-    .order("sort_order", { ascending: false })
-    .limit(1);
-  if (lastError) throw lastError;
-  const { error } = await supabase
-    .from("tasks")
-    .update({ parent_id: targetEpicId, sort_order: (last?.[0]?.sort_order ?? 0) + 1 })
-    .eq("id", storyId);
-  if (error) throw error;
-}
-
 // Kanban: every in-progress story across projects, with its epic and child tasks.
 export async function getKanbanLanes(): Promise<KanbanLane[]> {
   const { data: stories, error } = await supabase
@@ -279,8 +266,6 @@ export async function updateTaskDates(id: string, start_date: string, due_date: 
   if (error) throw error;
 }
 
-// Persist a new epic ordering: assign sort_order = position (1-based) in the
-// given id list. Called after a drag-and-drop reorder in the gantt.
 // Move a task to another story. The column it was dropped on decides the status.
 // Tasks with dependencies are rejected by the DB trigger (dependencies are per story).
 export async function moveTask(taskId: string, targetStoryId: string, status: Status): Promise<void> {
@@ -298,14 +283,6 @@ export async function moveTask(taskId: string, targetStoryId: string, status: St
     .update({ parent_id: targetStoryId, sort_order: (last?.[0]?.sort_order ?? 0) + 1, status })
     .eq("id", taskId);
   if (error) throw error;
-}
-
-export async function reorderEpics(orderedIds: string[]): Promise<void> {
-  const results = await Promise.all(
-    orderedIds.map((id, i) => supabase.from("tasks").update({ sort_order: i + 1 }).eq("id", id))
-  );
-  const failed = results.find((r) => r.error);
-  if (failed?.error) throw failed.error;
 }
 
 export async function createTask(input: Partial<Task> & { project_id: string; level: Task["level"]; title: string }): Promise<Task> {

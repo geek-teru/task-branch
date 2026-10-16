@@ -1,8 +1,8 @@
-// Gantt view: every project's phases/tasks on a shared timeline.
-// Built from start_date/due_date on story-level nodes (epics summarize their children).
+// Gantt view: a project's stories and their tasks on a shared timeline.
+// Built from start_date/due_date on the story and task nodes.
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, isFinished } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -36,8 +36,8 @@ function isoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// Prefill a new story form: starts the day after the epic's current last due
-// date (or today if the epic has no dated stories) and spans one week.
+// Prefill a new story form: starts the day after the project's current last due
+// date (or today if the project has no dated stories) and spans one week.
 function storyInitial(prevEnd: Date | null): StoryInput {
   const start = prevEnd ? addDays(prevEnd, 1) : new Date();
   const due = addDays(start, 6);
@@ -61,7 +61,7 @@ function editInitial(node: GraphNode): StoryInput {
 
 interface Row {
   key: string;
-  kind: "project" | "epic" | "story" | "task";
+  kind: "project" | "story" | "task";
   label: string;
   start: Date | null;
   end: Date | null;
@@ -84,70 +84,40 @@ function byStart(aStart: Date | null, aOrder: number, bStart: Date | null, bOrde
 function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
   const rows: Row[] = [];
   for (const { project, graph } of data) {
-    const tasksOf = (phaseId: string) =>
+    const sortedByStart = (filter: (n: GraphNode) => boolean) =>
       graph.nodes
-        .filter((n) => n.level === "story" && n.parent_id === phaseId)
+        .filter(filter)
         .map((t) => ({
           node: t,
           start: t.start_date ? parseDate(t.start_date) : null,
           end: t.due_date ? parseDate(t.due_date) : null,
         }))
         .sort((a, b) => byStart(a.start, a.node.sort_order, b.start, b.node.sort_order));
-
-    const childTasks = (storyId: string) =>
-      graph.nodes
-        .filter((n) => n.level === "task" && n.parent_id === storyId)
-        .map((t) => ({
-          node: t,
-          start: t.start_date ? parseDate(t.start_date) : null,
-          end: t.due_date ? parseDate(t.due_date) : null,
-        }))
-        .sort((a, b) => byStart(a.start, a.node.sort_order, b.start, b.node.sort_order));
-
-    const phases = graph.nodes
-      .filter((n) => n.level === "epic")
-      .map((ph) => {
-        const kids = tasksOf(ph.id);
-        const starts = kids.map((t) => t.start).filter(Boolean) as Date[];
-        const ends = kids.map((t) => t.end).filter(Boolean) as Date[];
-        const phStart = starts.length ? new Date(Math.min(...starts.map((d) => d.getTime()))) : null;
-        const phEnd = ends.length ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null;
-        return { node: ph, kids, start: phStart, end: phEnd };
-      })
-      // Epics keep the manual order (sort_order); ties fall back to start date.
-      .sort((a, b) =>
-        a.node.sort_order !== b.node.sort_order
-          ? a.node.sort_order - b.node.sort_order
-          : byStart(a.start, a.node.sort_order, b.start, b.node.sort_order)
-      );
 
     rows.push({ key: `p:${project.id}`, kind: "project", label: project.name, start: null, end: null, status: null, node: null });
 
-    for (const ph of phases) {
-      rows.push({ key: `ph:${ph.node.id}`, kind: "epic", label: ph.node.title, start: ph.start, end: ph.end, status: null, node: ph.node });
+    // Stories are the top level, whatever epic they still sit under during the migration.
+    for (const t of sortedByStart((n) => n.level === "story")) {
+      rows.push({
+        key: `t:${t.node.id}`,
+        kind: "story",
+        label: t.node.title,
+        start: t.start,
+        end: t.end,
+        status: t.node.status,
+        node: t.node,
+      });
 
-      for (const t of ph.kids) {
+      for (const k of sortedByStart((n) => n.level === "task" && n.parent_id === t.node.id)) {
         rows.push({
-          key: `t:${t.node.id}`,
-          kind: "story",
-          label: t.node.title,
-          start: t.start,
-          end: t.end,
-          status: t.node.status,
-          node: t.node,
+          key: `k:${k.node.id}`,
+          kind: "task",
+          label: k.node.title,
+          start: k.start,
+          end: k.end,
+          status: k.node.status,
+          node: k.node,
         });
-
-        for (const k of childTasks(t.node.id)) {
-          rows.push({
-            key: `k:${k.node.id}`,
-            kind: "task",
-            label: k.node.title,
-            start: k.start,
-            end: k.end,
-            status: k.node.status,
-            node: k.node,
-          });
-        }
       }
     }
   }
@@ -167,14 +137,12 @@ export function GanttView({
   onCompleteStory,
   onChangeStatus,
   onResizeStory,
-  onReorderEpics,
-  onMoveStory,
 }: {
   projects: Project[];
   project: Project;
   graph: ProjectGraph;
   onSelectProject: (projectId: string) => void;
-  onAddStory?: (epic: GraphNode, values: StoryInput) => void;
+  onAddStory?: (values: StoryInput) => void;
   onAddTask?: (story: GraphNode, values: StoryInput) => void;
   onUpdateTask?: (id: string, values: StoryInput) => void;
   onDeleteTask?: (id: string) => void;
@@ -182,34 +150,23 @@ export function GanttView({
   onCompleteStory?: (id: string) => void;
   onChangeStatus?: (id: string, status: Status) => void;
   onResizeStory?: (id: string, startDate: string, dueDate: string) => void;
-  onReorderEpics?: (orderedEpicIds: string[]) => void;
-  onMoveStory?: (storyId: string, targetEpicId: string) => void;
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  // Row being dragged: an epic (reorder) or a story (move to another epic).
-  const [drag, setDrag] = useState<{ kind: "epic" | "story"; id: string; title: string; parentId: string | null } | null>(null);
-  const [overKey, setOverKey] = useState<string | null>(null);
   const [form, setForm] = useState<
-    | { mode: "create"; epic: GraphNode; prevEnd: Date | null }
+    | { mode: "create"; prevEnd: Date | null }
     | { mode: "create-task"; story: GraphNode }
     | { mode: "edit"; node: GraphNode }
     | null
   >(null);
   // Pending change awaiting confirmation via the custom modal.
   const [confirm, setConfirm] = useState<{ message: string; label?: string; onConfirm: () => void } | null>(null);
-  // 畳んでいるエピック / ストーリーの id。ストーリーは全部畳んだ状態で始めるので、
-  // タスクは既定で隠れている。エピックは完了・クローズしたものだけ畳む。
+  // 畳んでいるストーリーの id。全部畳んだ状態で始めるので、タスクは既定で隠れている。
   // 張り直すのはプロジェクトを変えたときだけ。ステータス変更のたびに走る refreshGraph で
   // 作り直すと、ユーザーが開いた行が勝手に閉じてしまう。
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => {
-    const initial = new Set<string>();
-    for (const n of graph.nodes) {
-      if (n.level === "story") initial.add(n.id);
-      else if (n.level === "epic" && isFinished(n.status)) initial.add(n.id);
-    }
-    setCollapsed(initial);
+    setCollapsed(new Set(graph.nodes.filter((n) => n.level === "story").map((n) => n.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id]);
   const filtered = useMemo(() => [{ project, graph }], [project, graph]);
@@ -284,30 +241,23 @@ export function GanttView({
 
   const { rows, timelineStart, timelineW, months, todayX } = model;
 
-  // 配下の数。0 件の行には開閉のトグルを出さない。
+  // 配下のタスクの数。0 件のストーリーには開閉のトグルを出さない。
   const childCount = new Map<string, number>();
-  const epicOfStory = new Map<string, string>();
   for (const r of rows) {
-    if ((r.kind === "story" || r.kind === "task") && r.node?.parent_id) {
+    if (r.kind === "task" && r.node?.parent_id) {
       childCount.set(r.node.parent_id, (childCount.get(r.node.parent_id) ?? 0) + 1);
-      if (r.kind === "story") epicOfStory.set(r.node.id, r.node.parent_id);
     }
   }
-  // 畳んだ親の配下を落とす。エピックを畳めば、配下のストーリーもそのタスクも消える。
+  // 畳んだストーリーのタスクを落とす。
   // 期間の計算は rows（全行）のままなので、畳んでもタイムラインの横幅と月の並びは動かない。
-  const hidden = (r: Row): boolean => {
-    const parent = r.node?.parent_id;
-    if (!parent) return false;
-    if (collapsed.has(parent)) return true;
-    return r.kind === "task" && collapsed.has(epicOfStory.get(parent) ?? "");
-  };
-  const visibleRows = rows.filter((r) => !hidden(r));
+  const visibleRows = rows.filter((r) => !(r.kind === "task" && collapsed.has(r.node?.parent_id ?? "")));
   const bodyH = visibleRows.length * ROW_H;
   const totalW = LABEL_W + timelineW;
   const selectedRow = selectedKey ? rows.find((r) => r.key === selectedKey) ?? null : null;
+  // 新しいストーリーの期間の初期値に使う、プロジェクト内のストーリーの最終期限。
+  const storyEnds = rows.filter((r) => r.kind === "story" && r.end).map((r) => r.end!.getTime());
+  const lastStoryEnd = storyEnds.length ? new Date(Math.max(...storyEnds)) : null;
 
-  const epicIds = rows.filter((r) => r.kind === "epic").map((r) => r.node!.id);
-  const epicTitle = (id: string) => rows.find((r) => r.kind === "epic" && r.node?.id === id)?.label ?? "";
   const toggleCollapsed = (storyId: string) =>
     setCollapsed((cur) => {
       const next = new Set(cur);
@@ -315,43 +265,9 @@ export function GanttView({
       return next;
     });
 
-  const endDrag = () => {
-    setDrag(null);
-    setOverKey(null);
-  };
-
-  const handleEpicDrop = (targetId: string) => {
-    if (!onReorderEpics || drag?.kind !== "epic" || drag.id === targetId) return;
-    const from = epicIds.indexOf(drag.id);
-    const target = epicIds.indexOf(targetId);
-    if (from < 0 || target < 0) return;
-    const next = epicIds.filter((id) => id !== drag.id);
-    let insertAt = next.indexOf(targetId);
-    if (from < target) insertAt += 1; // dragging down: drop after the target
-    next.splice(insertAt, 0, drag.id);
-    onReorderEpics(next);
-  };
-
-  // Epic a dragged story would land in when dropped on this row (null = not a drop target).
-  const storyDropEpicId = (r: Row): string | null => {
-    if (!onMoveStory || drag?.kind !== "story") return null;
-    const target = r.kind === "epic" ? r.node?.id ?? null : r.kind === "story" ? r.node?.parent_id ?? null : null;
-    return target && target !== drag.parentId ? target : null;
-  };
-
-  const handleStoryDrop = (targetEpicId: string) => {
-    if (!onMoveStory || drag?.kind !== "story") return;
-    const { id, title } = drag;
-    setConfirm({
-      message: `「${title}」を\nエピック「${epicTitle(targetEpicId)}」へ移動します。よろしいですか？`,
-      label: "移動する",
-      onConfirm: () => onMoveStory(id, targetEpicId),
-    });
-  };
-
   const submitForm = (values: StoryInput) => {
     if (!form) return;
-    if (form.mode === "create") onAddStory?.(form.epic, values);
+    if (form.mode === "create") onAddStory?.(values);
     else if (form.mode === "create-task") onAddTask?.(form.story, values);
     else onUpdateTask?.(form.node.id, values);
     setForm(null);
@@ -383,7 +299,7 @@ export function GanttView({
               color: "#3b4149",
             }}
           >
-            プロジェクト / エピック / ストーリー
+            プロジェクト / ストーリー
             <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
           </div>
           <div style={{ position: "relative", width: timelineW, background: "#f7f9fa", borderBottom: "1px solid #cbd2d9" }}>
@@ -426,85 +342,29 @@ export function GanttView({
           </div>
 
           {visibleRows.map((r) => {
-            const storyTarget = storyDropEpicId(r);
-            const epicTarget =
-              drag?.kind === "epic" && r.kind === "epic" && r.node && r.node.id !== drag.id ? r.node.id : null;
-            const canDrop = !!storyTarget || !!epicTarget;
-            const isOver = canDrop && overKey === r.key;
-            const canDragRow =
-              !!r.node && ((r.kind === "epic" && !!onReorderEpics) || (r.kind === "story" && !!onMoveStory));
-            // 子を持つエピック / ストーリーだけ開閉できる。
-            const canToggle =
-              !!r.node && (r.kind === "epic" || r.kind === "story") && !!childCount.get(r.node.id);
+            // タスクを持つストーリーだけ開閉できる。
+            const canToggle = !!r.node && r.kind === "story" && !!childCount.get(r.node.id);
             return (
             <div key={r.key} style={{ display: "flex", height: ROW_H, position: "relative" }}>
               <div
-                draggable={canDragRow}
-                onDragStart={
-                  canDragRow
-                    ? () =>
-                        setDrag({
-                          kind: r.kind === "epic" ? "epic" : "story",
-                          id: r.node!.id,
-                          title: r.label,
-                          parentId: r.node!.parent_id,
-                        })
-                    : undefined
-                }
-                onDragOver={
-                  canDrop
-                    ? (e) => {
-                        e.preventDefault();
-                        if (overKey !== r.key) setOverKey(r.key);
-                      }
-                    : undefined
-                }
-                onDragLeave={() => setOverKey((cur) => (cur === r.key ? null : cur))}
-                onDrop={
-                  canDrop
-                    ? (e) => {
-                        e.preventDefault();
-                        if (storyTarget) handleStoryDrop(storyTarget);
-                        else if (epicTarget) handleEpicDrop(epicTarget);
-                        endDrag();
-                      }
-                    : undefined
-                }
-                onDragEnd={endDrag}
                 style={{
                   width: LABEL_W,
                   flexShrink: 0,
                   position: "sticky",
                   left: 0,
                   zIndex: 2,
-                  background: isOver ? "#eaf2fc" : r.kind === "project" ? "#eef1f3" : "#fff",
-                  boxShadow: isOver ? "inset 0 2px 0 #0972d3" : undefined,
-                  opacity: r.node && drag?.id === r.node.id ? 0.4 : undefined,
+                  background: r.kind === "project" ? "#eef1f3" : "#fff",
                   borderRight: "1px solid #cbd2d9",
                   borderBottom: "1px solid #f0f2f4",
                   display: "flex",
                   alignItems: "center",
-                  padding:
-                    r.kind === "task"
-                      ? "0 8px 0 58px"
-                      : r.kind === "story"
-                      ? "0 8px 0 40px"
-                      : r.kind === "epic"
-                      ? "0 8px 0 22px"
-                      : "0 8px",
+                  padding: r.kind === "task" ? "0 8px 0 40px" : r.kind === "story" ? "0 8px 0 22px" : "0 8px",
                   fontSize: r.kind === "project" ? 12 : 11,
-                  fontWeight: r.kind === "story" || r.kind === "task" ? 400 : 700,
-                  color: r.kind === "story" || r.kind === "task" ? "#3b4149" : "#1f2933",
-                  cursor: canDragRow ? "grab" : undefined,
+                  fontWeight: r.kind === "project" ? 700 : 400,
+                  color: r.kind === "project" ? "#1f2933" : "#3b4149",
                   gap: 4,
                 }}
-                title={
-                  r.kind === "epic" && onReorderEpics
-                    ? `${r.label}（ドラッグで並び替え）`
-                    : r.kind === "story" && onMoveStory
-                    ? `${r.label}（ドラッグで別のエピックへ移動）`
-                    : r.label
-                }
+                title={r.label}
               >
                 <span
                   onClick={(e) => {
@@ -514,9 +374,7 @@ export function GanttView({
                   }}
                   title={
                     canToggle
-                      ? `クリックで${r.kind === "epic" ? "ストーリー" : "タスク"}を${
-                          collapsed.has(r.node!.id) ? "表示" : "隠す"
-                        }`
+                      ? `クリックでタスクを${collapsed.has(r.node!.id) ? "表示" : "隠す"}`
                       : undefined
                   }
                   style={{ flexShrink: 0, width: 12, color: "#5f6b7a", cursor: canToggle ? "pointer" : "default" }}
@@ -543,11 +401,11 @@ export function GanttView({
                     </span>
                   )}
                 </span>
-                {r.kind === "epic" && r.node && onAddStory && (
+                {r.kind === "project" && onAddStory && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setForm({ mode: "create", epic: r.node!, prevEnd: r.end });
+                      setForm({ mode: "create", prevEnd: lastStoryEnd });
                     }}
                     title="ストーリーを追加"
                     style={addBtn}
@@ -695,7 +553,7 @@ export function GanttView({
   );
 }
 
-// エピックの「ストーリーを追加」／ストーリーの「タスクを追加」で共通。
+// プロジェクトの「ストーリーを追加」／ストーリーの「タスクを追加」で共通。
 const addBtn: CSSProperties = {
   flexShrink: 0,
   width: 18,
@@ -725,7 +583,6 @@ function Bar({
 }) {
   const start = row.start as Date;
   const end = row.end as Date;
-  const isPhase = row.kind === "epic";
   const c = row.status ? STATUS_COLOR[row.status] : null;
 
   // Live drag offset (in whole days) while an edge is being dragged; null otherwise.
@@ -767,7 +624,7 @@ function Bar({
     window.addEventListener("mouseup", onUp);
   };
 
-  const showHandles = !isPhase && !!onResize;
+  const showHandles = !!onResize;
   const HANDLE_W = 7;
 
   return (
@@ -782,11 +639,10 @@ function Bar({
           position: "absolute",
           left,
           width,
-          top: isPhase ? ROW_H / 2 - 3 : 4,
-          height: isPhase ? 6 : ROW_H - 10,
-          borderRadius: isPhase ? 3 : 4,
-          background: isPhase ? "#94a0ad" : c?.border ?? "#94a0ad",
-          opacity: isPhase ? 0.55 : 1,
+          top: 4,
+          height: ROW_H - 10,
+          borderRadius: 4,
+          background: c?.border ?? "#94a0ad",
           cursor: "pointer",
           outline: selected || drag ? "2px solid #1f2933" : "none",
           outlineOffset: 1,
@@ -824,24 +680,22 @@ function Bar({
           />
         </>
       )}
-      {!isPhase && (
-        <span
-          style={{
-            position: "absolute",
-            left: left + width + 6,
-            top: 0,
-            height: ROW_H,
-            display: "flex",
-            alignItems: "center",
-            fontSize: 10,
-            color: "#5f6b7a",
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-          }}
-        >
-          {short(pStart)} - {short(pEnd)}
-        </span>
-      )}
+      <span
+        style={{
+          position: "absolute",
+          left: left + width + 6,
+          top: 0,
+          height: ROW_H,
+          display: "flex",
+          alignItems: "center",
+          fontSize: 10,
+          color: "#5f6b7a",
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+        }}
+      >
+        {short(pStart)} - {short(pEnd)}
+      </span>
     </>
   );
 }
