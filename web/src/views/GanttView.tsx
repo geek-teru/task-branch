@@ -5,6 +5,7 @@ import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../li
 import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
+import { GroupForm } from "../components/GroupForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
@@ -178,6 +179,9 @@ export function GanttView({
   onResizeStory,
   onShiftStory,
   onMoveTask,
+  onAddGroup,
+  onRenameGroup,
+  onDeleteGroup,
 }: {
   projects: Project[];
   project: Project;
@@ -195,6 +199,10 @@ export function GanttView({
   onShiftStory?: (id: string, days: number) => void;
   // Move one task's start and due dates (its bar is dragged by the middle).
   onMoveTask?: (id: string, startDate: string, dueDate: string) => void;
+  onAddGroup?: (name: string) => void;
+  onRenameGroup?: (id: string, name: string) => void;
+  // The stories in the group go back to no group; they are not deleted.
+  onDeleteGroup?: (id: string) => void;
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -204,6 +212,8 @@ export function GanttView({
     | { mode: "edit"; node: GraphNode }
     | null
   >(null);
+  // グループの追加（id なし）／名前の変更（id あり）のフォーム。
+  const [groupForm, setGroupForm] = useState<{ id: string | null; name: string } | null>(null);
   // Pending change awaiting confirmation via the custom modal.
   const [confirm, setConfirm] = useState<{ message: string; label?: string; onConfirm: () => void } | null>(null);
   // 畳んでいるストーリーの id。全部畳んだ状態で始めるので、タスクは既定で隠れている。
@@ -483,6 +493,47 @@ export function GanttView({
                     +
                   </button>
                 )}
+                {r.kind === "project" && onAddGroup && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGroupForm({ id: null, name: "" });
+                    }}
+                    title="グループを追加"
+                    style={textBtn}
+                  >
+                    グループを追加
+                  </button>
+                )}
+                {r.kind === "group" && r.groupId && onRenameGroup && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGroupForm({ id: r.groupId, name: r.label });
+                    }}
+                    title="グループ名を変更"
+                    style={textBtn}
+                  >
+                    変更
+                  </button>
+                )}
+                {r.kind === "group" && r.groupId && onDeleteGroup && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const id = r.groupId!;
+                      setConfirm({
+                        message: `グループ「${r.label}」を削除します。中のストーリーはグループなしに戻ります。`,
+                        label: "削除する",
+                        onConfirm: () => onDeleteGroup(id),
+                      });
+                    }}
+                    title="グループを削除"
+                    style={{ ...textBtn, color: "#d13212" }}
+                  >
+                    削除
+                  </button>
+                )}
                 {r.kind === "story" && r.node && onAddTask && (
                   <button
                     onClick={(e) => {
@@ -636,6 +687,20 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
         />
       )}
 
+      {groupForm && (
+        <GroupForm
+          heading={groupForm.id ? "グループ名を変更" : "グループを追加"}
+          submitLabel={groupForm.id ? "保存" : "追加"}
+          initialName={groupForm.name}
+          onSubmit={(name) => {
+            if (groupForm.id) onRenameGroup?.(groupForm.id, name);
+            else onAddGroup?.(name);
+            setGroupForm(null);
+          }}
+          onCancel={() => setGroupForm(null)}
+        />
+      )}
+
       {confirm && (
         <ConfirmDialog
           message={confirm.message}
@@ -664,6 +729,22 @@ const addBtn: CSSProperties = {
   color: "#0972d3",
   cursor: "pointer",
   fontSize: 13,
+};
+
+// プロジェクトの「グループを追加」／グループの「変更」「削除」。
+const textBtn: CSSProperties = {
+  flexShrink: 0,
+  height: 18,
+  lineHeight: "16px",
+  padding: "0 6px",
+  border: "1px solid #cbd2d9",
+  borderRadius: 4,
+  background: "#fff",
+  color: "#0972d3",
+  cursor: "pointer",
+  fontSize: 10,
+  fontWeight: 400,
+  whiteSpace: "nowrap",
 };
 
 // グループの期間（中のストーリーの最小開始日〜最大期限）。ストーリーより細いグレーのバーで、動かせない。
