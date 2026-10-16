@@ -22,6 +22,9 @@ import {
   updateTaskDates,
   shiftStoryDates,
   updateTaskStatus,
+  createStoryGroup,
+  renameStoryGroup,
+  deleteStoryGroup,
 } from "./lib/api";
 import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
@@ -334,6 +337,44 @@ export default function App() {
     [refreshGraph]
   );
 
+  // Gantt: add / rename / delete a story group of the shown project.
+  const handleAddGroup = useCallback(
+    async (name: string) => {
+      if (!ganttProjectId) return;
+      try {
+        await createStoryGroup(ganttProjectId, name);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [ganttProjectId, refreshGraph]
+  );
+
+  const handleRenameGroup = useCallback(
+    async (id: string, name: string) => {
+      try {
+        await renameStoryGroup(id, name);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
+  const handleDeleteGroup = useCallback(
+    async (id: string) => {
+      try {
+        await deleteStoryGroup(id);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleCreateProject = useCallback(async (input: ProjectInput) => {
     try {
       const p = await createProject(input);
@@ -473,6 +514,9 @@ export default function App() {
           onResizeStory={handleResizeStory}
           onShiftStory={handleShiftStory}
           onMoveTask={handleMoveTaskDates}
+          onAddGroup={handleAddGroup}
+          onRenameGroup={handleRenameGroup}
+          onDeleteGroup={handleDeleteGroup}
         />
       )}
     </main>

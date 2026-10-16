@@ -135,6 +135,32 @@ export async function addRootStory(projectId: string, input: StoryInput, active 
   return data;
 }
 
+// Gantt: add a story group to a project, appended after its other groups.
+export async function createStoryGroup(projectId: string, name: string): Promise<void> {
+  const { data: last, error: lastError } = await supabase
+    .from("story_groups")
+    .select("sort_order")
+    .eq("project_id", projectId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (lastError) throw lastError;
+  const { error } = await supabase
+    .from("story_groups")
+    .insert({ project_id: projectId, name, sort_order: (last?.[0]?.sort_order ?? 0) + 1 });
+  if (error) throw error;
+}
+
+export async function renameStoryGroup(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("story_groups").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+// The stories in it go back to no group (tasks.group_id is on delete set null); they are not deleted.
+export async function deleteStoryGroup(id: string): Promise<void> {
+  const { error } = await supabase.from("story_groups").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // Story detail page: the story including its context document.
 export async function getStory(storyId: string): Promise<Task | null> {
   const { data, error } = await supabase
