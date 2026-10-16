@@ -177,6 +177,7 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 ```
 所有者（ユーザー） 1 ──< projects
 projects 1 ──< tasks(自己参照ツリー parent_id)
+projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
                  ├──< epic_context_revisions (story のドキュメントの更新履歴。移行中は epic も)
                  ├──< task_comments (task へのコメント。本文は編集できる)
                  └──> 担当者（人の場合。ユーザー）
@@ -207,6 +208,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 | id            | uuid        | PK, default gen_random_uuid() |                                                                                                                                                                                                                                                                                                                      |
 | project_id    | uuid        | FK→projects.id, not null      |                                                                                                                                                                                                                                                                                                                      |
 | parent_id     | uuid        | FK→tasks.id, null可           | 親（階層）。null はルート（story。移行中は epic も）                                                                                                                                                                                                                                                                                  |
+| group_id      | uuid        | FK→story_groups.id, null可, on delete set null | **story のみ**。属するグループ（ガントチャートでまとめて見せる単位）。null はグループなし。グループを消すとグループなしに戻る                                                                                                                                                                                |
 | level         | text        | not null                      | `epic` / `story` / `task`                                                                                                                                                                                                                                                                                            |
 | title         | text        | not null                      | 名称                                                                                                                                                                                                                                                                                                                 |
 | description   | text        |                               | 短い説明（一覧やカードに出す 1〜2 行）                                                                                                                                                                                                                                                                               |
@@ -233,6 +235,26 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 - **拡張フィールド（`start_date` / `due_date` / `metadata`）は nullable で初期は未使用**。ガント/カレンダー等のビュー追加時にそのまま利用でき、既存機能に影響しない。
 - 見積り（`estimate`）は未導入。導入時は `estimate_value numeric` + `estimate_unit text` を追加する想定（§10）。
 - `context` は長文になるため、一覧系の取得（カンバン・ガントチャート・`get_task_graph` など）では読み込まない。詳細・バックログの画面と、AI にエピックの文脈を渡すときだけ取得する。
+- `group_id` を持てるのは `level = 'story'` の行だけで、グループはストーリーと同じプロジェクトに属すること（トリガ `check_task_group()`）。
+
+#### story_groups
+
+ストーリーのグループ。ガントチャートでストーリーをまとめて見せるための入れ物。
+
+| カラム     | 型          | 制約                                                | 説明                     |
+| ---------- | ----------- | --------------------------------------------------- | ------------------------ |
+| id         | uuid        | PK, default gen_random_uuid()                       |                          |
+| project_id | uuid        | FK→projects.id, not null, on delete cascade         | 属するプロジェクト       |
+| name       | text        | not null, check (length(btrim(name)) > 0)           | グループ名               |
+| sort_order | int         | not null, default 0                                 | プロジェクト内の表示順   |
+| created_at | timestamptz | not null, default now()                             |                          |
+| updated_at | timestamptz | not null, default now()                             | 更新時に now()（トリガ） |
+
+- インデックス：(project_id, sort_order)。
+- 状態・期間・コンテキストは持たない。期間は中のストーリーから画面で算出する。
+- `project_id` は付け替えられない（トリガ `check_story_group()`。中のストーリーとプロジェクトがずれるため）。
+- `get_task_graph` は nodes に `group_id` を含め、`groups`（id / name / sort_order）を返す。
+- RLS は §3.5。
 
 #### task_comments
 
@@ -379,6 +401,7 @@ $$ language sql stable;
 | ---------------------- | ----------------------------------------------- | ------ | ----------------------------------- | ---------- |
 | projects               | ログイン済みなら誰でも。`owner_id` は自分に固定 | 所有者 | 所有者。`owner_id` の付け替えは不可 | 所有者     |
 | tasks                  | 所有者                                          | 所有者 | 所有者                              | 所有者     |
+| story_groups           | 所有者                                          | 所有者 | 所有者                              | 所有者     |
 | epic_context_revisions | 所有者                                          | 所有者 | 不可                                | 不可       |
 | task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
 
@@ -418,6 +441,27 @@ create policy tasks_owner on tasks
   with check (exists (
     select 1 from projects p
      where p.id = tasks.project_id
+       and p.owner_id = current_owner_id()
+  ));
+```
+
+##### story_groups
+
+tasks と同じく、属するプロジェクトの所有者だけが読み書きできる。
+
+```sql
+alter table story_groups enable row level security;
+
+create policy story_groups_owner on story_groups
+  for all to authenticated
+  using (exists (
+    select 1 from projects p
+     where p.id = story_groups.project_id
+       and p.owner_id = current_owner_id()
+  ))
+  with check (exists (
+    select 1 from projects p
+     where p.id = story_groups.project_id
        and p.owner_id = current_owner_id()
   ));
 ```
