@@ -25,6 +25,7 @@ import {
   createStoryGroup,
   renameStoryGroup,
   deleteStoryGroup,
+  setStoryGroup,
 } from "./lib/api";
 import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
@@ -375,6 +376,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  const handleMoveStoryToGroup = useCallback(
+    async (storyId: string, groupId: string | null) => {
+      try {
+        await setStoryGroup(storyId, groupId);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleCreateProject = useCallback(async (input: ProjectInput) => {
     try {
       const p = await createProject(input);
@@ -517,6 +530,7 @@ export default function App() {
           onAddGroup={handleAddGroup}
           onRenameGroup={handleRenameGroup}
           onDeleteGroup={handleDeleteGroup}
+          onMoveStoryToGroup={handleMoveStoryToGroup}
         />
       )}
     </main>
