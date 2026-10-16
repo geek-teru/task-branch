@@ -519,6 +519,7 @@ create policy task_comments_delete on task_comments
 | `get_task_graph(project uuid)`  | 可視化用 | tasks（階層・担当・進捗込）を `{nodes}` で返す。依存（edges）と rank は依存の設計時に足す（R4/R5）               |
 | `get_critical_path(story uuid)` | CP 抽出  | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6）                                        |
 | `get_progress(project uuid)`    | 進捗集約 | epic/story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
+| `shift_story_dates(story uuid, days int)` | 日付移動 | ストーリーと配下のタスクの開始日・期限を同じ日数ずらす（null は null のまま）。1 トランザクションで更新し、ストーリー以外を渡すと例外。ガントのバー移動で使う |
 
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
 - AI・UI が同じ RPC を使い、計算結果を一致させる。

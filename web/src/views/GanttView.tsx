@@ -150,6 +150,8 @@ export function GanttView({
   onCompleteStory?: (id: string) => void;
   onChangeStatus?: (id: string, status: Status) => void;
   onResizeStory?: (id: string, startDate: string, dueDate: string) => void;
+  // Move a story and its tasks by the same number of days.
+  onShiftStory?: (id: string, days: number) => void;
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);

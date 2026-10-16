@@ -274,6 +274,12 @@ export async function updateTaskDates(id: string, start_date: string, due_date: 
   if (error) throw error;
 }
 
+// Shift a story and its tasks by the same number of days in one call (shift_story_dates RPC).
+export async function shiftStoryDates(storyId: string, days: number): Promise<void> {
+  const { error } = await supabase.rpc("shift_story_dates", { story: storyId, days });
+  if (error) throw error;
+}
+
 // Move a task to another story. The column it was dropped on decides the status.
 // Tasks with dependencies are rejected by the DB trigger (dependencies are per story).
 export async function moveTask(taskId: string, targetStoryId: string, status: Status): Promise<void> {
