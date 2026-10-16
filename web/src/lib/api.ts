@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
+import type { BacklogEpic, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -69,7 +69,7 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
-// Backlog page: epics of a project (active and inactive), without the context document.
+// Epics of a project (active and inactive), without the context document. Used by the kanban's story pickers.
 export async function listEpics(projectId: string): Promise<BacklogEpic[]> {
   const { data, error } = await supabase
     .from("tasks")
@@ -81,30 +81,49 @@ export async function listEpics(projectId: string): Promise<BacklogEpic[]> {
   return data ?? [];
 }
 
-// Backlog page: add a backlog item, i.e. an inactive epic (activated_at stays null),
-// appended after the project's existing epics.
-export async function createEpic(projectId: string, title: string, description: string | null): Promise<BacklogEpic> {
+// Backlog page: stories of a project (active and inactive), without the context document.
+// Ordered as the epics were (epic order, then story order within the epic); stories without a parent come last.
+export async function listBacklogStories(projectId: string): Promise<BacklogStory[]> {
+  const [storiesRes, epicsRes] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id, parent_id, title, description, status, activated_at, sort_order")
+      .eq("project_id", projectId)
+      .eq("level", "story"),
+    supabase.from("tasks").select("id, sort_order").eq("project_id", projectId).eq("level", "epic"),
+  ]);
+  if (storiesRes.error) throw storiesRes.error;
+  if (epicsRes.error) throw epicsRes.error;
+  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
+  const groupOrder = (s: BacklogStory) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
+  return [...((storiesRes.data ?? []) as BacklogStory[])].sort(
+    (a, b) =>
+      groupOrder(a) - groupOrder(b) ||
+      (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
+      a.sort_order - b.sort_order
+  );
+}
+
+// Backlog page: add a backlog item, i.e. an inactive story without a parent (activated_at stays null),
+// appended after the project's other stories without a parent.
+export async function createBacklogStory(projectId: string, title: string, description: string | null): Promise<void> {
   const { data: last, error: lastError } = await supabase
     .from("tasks")
     .select("sort_order")
     .eq("project_id", projectId)
-    .eq("level", "epic")
+    .eq("level", "story")
+    .is("parent_id", null)
     .order("sort_order", { ascending: false })
     .limit(1);
   if (lastError) throw lastError;
-  const { data, error } = await supabase
-    .from("tasks")
-    .insert({
-      project_id: projectId,
-      level: "epic",
-      title,
-      description,
-      sort_order: (last?.[0]?.sort_order ?? 0) + 1,
-    })
-    .select("id, title, description, activated_at, sort_order")
-    .single();
+  const { error } = await supabase.from("tasks").insert({
+    project_id: projectId,
+    level: "story",
+    title,
+    description,
+    sort_order: (last?.[0]?.sort_order ?? 0) + 1,
+  });
   if (error) throw error;
-  return data;
 }
 
 // Epic detail page: the epic including its context document.
@@ -127,12 +146,12 @@ export async function updateEpicInfo(epicId: string, title: string, description:
   if (error) throw error;
 }
 
-// Activate an epic (activated_at = now) or shelve it back to the backlog (null).
-export async function setEpicActive(epicId: string, active: boolean): Promise<void> {
+// Activate an epic or a story (activated_at = now) or shelve it back to the backlog (null).
+export async function setActive(id: string, active: boolean): Promise<void> {
   const { error } = await supabase
     .from("tasks")
     .update({ activated_at: active ? new Date().toISOString() : null })
-    .eq("id", epicId);
+    .eq("id", id);
   if (error) throw error;
 }
 

@@ -10,9 +10,9 @@ import {
   deleteTask,
   exportProject,
   getKanbanLanes,
-  listEpics,
-  createEpic,
-  setEpicActive,
+  listBacklogStories,
+  createBacklogStory,
+  setActive,
   getProjectGraph,
   listProjects,
   moveStory,
@@ -24,7 +24,7 @@ import {
   updateTaskDates,
   updateTaskStatus,
 } from "./lib/api";
-import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { ProjectsListPage } from "./views/ProjectsListPage";
@@ -81,13 +81,13 @@ export default function App() {
 
   // Backlog page: the project comes from ?project=, defaulting to the first project.
   const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? defaultProjectId : undefined;
-  const [backlog, setBacklog] = useState<{ projectId: string; epics: BacklogEpic[] } | null>(null);
+  const [backlog, setBacklog] = useState<{ projectId: string; stories: BacklogStory[] } | null>(null);
   useEffect(() => {
     if (!userId || !backlogProjectId) return;
     let cancelled = false;
-    listEpics(backlogProjectId)
-      .then((epics) => {
-        if (!cancelled) setBacklog({ projectId: backlogProjectId, epics });
+    listBacklogStories(backlogProjectId)
+      .then((stories) => {
+        if (!cancelled) setBacklog({ projectId: backlogProjectId, stories });
       })
       .catch((e) => setError(String(e.message ?? e)));
     return () => {
@@ -95,13 +95,13 @@ export default function App() {
     };
   }, [userId, backlogProjectId]);
 
-  // Add a backlog item (inactive epic) to the selected project, then reload the list.
+  // Add a backlog item (inactive story without a parent) to the selected project, then reload the list.
   const handleAddBacklog = useCallback(
     async (title: string, description: string | null) => {
       if (!backlogProjectId) return;
       try {
-        await createEpic(backlogProjectId, title, description);
-        setBacklog({ projectId: backlogProjectId, epics: await listEpics(backlogProjectId) });
+        await createBacklogStory(backlogProjectId, title, description);
+        setBacklog({ projectId: backlogProjectId, stories: await listBacklogStories(backlogProjectId) });
       } catch (e: any) {
         setError(String(e.message ?? e));
         throw e;
@@ -110,13 +110,13 @@ export default function App() {
     [backlogProjectId]
   );
 
-  // Activate / shelve an epic from the backlog list, then reload it.
-  const handleSetEpicActive = useCallback(
-    async (epicId: string, active: boolean) => {
+  // Activate / shelve a story from the backlog list, then reload it.
+  const handleSetStoryActive = useCallback(
+    async (storyId: string, active: boolean) => {
       if (!backlogProjectId) return;
       try {
-        await setEpicActive(epicId, active);
-        setBacklog({ projectId: backlogProjectId, epics: await listEpics(backlogProjectId) });
+        await setActive(storyId, active);
+        setBacklog({ projectId: backlogProjectId, stories: await listBacklogStories(backlogProjectId) });
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
@@ -551,10 +551,10 @@ export default function App() {
                     <BacklogView
                       projects={pickerProjects(backlogProjectId)}
                       projectId={backlogProjectId!}
-                      epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
+                      stories={backlog && backlog.projectId === backlogProjectId ? backlog.stories : null}
                       onSelectProject={(id) => setSearchParams({ project: id })}
                       onAddBacklog={handleAddBacklog}
-                      onSetActive={handleSetEpicActive}
+                      onSetActive={handleSetStoryActive}
                     />
                   )}
                 </main>

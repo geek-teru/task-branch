@@ -1,40 +1,43 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import type { BacklogEpic, Project } from "../lib/types";
+import type { BacklogStory, Project } from "../lib/types";
+import { STATUS_LABEL } from "../lib/types";
+import { STATUS_COLOR } from "../lib/style";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
-// Epics of one project: active ones (エピック) and inactive ones (バックログ).
-// Only name / description / state are shown; the document (context) is not loaded here.
+// Stories of one project: active ones and inactive ones (バックログ).
+// Only name / description / status / state are shown; the document (context) is not loaded here.
 export function BacklogView({
   projects,
   projectId,
-  epics,
+  stories,
   onSelectProject,
   onAddBacklog,
   onSetActive,
 }: {
   projects: Project[];
   projectId: string;
-  epics: BacklogEpic[] | null;
+  stories: BacklogStory[] | null;
   onSelectProject: (projectId: string) => void;
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
-  onSetActive: (epicId: string, active: boolean) => void;
+  onSetActive: (storyId: string, active: boolean) => void;
 }) {
   const [adding, setAdding] = useState(false);
-  const [pendingState, setPendingState] = useState<{ epic: BacklogEpic; active: boolean } | null>(null);
-  // 名前と状態はドラッグで幅を変えられる。説明は残り幅を使う。
+  const [pendingState, setPendingState] = useState<{ story: BacklogStory; active: boolean } | null>(null);
+  // 名前・ステータス・状態はドラッグで幅を変えられる。説明は残り幅を使う。
   const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
+  const status = useResizableWidth("backlog.statusWidth", 96, 72, 240, { invert: true });
   const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
   // 状態での絞り込み。all = 両方出す
   const [stateFilter, setStateFilter] = useState<"all" | "active" | "inactive">("all");
 
   const visible = useMemo(() => {
-    if (!epics) return null;
-    if (stateFilter === "all") return epics;
-    return epics.filter((e) => (stateFilter === "active" ? e.activated_at != null : e.activated_at == null));
-  }, [epics, stateFilter]);
+    if (!stories) return null;
+    if (stateFilter === "all") return stories;
+    return stories.filter((s) => (stateFilter === "active" ? s.activated_at != null : s.activated_at == null));
+  }, [stories, stateFilter]);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -79,11 +82,11 @@ export function BacklogView({
       <div style={{ flex: 1, minHeight: 0, padding: 24, overflow: "auto", boxSizing: "border-box" }}>
         {!visible ? (
           <div style={{ color: "#5f6b7a" }}>読み込み中…</div>
-        ) : epics!.length === 0 ? (
-          <div style={{ color: "#5f6b7a" }}>エピック・バックログがありません。「バックログを追加」から登録してください。</div>
+        ) : stories!.length === 0 ? (
+          <div style={{ color: "#5f6b7a" }}>ストーリーがありません。「バックログを追加」から登録してください。</div>
         ) : visible.length === 0 ? (
           <div style={{ color: "#5f6b7a" }}>
-            {stateFilter === "active" ? "Active" : "InActive"}のエピックはありません。
+            {stateFilter === "active" ? "Active" : "InActive"}のストーリーはありません。
           </div>
         ) : (
           <table style={table}>
@@ -94,6 +97,10 @@ export function BacklogView({
                   <div onMouseDown={name.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
                 </th>
                 <th style={th}>説明</th>
+                <th style={{ ...th, width: status.width, position: "relative" }}>
+                  ステータス
+                  <div onMouseDown={status.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
+                </th>
                 <th style={{ ...th, width: state.width, position: "relative" }}>
                   状態
                   <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
@@ -101,23 +108,30 @@ export function BacklogView({
               </tr>
             </thead>
             <tbody>
-              {visible.map((e) => {
-                const active = e.activated_at != null;
+              {visible.map((s) => {
+                const active = s.activated_at != null;
+                const c = STATUS_COLOR[s.status];
                 return (
-                  <tr key={e.id}>
+                  <tr key={s.id}>
                     <td style={{ ...td, position: "relative" }}>
-                      <Link to={`/epics/${e.id}`} style={titleLink} title="詳細を開く">
-                        {e.title}
+                      <Link to={`/stories/${s.id}`} style={titleLink} title="詳細を開く">
+                        {s.title}
                       </Link>
                       <div onMouseDown={name.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
                     </td>
-                    <td style={{ ...td, color: e.description ? "#3b4149" : "#94a0ad" }}>
-                      {e.description ?? "（説明なし）"}
+                    <td style={{ ...td, color: s.description ? "#3b4149" : "#94a0ad" }}>
+                      {s.description ?? "（説明なし）"}
+                    </td>
+                    <td style={{ ...td, position: "relative" }}>
+                      <span style={{ ...statusBadge, background: c.bg, color: c.fg, borderColor: c.border }}>
+                        {STATUS_LABEL[s.status]}
+                      </span>
+                      <div onMouseDown={status.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
                     </td>
                     <td style={{ ...td, position: "relative" }}>
                       <EpicStateBadge
                         active={active}
-                        onPick={(next) => setPendingState({ epic: e, active: next })}
+                        onPick={(next) => setPendingState({ story: s, active: next })}
                       />
                       <div onMouseDown={state.startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: -3 }} />
                     </td>
@@ -133,11 +147,11 @@ export function BacklogView({
         <ConfirmDialog
           message={
             pendingState.active
-              ? `「${pendingState.epic.title}」を Active にします。エピックとして着手した扱いになります。よろしいですか？`
-              : `「${pendingState.epic.title}」を InActive にします。バックログに戻ります。よろしいですか？`
+              ? `「${pendingState.story.title}」を Active にします。ストーリーとして着手した扱いになります。よろしいですか？`
+              : `「${pendingState.story.title}」を InActive にします。バックログに戻ります。よろしいですか？`
           }
           onConfirm={() => {
-            onSetActive(pendingState.epic.id, pendingState.active);
+            onSetActive(pendingState.story.id, pendingState.active);
             setPendingState(null);
           }}
           onCancel={() => setPendingState(null)}
@@ -253,6 +267,15 @@ const td: CSSProperties = {
   borderBottom: "1px solid #eef0f2",
   verticalAlign: "top",
   color: "#1f2933",
+};
+
+const statusBadge: CSSProperties = {
+  display: "inline-block",
+  fontSize: 12,
+  padding: "2px 8px",
+  borderRadius: 10,
+  border: "1px solid",
+  whiteSpace: "nowrap",
 };
 
 const titleLink: CSSProperties = {

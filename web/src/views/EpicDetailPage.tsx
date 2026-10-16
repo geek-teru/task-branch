@@ -5,7 +5,7 @@ import {
   getEpic,
   getLatestContextRevision,
   listStories,
-  setEpicActive,
+  setActive,
   updateEpicContext,
   updateEpicInfo,
 } from "../lib/api";
@@ -83,7 +83,7 @@ export function EpicDetailPage({
 
   const changeState = async (next: boolean) => {
     try {
-      await setEpicActive(epic.id, next);
+      await setActive(epic.id, next);
       setPendingState(null);
       await load();
     } catch (err: any) {
