@@ -233,6 +233,20 @@ export async function addTaskComment(taskId: string, body: string): Promise<Task
   return data as TaskComment;
 }
 
+// Only the body is sent; updated_at is set by the trigger. A row blocked by RLS makes .single() fail.
+export async function updateTaskComment(id: string, body: string): Promise<TaskComment> {
+  const { data, error } = await supabase.from("task_comments").update({ body }).eq("id", id).select().single();
+  if (error) throw error;
+  return data as TaskComment;
+}
+
+// A delete blocked by RLS is not an error, just 0 rows — treat that as a failure.
+export async function deleteTaskComment(id: string): Promise<void> {
+  const { data, error } = await supabase.from("task_comments").delete().eq("id", id).select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("コメントを削除できませんでした（権限がないか、既に削除されています）");
+}
+
 export async function listStoryTasks(storyId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")
