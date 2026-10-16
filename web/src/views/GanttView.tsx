@@ -61,12 +61,14 @@ function editInitial(node: GraphNode): StoryInput {
 
 interface Row {
   key: string;
-  kind: "project" | "story" | "task";
+  kind: "project" | "group" | "story" | "task";
   label: string;
   start: Date | null;
   end: Date | null;
   status: GraphNode["status"] | null;
   node: GraphNode | null;
+  // The story group this row sits in (the group row itself, or a story / task inside it). null = no group.
+  groupId: string | null;
 }
 
 // Sort ascending by start date; rows without a start date go last. Ties fall
@@ -94,10 +96,9 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
         }))
         .sort((a, b) => byStart(a.start, a.node.sort_order, b.start, b.node.sort_order));
 
-    rows.push({ key: `p:${project.id}`, kind: "project", label: project.name, start: null, end: null, status: null, node: null });
+    rows.push({ key: `p:${project.id}`, kind: "project", label: project.name, start: null, end: null, status: null, node: null, groupId: null });
 
-    // Stories are the top level, whatever epic they still sit under during the migration.
-    for (const t of sortedByStart((n) => n.level === "story")) {
+    const pushStory = (t: { node: GraphNode; start: Date | null; end: Date | null }, groupId: string | null) => {
       rows.push({
         key: `t:${t.node.id}`,
         kind: "story",
@@ -106,6 +107,7 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
         end: t.end,
         status: t.node.status,
         node: t.node,
+        groupId,
       });
 
       for (const k of sortedByStart((n) => n.level === "task" && n.parent_id === t.node.id)) {
@@ -117,9 +119,46 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
           end: k.end,
           status: k.node.status,
           node: k.node,
+          groupId,
         });
       }
-    }
+    };
+
+    // Stories are the top level, whatever epic they still sit under during the migration.
+    // A group sits at the same level as the ungrouped stories. Its period is its stories'
+    // earliest start to latest due, so it sorts by that start (an empty group goes last).
+    const stories = sortedByStart((n) => n.level === "story");
+    const groupIds = new Set(graph.groups.map((g) => g.id));
+    const items = [
+      ...graph.groups.map((g) => {
+        const inner = stories.filter((s) => s.node.group_id === g.id);
+        const starts = inner.flatMap((s) => (s.start ? [s.start.getTime()] : []));
+        const ends = inner.flatMap((s) => (s.end ? [s.end.getTime()] : []));
+        const start = starts.length ? new Date(Math.min(...starts)) : null;
+        return {
+          start,
+          order: g.sort_order,
+          push: () => {
+            rows.push({
+              key: `g:${g.id}`,
+              kind: "group",
+              label: g.name,
+              start,
+              end: ends.length ? new Date(Math.max(...ends)) : null,
+              status: null,
+              node: null,
+              groupId: g.id,
+            });
+            for (const s of inner) pushStory(s, g.id);
+          },
+        };
+      }),
+      // A group_id pointing at a group we did not get back is shown as no group.
+      ...stories
+        .filter((s) => !(s.node.group_id && groupIds.has(s.node.group_id)))
+        .map((s) => ({ start: s.start, order: s.node.sort_order, push: () => pushStory(s, null) })),
+    ];
+    for (const it of items.sort((a, b) => byStart(a.start, a.order, b.start, b.order))) it.push();
   }
   return rows;
 }
@@ -171,8 +210,11 @@ export function GanttView({
   // 張り直すのはプロジェクトを変えたときだけ。ステータス変更のたびに走る refreshGraph で
   // 作り直すと、ユーザーが開いた行が勝手に閉じてしまう。
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // 畳んでいるグループの id。グループは開いた状態で始める。
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   useEffect(() => {
     setCollapsed(new Set(graph.nodes.filter((n) => n.level === "story").map((n) => n.id)));
+    setCollapsedGroups(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id]);
   const filtered = useMemo(() => [{ project, graph }], [project, graph]);
@@ -249,14 +291,23 @@ export function GanttView({
 
   // 配下のタスクの数。0 件のストーリーには開閉のトグルを出さない。
   const childCount = new Map<string, number>();
+  // グループの中のストーリーの数。0 件のグループも行は出すが、開閉のトグルは出さない。
+  const groupStoryCount = new Map<string, number>();
   for (const r of rows) {
     if (r.kind === "task" && r.node?.parent_id) {
       childCount.set(r.node.parent_id, (childCount.get(r.node.parent_id) ?? 0) + 1);
     }
+    if (r.kind === "story" && r.groupId) {
+      groupStoryCount.set(r.groupId, (groupStoryCount.get(r.groupId) ?? 0) + 1);
+    }
   }
-  // 畳んだストーリーのタスクを落とす。
+  // 畳んだグループのストーリーとタスク、畳んだストーリーのタスクを落とす。
   // 期間の計算は rows（全行）のままなので、畳んでもタイムラインの横幅と月の並びは動かない。
-  const visibleRows = rows.filter((r) => !(r.kind === "task" && collapsed.has(r.node?.parent_id ?? "")));
+  const visibleRows = rows.filter(
+    (r) =>
+      !((r.kind === "story" || r.kind === "task") && r.groupId && collapsedGroups.has(r.groupId)) &&
+      !(r.kind === "task" && collapsed.has(r.node?.parent_id ?? ""))
+  );
   const bodyH = visibleRows.length * ROW_H;
   const totalW = LABEL_W + timelineW;
   const selectedRow = selectedKey ? rows.find((r) => r.key === selectedKey) ?? null : null;
@@ -264,12 +315,14 @@ export function GanttView({
   const storyEnds = rows.filter((r) => r.kind === "story" && r.end).map((r) => r.end!.getTime());
   const lastStoryEnd = storyEnds.length ? new Date(Math.max(...storyEnds)) : null;
 
-  const toggleCollapsed = (storyId: string) =>
-    setCollapsed((cur) => {
+  const toggleIn = (setter: typeof setCollapsed) => (id: string) =>
+    setter((cur) => {
       const next = new Set(cur);
-      if (!next.delete(storyId)) next.add(storyId);
+      if (!next.delete(id)) next.add(id);
       return next;
     });
+  const toggleCollapsed = toggleIn(setCollapsed);
+  const toggleGroup = toggleIn(setCollapsedGroups);
 
   const submitForm = (values: StoryInput) => {
     if (!form) return;
@@ -348,8 +401,25 @@ export function GanttView({
           </div>
 
           {visibleRows.map((r) => {
-            // タスクを持つストーリーだけ開閉できる。
-            const canToggle = !!r.node && r.kind === "story" && !!childCount.get(r.node.id);
+            // タスクを持つストーリーと、ストーリーを持つグループだけ開閉できる。
+            const toggle =
+              r.kind === "group" && r.groupId && groupStoryCount.get(r.groupId)
+                ? {
+                    collapsed: collapsedGroups.has(r.groupId),
+                    count: groupStoryCount.get(r.groupId)!,
+                    noun: "ストーリーとタスク",
+                    onToggle: () => toggleGroup(r.groupId!),
+                  }
+                : r.kind === "story" && r.node && childCount.get(r.node.id)
+                  ? {
+                      collapsed: collapsed.has(r.node.id),
+                      count: childCount.get(r.node.id)!,
+                      noun: "タスク",
+                      onToggle: () => toggleCollapsed(r.node!.id),
+                    }
+                  : null;
+            // グループの中はストーリーとタスクを1段ずつ深くする。
+            const indent = r.kind === "project" ? 8 : r.kind === "group" ? 22 : (r.groupId ? 14 : 0) + (r.kind === "task" ? 40 : 22);
             return (
             <div key={r.key} style={{ display: "flex", height: ROW_H, position: "relative" }}>
               <div
@@ -359,14 +429,14 @@ export function GanttView({
                   position: "sticky",
                   left: 0,
                   zIndex: 2,
-                  background: r.kind === "project" ? "#eef1f3" : "#fff",
+                  background: r.kind === "project" ? "#eef1f3" : r.kind === "group" ? "#f7f9fa" : "#fff",
                   borderRight: "1px solid #cbd2d9",
                   borderBottom: "1px solid #f0f2f4",
                   display: "flex",
                   alignItems: "center",
-                  padding: r.kind === "task" ? "0 8px 0 40px" : r.kind === "story" ? "0 8px 0 22px" : "0 8px",
+                  padding: `0 8px 0 ${indent}px`,
                   fontSize: r.kind === "project" ? 12 : 11,
-                  fontWeight: r.kind === "project" ? 700 : 400,
+                  fontWeight: r.kind === "project" ? 700 : r.kind === "group" ? 600 : 400,
                   color: r.kind === "project" ? "#1f2933" : "#3b4149",
                   gap: 4,
                 }}
@@ -374,18 +444,14 @@ export function GanttView({
               >
                 <span
                   onClick={(e) => {
-                    if (!canToggle) return;
+                    if (!toggle) return;
                     e.stopPropagation();
-                    toggleCollapsed(r.node!.id);
+                    toggle.onToggle();
                   }}
-                  title={
-                    canToggle
-                      ? `クリックでタスクを${collapsed.has(r.node!.id) ? "表示" : "隠す"}`
-                      : undefined
-                  }
-                  style={{ flexShrink: 0, width: 12, color: "#5f6b7a", cursor: canToggle ? "pointer" : "default" }}
+                  title={toggle ? `クリックで${toggle.noun}を${toggle.collapsed ? "表示" : "隠す"}` : undefined}
+                  style={{ flexShrink: 0, width: 12, color: "#5f6b7a", cursor: toggle ? "pointer" : "default" }}
                 >
-                  {canToggle ? (collapsed.has(r.node!.id) ? "▸" : "▾") : ""}
+                  {toggle ? (toggle.collapsed ? "▸" : "▾") : ""}
                 </span>
                 <span
                   onClick={() => {
@@ -401,10 +467,8 @@ export function GanttView({
                   }}
                 >
                   {r.label}
-                  {canToggle && collapsed.has(r.node!.id) && (
-                    <span style={{ color: "#94a0ad", marginLeft: 4, fontWeight: 400 }}>
-                      ({childCount.get(r.node!.id)})
-                    </span>
+                  {toggle?.collapsed && (
+                    <span style={{ color: "#94a0ad", marginLeft: 4, fontWeight: 400 }}>({toggle.count})</span>
                   )}
                 </span>
                 {r.kind === "project" && onAddStory && (
@@ -450,7 +514,8 @@ export function GanttView({
                     期間未設定
                   </span>
                 )}
-                {r.start && r.end && (
+                {r.kind === "group" && r.start && r.end && <GroupBar row={r} timelineStart={timelineStart} />}
+                {r.kind !== "group" && r.start && r.end && (
                   <Bar
                     row={r}
                     timelineStart={timelineStart}
@@ -600,6 +665,48 @@ const addBtn: CSSProperties = {
   cursor: "pointer",
   fontSize: 13,
 };
+
+// グループの期間（中のストーリーの最小開始日〜最大期限）。ストーリーより細いグレーのバーで、動かせない。
+function GroupBar({ row, timelineStart }: { row: Row; timelineStart: Date }) {
+  const start = row.start as Date;
+  const end = row.end as Date;
+  const left = diffDays(timelineStart, start) * PX_PER_DAY;
+  const width = Math.max((diffDays(start, end) + 1) * PX_PER_DAY, 4);
+  const fmt = (d: Date) => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  const short = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+  return (
+    <>
+      <div
+        title={`${row.label}\n${fmt(start)} 〜 ${fmt(end)}`}
+        style={{
+          position: "absolute",
+          left,
+          width,
+          top: (ROW_H - 8) / 2,
+          height: 8,
+          borderRadius: 4,
+          background: "#b8c1cc",
+        }}
+      />
+      <span
+        style={{
+          position: "absolute",
+          left: left + width + 6,
+          top: 0,
+          height: ROW_H,
+          display: "flex",
+          alignItems: "center",
+          fontSize: 10,
+          color: "#5f6b7a",
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+        }}
+      >
+        {short(start)} - {short(end)}
+      </span>
+    </>
+  );
+}
 
 function Bar({
   row,
