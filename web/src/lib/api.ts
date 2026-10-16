@@ -161,6 +161,12 @@ export async function deleteStoryGroup(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Gantt: put a story into a group, or take it out of its group (null).
+export async function setStoryGroup(storyId: string, groupId: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ group_id: groupId }).eq("id", storyId);
+  if (error) throw error;
+}
+
 // Story detail page: the story including its context document.
 export async function getStory(storyId: string): Promise<Task | null> {
   const { data, error } = await supabase

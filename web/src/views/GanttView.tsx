@@ -182,6 +182,7 @@ export function GanttView({
   onAddGroup,
   onRenameGroup,
   onDeleteGroup,
+  onMoveStoryToGroup,
 }: {
   projects: Project[];
   project: Project;
@@ -203,6 +204,8 @@ export function GanttView({
   onRenameGroup?: (id: string, name: string) => void;
   // The stories in the group go back to no group; they are not deleted.
   onDeleteGroup?: (id: string) => void;
+  // Put a story into a group, or take it out of its group (null).
+  onMoveStoryToGroup?: (storyId: string, groupId: string | null) => void;
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -222,6 +225,9 @@ export function GanttView({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   // 畳んでいるグループの id。グループは開いた状態で始める。
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // ドラッグ中のストーリーと今いるグループ、ドラッグが重なっているドロップ先の行の key。
+  const [dragStory, setDragStory] = useState<{ id: string; groupId: string | null } | null>(null);
+  const [dropKey, setDropKey] = useState<string | null>(null);
   useEffect(() => {
     setCollapsed(new Set(graph.nodes.filter((n) => n.level === "story").map((n) => n.id)));
     setCollapsedGroups(new Set());
@@ -430,16 +436,65 @@ export function GanttView({
                   : null;
             // グループの中はストーリーとタスクを1段ずつ深くする。
             const indent = r.kind === "project" ? 8 : r.kind === "group" ? 22 : (r.groupId ? 14 : 0) + (r.kind === "task" ? 40 : 22);
+            // ストーリーはグループ行（そのグループへ）とプロジェクト行（グループから出す）にドロップできる。
+            // 今いるグループへのドロップは何もしないので、ドロップ先にもしない。
+            const dropGroupId = r.kind === "group" ? r.groupId : r.kind === "project" ? null : undefined;
+            const canDrop = !!dragStory && dropGroupId !== undefined && dropGroupId !== dragStory.groupId;
+            const isOver = canDrop && dropKey === r.key;
+            const draggableStory = r.kind === "story" && !!r.node && !!onMoveStoryToGroup;
             return (
-            <div key={r.key} style={{ display: "flex", height: ROW_H, position: "relative" }}>
+            <div
+              key={r.key}
+              onDragOver={
+                canDrop
+                  ? (e) => {
+                      e.preventDefault();
+                      if (!isOver) setDropKey(r.key);
+                    }
+                  : undefined
+              }
+              onDragLeave={() => setDropKey((cur) => (cur === r.key ? null : cur))}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (canDrop && dragStory) onMoveStoryToGroup?.(dragStory.id, dropGroupId ?? null);
+                setDragStory(null);
+                setDropKey(null);
+              }}
+              style={{ display: "flex", height: ROW_H, position: "relative" }}
+            >
               <div
+                draggable={draggableStory}
+                onDragStart={
+                  draggableStory
+                    ? (e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        setDragStory({ id: r.node!.id, groupId: r.groupId });
+                      }
+                    : undefined
+                }
+                onDragEnd={() => {
+                  setDragStory(null);
+                  setDropKey(null);
+                }}
                 style={{
+                  cursor: draggableStory ? "grab" : undefined,
+                  opacity: dragStory && r.node?.id === dragStory.id ? 0.5 : 1,
+                  outline: isOver ? "2px solid #0972d3" : "none",
+                  outlineOffset: -2,
                   width: LABEL_W,
                   flexShrink: 0,
                   position: "sticky",
                   left: 0,
                   zIndex: 2,
-                  background: r.kind === "project" ? "#eef1f3" : r.kind === "group" ? "#f7f9fa" : "#fff",
+                  background: isOver
+                    ? "#eaf2fc"
+                    : canDrop
+                      ? "#f7fafe"
+                      : r.kind === "project"
+                        ? "#eef1f3"
+                        : r.kind === "group"
+                          ? "#f7f9fa"
+                          : "#fff",
                   borderRight: "1px solid #cbd2d9",
                   borderBottom: "1px solid #f0f2f4",
                   display: "flex",
