@@ -32,7 +32,7 @@ import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
 import { KanbanView } from "./views/KanbanView";
 import { BacklogView } from "./views/BacklogView";
-import { EpicDetailPage } from "./views/EpicDetailPage";
+import { StoryDetailPage } from "./views/StoryDetailPage";
 import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
 
@@ -45,8 +45,8 @@ export default function App() {
   const projectMatch = useMatch("/projects/:projectId");
   const isGantt = pathname === "/gantt" || ganttMatch !== null;
   const isKanban = pathname === "/kanban";
-  const epicMatch = useMatch("/epics/:epicId");
-  const isBacklog = pathname === "/backlog" || epicMatch !== null;
+  const storyMatch = useMatch("/stories/:storyId");
+  const isBacklog = pathname === "/backlog" || storyMatch !== null;
   const [searchParams, setSearchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, or the first active project for /gantt.
   const defaultProjectId = (projects.find((p) => p.is_active) ?? projects[0])?.id;
@@ -561,15 +561,17 @@ export default function App() {
               }
             />
             <Route
-              path="/epics/:epicId"
+              path="/stories/:storyId"
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
-                  {epicMatch?.params.epicId && (
-                    <EpicDetailPage epicId={epicMatch.params.epicId} projects={projects} onError={setError} />
+                  {storyMatch?.params.storyId && (
+                    <StoryDetailPage storyId={storyMatch.params.storyId} projects={projects} onError={setError} />
                   )}
                 </main>
               }
             />
+            {/* Epics go away in the two-level model; nothing links here any more. */}
+            <Route path="/epics/:epicId" element={<Navigate to="/backlog" replace />} />
             <Route
               path="/kanban"
               element={

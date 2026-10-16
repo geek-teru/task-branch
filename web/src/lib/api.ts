@@ -126,23 +126,22 @@ export async function createBacklogStory(projectId: string, title: string, descr
   if (error) throw error;
 }
 
-// Epic detail page: the epic including its context document.
-export async function getEpic(epicId: string): Promise<Task | null> {
+// Story detail page: the story including its context document.
+export async function getStory(storyId: string): Promise<Task | null> {
   const { data, error } = await supabase
     .from("tasks")
     .select(`${TASK_LIST_COLUMNS}, context`)
-    .eq("id", epicId)
-    .eq("level", "epic")
+    .eq("id", storyId)
+    .eq("level", "story")
     .maybeSingle()
     .overrideTypes<Task | null, { merge: false }>();
   if (error) throw error;
   return data;
 }
 
-// Saving the context adds a version to epic_context_revisions (DB trigger).
-// Rename an epic / edit its one-line description. The context document has its own function.
-export async function updateEpicInfo(epicId: string, title: string, description: string | null): Promise<void> {
-  const { error } = await supabase.from("tasks").update({ title, description }).eq("id", epicId);
+// Rename a story / edit its one-line description. The context document has its own function.
+export async function updateStoryInfo(storyId: string, title: string, description: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ title, description }).eq("id", storyId);
   if (error) throw error;
 }
 
@@ -155,16 +154,19 @@ export async function setActive(id: string, active: boolean): Promise<void> {
   if (error) throw error;
 }
 
-export async function updateEpicContext(epicId: string, context: string | null): Promise<void> {
-  const { error } = await supabase.from("tasks").update({ context }).eq("id", epicId);
+// Saving the context adds a version to epic_context_revisions (DB trigger).
+export async function updateStoryContext(storyId: string, context: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ context }).eq("id", storyId);
   if (error) throw error;
 }
 
-export async function getLatestContextRevision(epicId: string): Promise<ContextRevision | null> {
+// Until the table is renamed (migration stage ③), a story's revisions sit in epic_context_revisions
+// with the story id in epic_id.
+export async function getLatestContextRevision(storyId: string): Promise<ContextRevision | null> {
   const { data, error } = await supabase
     .from("epic_context_revisions")
     .select("version, edited_by_type, created_at")
-    .eq("epic_id", epicId)
+    .eq("epic_id", storyId)
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -190,12 +192,12 @@ export async function addTaskComment(taskId: string, body: string): Promise<Task
   return data as TaskComment;
 }
 
-export async function listStories(epicId: string): Promise<Task[]> {
+export async function listStoryTasks(storyId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")
     .select(TASK_LIST_COLUMNS)
-    .eq("parent_id", epicId)
-    .eq("level", "story")
+    .eq("parent_id", storyId)
+    .eq("level", "task")
     .order("sort_order", { ascending: true })
     .overrideTypes<Task[], { merge: false }>();
   if (error) throw error;
