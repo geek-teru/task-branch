@@ -58,7 +58,9 @@ export async function getProjectGraph(projectId: string): Promise<ProjectGraph> 
   const { data, error } = await supabase.rpc("get_task_graph", { project: projectId });
   if (error) throw error;
   const raw = (data ?? {}) as Partial<ProjectGraph>;
-  return { nodes: raw.nodes ?? [], edges: raw.edges ?? [] };
+  // story_groups のマイグレーション適用前の DB は group_id / groups を返さないので、グループなしとして扱う。
+  const nodes = (raw.nodes ?? []).map((n) => ({ ...n, group_id: n.group_id ?? null }));
+  return { nodes, edges: raw.edges ?? [], groups: raw.groups ?? [] };
 }
 
 // One project as a nested JSON document (export_project RPC).
@@ -131,6 +133,38 @@ export async function addRootStory(projectId: string, input: StoryInput, active 
     .single();
   if (error) throw error;
   return data;
+}
+
+// Gantt: add a story group to a project, appended after its other groups.
+export async function createStoryGroup(projectId: string, name: string): Promise<void> {
+  const { data: last, error: lastError } = await supabase
+    .from("story_groups")
+    .select("sort_order")
+    .eq("project_id", projectId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (lastError) throw lastError;
+  const { error } = await supabase
+    .from("story_groups")
+    .insert({ project_id: projectId, name, sort_order: (last?.[0]?.sort_order ?? 0) + 1 });
+  if (error) throw error;
+}
+
+export async function renameStoryGroup(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("story_groups").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+// The stories in it go back to no group (tasks.group_id is on delete set null); they are not deleted.
+export async function deleteStoryGroup(id: string): Promise<void> {
+  const { error } = await supabase.from("story_groups").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Gantt: put a story into a group, or take it out of its group (null).
+export async function setStoryGroup(storyId: string, groupId: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ group_id: groupId }).eq("id", storyId);
+  if (error) throw error;
 }
 
 // Story detail page: the story including its context document.
