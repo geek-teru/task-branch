@@ -4,7 +4,6 @@ import { isConfigured } from "./lib/supabase";
 import { signOut, useSession } from "./lib/useSession";
 import {
   addRootStory,
-  addStory,
   addTask,
   createProject,
   deleteProject,
@@ -149,10 +148,11 @@ export default function App() {
     }
   }, []);
 
+  // Kanban: add a story without a parent, already started (Active).
   const handleKanbanAddStory = useCallback(
-    async (epic: Pick<Task, "id" | "project_id">, values: StoryInput) => {
+    async (projectId: string, values: StoryInput) => {
       try {
-        await addStory(epic, values);
+        await addRootStory(projectId, values, true);
         setLanes(await getKanbanLanes());
       } catch (e: any) {
         setError(String(e.message ?? e));

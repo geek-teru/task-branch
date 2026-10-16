@@ -110,8 +110,8 @@ export async function createBacklogStory(projectId: string, title: string, descr
 }
 
 // Create a story without a parent, appended after the project's other stories without a parent.
-// activated_at is left null.
-export async function addRootStory(projectId: string, input: StoryInput): Promise<Task> {
+// activated_at is set to now only when active is true (the kanban adds stories as started).
+export async function addRootStory(projectId: string, input: StoryInput, active = false): Promise<Task> {
   const { data: last, error: lastError } = await supabase
     .from("tasks")
     .select("sort_order")
@@ -123,7 +123,13 @@ export async function addRootStory(projectId: string, input: StoryInput): Promis
   if (lastError) throw lastError;
   const { data, error } = await supabase
     .from("tasks")
-    .insert({ ...input, project_id: projectId, level: "story", sort_order: (last?.[0]?.sort_order ?? 0) + 1 })
+    .insert({
+      ...input,
+      project_id: projectId,
+      level: "story",
+      sort_order: (last?.[0]?.sort_order ?? 0) + 1,
+      activated_at: active ? new Date().toISOString() : null,
+    })
     .select()
     .single();
   if (error) throw error;
@@ -221,7 +227,8 @@ export async function listProjectStories(projectId: string): Promise<Task[]> {
   return data ?? [];
 }
 
-// Kanban: every in-progress story across projects, with its epic and child tasks.
+// Kanban: every in-progress story across projects, with its child tasks.
+// Ordered like the backlog (epic order, then story order within the epic); stories without a parent come last.
 export async function getKanbanLanes(): Promise<KanbanLane[]> {
   const { data: stories, error } = await supabase
     .from("tasks")
@@ -235,7 +242,7 @@ export async function getKanbanLanes(): Promise<KanbanLane[]> {
 
   const epicIds = [...new Set(stories.map((s) => s.parent_id).filter((id): id is string => !!id))];
   const [epicsRes, tasksRes] = await Promise.all([
-    supabase.from("tasks").select(TASK_LIST_COLUMNS).in("id", epicIds).overrideTypes<Task[], { merge: false }>(),
+    supabase.from("tasks").select("id, sort_order").in("id", epicIds),
     supabase
       .from("tasks")
       .select(TASK_LIST_COLUMNS)
@@ -247,12 +254,19 @@ export async function getKanbanLanes(): Promise<KanbanLane[]> {
   if (epicsRes.error) throw epicsRes.error;
   if (tasksRes.error) throw tasksRes.error;
 
-  const epics = new Map((epicsRes.data ?? []).map((e: Task) => [e.id, e]));
-  return stories.map((story: Task) => ({
-    story,
-    epic: (story.parent_id && epics.get(story.parent_id)) || null,
-    tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
-  }));
+  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
+  const groupOrder = (s: Task) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
+  return [...stories]
+    .sort(
+      (a, b) =>
+        groupOrder(a) - groupOrder(b) ||
+        (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
+        a.sort_order - b.sort_order
+    )
+    .map((story: Task) => ({
+      story,
+      tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
+    }));
 }
 
 export async function updateTaskStatus(id: string, status: Status): Promise<void> {
@@ -301,11 +315,6 @@ export async function updateTask(id: string, input: StoryInput): Promise<Task> {
 export async function deleteTask(id: string): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) throw error;
-}
-
-// Create a new story under the given epic, appended after its existing stories.
-export function addStory(epic: Pick<Task, "id" | "project_id">, input: StoryInput): Promise<Task> {
-  return addChild(epic, "story", input);
 }
 
 // Create a new task under the given story, appended after its existing tasks.

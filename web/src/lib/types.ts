@@ -99,10 +99,9 @@ export interface ProjectGraph {
   edges: TaskDependency[];
 }
 
-// One kanban swimlane: an in-progress story with its parent epic and child tasks.
+// One kanban swimlane: an in-progress story with its child tasks.
 export interface KanbanLane {
   story: Task;
-  epic: Task | null;
   tasks: Task[];
 }
 
