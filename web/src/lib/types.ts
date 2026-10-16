@@ -26,7 +26,7 @@ export interface Task {
   sort_order: number;
   start_date: string | null; // extensibility: gantt / calendar
   due_date: string | null;
-  activated_at: string | null; // epic only: null = backlog, set = active
+  activated_at: string | null; // epic / story: null = backlog, set = active
   assignee_type: AssigneeType | null; // task only
   assignee_id: string | null; // task only: the human assignee
   context?: string | null; // epic only: Markdown document. Not fetched by list queries
@@ -59,8 +59,11 @@ export interface GraphNode extends Task {
   progress: number | null;
 }
 
-// An epic as listed on the backlog page (no context document).
-export type BacklogEpic = Pick<Task, "id" | "title" | "description" | "activated_at" | "sort_order">;
+// A row of the backlog page (stories of a project, without the context document).
+export type BacklogStory = Pick<
+  Task,
+  "id" | "parent_id" | "title" | "description" | "status" | "activated_at" | "sort_order"
+>;
 
 // Latest saved version of an epic's context document (epic_context_revisions).
 export interface ContextRevision {
@@ -93,10 +96,9 @@ export interface ProjectGraph {
   edges: TaskDependency[];
 }
 
-// One kanban swimlane: an in-progress story with its parent epic and child tasks.
+// One kanban swimlane: an in-progress story with its child tasks.
 export interface KanbanLane {
   story: Task;
-  epic: Task | null;
   tasks: Task[];
 }
 

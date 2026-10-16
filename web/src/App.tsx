@@ -3,28 +3,26 @@ import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchP
 import { isConfigured } from "./lib/supabase";
 import { signOut, useSession } from "./lib/useSession";
 import {
-  addStory,
+  addRootStory,
   addTask,
   createProject,
   deleteProject,
   deleteTask,
   exportProject,
   getKanbanLanes,
-  listEpics,
-  createEpic,
-  setEpicActive,
+  listBacklogStories,
+  createBacklogStory,
+  setActive,
   getProjectGraph,
   listProjects,
-  moveStory,
   moveTask,
-  reorderEpics,
   setProjectActive,
   updateProject,
   updateTask,
   updateTaskDates,
   updateTaskStatus,
 } from "./lib/api";
-import type { BacklogEpic, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { ProjectsListPage } from "./views/ProjectsListPage";
@@ -32,7 +30,7 @@ import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
 import { KanbanView } from "./views/KanbanView";
 import { BacklogView } from "./views/BacklogView";
-import { EpicDetailPage } from "./views/EpicDetailPage";
+import { StoryDetailPage } from "./views/StoryDetailPage";
 import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
 
@@ -45,8 +43,8 @@ export default function App() {
   const projectMatch = useMatch("/projects/:projectId");
   const isGantt = pathname === "/gantt" || ganttMatch !== null;
   const isKanban = pathname === "/kanban";
-  const epicMatch = useMatch("/epics/:epicId");
-  const isBacklog = pathname === "/backlog" || epicMatch !== null;
+  const storyMatch = useMatch("/stories/:storyId");
+  const isBacklog = pathname === "/backlog" || storyMatch !== null;
   const [searchParams, setSearchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, or the first active project for /gantt.
   const defaultProjectId = (projects.find((p) => p.is_active) ?? projects[0])?.id;
@@ -81,13 +79,13 @@ export default function App() {
 
   // Backlog page: the project comes from ?project=, defaulting to the first project.
   const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? defaultProjectId : undefined;
-  const [backlog, setBacklog] = useState<{ projectId: string; epics: BacklogEpic[] } | null>(null);
+  const [backlog, setBacklog] = useState<{ projectId: string; stories: BacklogStory[] } | null>(null);
   useEffect(() => {
     if (!userId || !backlogProjectId) return;
     let cancelled = false;
-    listEpics(backlogProjectId)
-      .then((epics) => {
-        if (!cancelled) setBacklog({ projectId: backlogProjectId, epics });
+    listBacklogStories(backlogProjectId)
+      .then((stories) => {
+        if (!cancelled) setBacklog({ projectId: backlogProjectId, stories });
       })
       .catch((e) => setError(String(e.message ?? e)));
     return () => {
@@ -95,13 +93,13 @@ export default function App() {
     };
   }, [userId, backlogProjectId]);
 
-  // Add a backlog item (inactive epic) to the selected project, then reload the list.
+  // Add a backlog item (inactive story without a parent) to the selected project, then reload the list.
   const handleAddBacklog = useCallback(
     async (title: string, description: string | null) => {
       if (!backlogProjectId) return;
       try {
-        await createEpic(backlogProjectId, title, description);
-        setBacklog({ projectId: backlogProjectId, epics: await listEpics(backlogProjectId) });
+        await createBacklogStory(backlogProjectId, title, description);
+        setBacklog({ projectId: backlogProjectId, stories: await listBacklogStories(backlogProjectId) });
       } catch (e: any) {
         setError(String(e.message ?? e));
         throw e;
@@ -110,13 +108,13 @@ export default function App() {
     [backlogProjectId]
   );
 
-  // Activate / shelve an epic from the backlog list, then reload it.
-  const handleSetEpicActive = useCallback(
-    async (epicId: string, active: boolean) => {
+  // Activate / shelve a story from the backlog list, then reload it.
+  const handleSetStoryActive = useCallback(
+    async (storyId: string, active: boolean) => {
       if (!backlogProjectId) return;
       try {
-        await setEpicActive(epicId, active);
-        setBacklog({ projectId: backlogProjectId, epics: await listEpics(backlogProjectId) });
+        await setActive(storyId, active);
+        setBacklog({ projectId: backlogProjectId, stories: await listBacklogStories(backlogProjectId) });
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
@@ -150,10 +148,11 @@ export default function App() {
     }
   }, []);
 
+  // Kanban: add a story without a parent, already started (Active).
   const handleKanbanAddStory = useCallback(
-    async (epic: Pick<Task, "id" | "project_id">, values: StoryInput) => {
+    async (projectId: string, values: StoryInput) => {
       try {
-        await addStory(epic, values);
+        await addRootStory(projectId, values, true);
         setLanes(await getKanbanLanes());
       } catch (e: any) {
         setError(String(e.message ?? e));
@@ -224,16 +223,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  // Gantt: add a story without a parent to the shown project.
   const handleAddStory = useCallback(
-    async (epic: GraphNode, values: StoryInput) => {
+    async (values: StoryInput) => {
+      if (!ganttProjectId) return;
       try {
-        await addStory(epic, values);
+        await addRootStory(ganttProjectId, values);
         await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
       }
     },
-    [refreshGraph]
+    [ganttProjectId, refreshGraph]
   );
 
   const handleUpdateTask = useCallback(
@@ -300,30 +301,6 @@ export default function App() {
     async (id: string, startDate: string, dueDate: string) => {
       try {
         await updateTaskDates(id, startDate, dueDate);
-        await refreshGraph();
-      } catch (e: any) {
-        setError(String(e.message ?? e));
-      }
-    },
-    [refreshGraph]
-  );
-
-  const handleMoveStory = useCallback(
-    async (storyId: string, targetEpicId: string) => {
-      try {
-        await moveStory(storyId, targetEpicId);
-        await refreshGraph();
-      } catch (e: any) {
-        setError(String(e.message ?? e));
-      }
-    },
-    [refreshGraph]
-  );
-
-  const handleReorderEpics = useCallback(
-    async (orderedIds: string[]) => {
-      try {
-        await reorderEpics(orderedIds);
         await refreshGraph();
       } catch (e: any) {
         setError(String(e.message ?? e));
@@ -469,8 +446,6 @@ export default function App() {
           onCompleteStory={handleCompleteStory}
           onChangeStatus={handleChangeStatus}
           onResizeStory={handleResizeStory}
-          onReorderEpics={handleReorderEpics}
-          onMoveStory={handleMoveStory}
         />
       )}
     </main>
@@ -551,25 +526,27 @@ export default function App() {
                     <BacklogView
                       projects={pickerProjects(backlogProjectId)}
                       projectId={backlogProjectId!}
-                      epics={backlog && backlog.projectId === backlogProjectId ? backlog.epics : null}
+                      stories={backlog && backlog.projectId === backlogProjectId ? backlog.stories : null}
                       onSelectProject={(id) => setSearchParams({ project: id })}
                       onAddBacklog={handleAddBacklog}
-                      onSetActive={handleSetEpicActive}
+                      onSetActive={handleSetStoryActive}
                     />
                   )}
                 </main>
               }
             />
             <Route
-              path="/epics/:epicId"
+              path="/stories/:storyId"
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
-                  {epicMatch?.params.epicId && (
-                    <EpicDetailPage epicId={epicMatch.params.epicId} projects={projects} onError={setError} />
+                  {storyMatch?.params.storyId && (
+                    <StoryDetailPage storyId={storyMatch.params.storyId} projects={projects} onError={setError} />
                   )}
                 </main>
               }
             />
+            {/* Epics go away in the two-level model; nothing links here any more. */}
+            <Route path="/epics/:epicId" element={<Navigate to="/backlog" replace />} />
             <Route
               path="/kanban"
               element={

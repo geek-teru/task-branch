@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { listEpics, listProjectStories } from "../lib/api";
-import type { BacklogEpic, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
+import { listProjectStories } from "../lib/api";
+import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { DetailPanel, type StoryGroup } from "../components/DetailPanel";
+import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 
@@ -41,7 +41,7 @@ export function KanbanView({
   onChangeProjectFilter: (projectId: string | null) => void;
   onChangeStatus: (taskId: string, status: Status) => void;
   onMoveTask: (taskId: string, storyId: string, status: Status) => void;
-  onAddStory: (epic: Pick<Task, "id" | "project_id">, values: StoryInput) => void;
+  onAddStory: (projectId: string, values: StoryInput) => void;
   onAddTask: (story: Task, values: StoryInput) => void;
   onUpdateTask: (id: string, values: StoryInput) => void;
   onDeleteTask: (id: string) => void;
@@ -66,19 +66,15 @@ export function KanbanView({
   };
   const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<Task | null>(null);
-  // ストーリー追加: エピックを選んでから、いつもの TaskForm で名前と期間を入れる
-  const [pickEpic, setPickEpic] = useState<{ project: Project; epics: BacklogEpic[] } | null>(null);
-  const [epicId, setEpicId] = useState("");
-  const [storyForm, setStoryForm] = useState<{ epic: Pick<Task, "id" | "project_id">; epicTitle: string } | null>(null);
+  // ストーリー追加: いつもの TaskForm で名前と期間を入れる。親なしのストーリーになる。
+  const [storyForm, setStoryForm] = useState<Project | null>(null);
   // targetStory がある＝別ストーリーへの移動。無ければ同じストーリー内のステータス変更。
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
   const [over, setOver] = useState<{ storyId: string; status: Status } | null>(null);
-  // ストーリーの変更: 詳細パネルのエピック / ストーリー名を押したときのプルダウンの中身。
+  // ストーリーの変更: 詳細パネルのストーリー名を押したときのプルダウンの中身。
   // 選んだタスクのプロジェクト単位で読み、同じプロジェクトの間は読み直さない。
-  const [storySource, setStorySource] = useState<{ projectId: string; epics: BacklogEpic[]; stories: Task[] } | null>(
-    null
-  );
+  const [storySource, setStorySource] = useState<{ projectId: string; stories: Task[] } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef<{ raf: number; step: number } | null>(null);
 
@@ -87,14 +83,10 @@ export function KanbanView({
     [projects, projectFilter]
   );
 
-  // Lanes grouped by project, each ordered by epic then story.
+  // Lanes grouped by project, keeping the order getKanbanLanes returns.
   const lanesByProject = useMemo(() => {
     const byProject = new Map<string, KanbanLane[]>();
     for (const l of lanes) byProject.set(l.story.project_id, [...(byProject.get(l.story.project_id) ?? []), l]);
-    for (const list of byProject.values())
-      list.sort(
-        (a, b) => (a.epic?.sort_order ?? 0) - (b.epic?.sort_order ?? 0) || a.story.sort_order - b.story.sort_order
-      );
     return byProject;
   }, [lanes]);
 
@@ -114,9 +106,9 @@ export function KanbanView({
   useEffect(() => {
     if (!selectedProjectId || storySource?.projectId === selectedProjectId) return;
     let cancelled = false;
-    Promise.all([listEpics(selectedProjectId), listProjectStories(selectedProjectId)])
-      .then(([epics, stories]) => {
-        if (!cancelled) setStorySource({ projectId: selectedProjectId, epics, stories });
+    listProjectStories(selectedProjectId)
+      .then((stories) => {
+        if (!cancelled) setStorySource({ projectId: selectedProjectId, stories });
       })
       .catch(() => {
         // 読めなければプルダウンを出さないだけで、詳細の表示は妨げない。
@@ -126,31 +118,14 @@ export function KanbanView({
     };
   }, [selectedProjectId, storySource?.projectId]);
 
-  // エピックごとにまとめた移動先。進行中でないストーリーには状態を添える。
-  const storyOptions = useMemo<StoryGroup[] | undefined>(() => {
+  // 移動先のストーリー（バックログと同じ並び）。進行中でないストーリーには状態を添える。
+  const storyOptions = useMemo<StoryOption[] | undefined>(() => {
     if (!selectedProjectId || storySource?.projectId !== selectedProjectId) return undefined;
-    return storySource.epics
-      .map((epic) => ({
-        epic: epic.title,
-        stories: storySource.stories
-          .filter((story) => story.parent_id === epic.id)
-          .map((story) => ({
-            id: story.id,
-            label: story.status === "in_progress" ? story.title : `${story.title}（${STATUS_LABEL[story.status]}）`,
-          })),
-      }))
-      .filter((group) => group.stories.length > 0);
+    return storySource.stories.map((story) => ({
+      id: story.id,
+      label: story.status === "in_progress" ? story.title : `${story.title}（${STATUS_LABEL[story.status]}）`,
+    }));
   }, [selectedProjectId, storySource]);
-
-  const startAddStory = async (project: Project) => {
-    try {
-      const epics = await listEpics(project.id);
-      setEpicId(epics[0]?.id ?? "");
-      setPickEpic({ project, epics });
-    } catch (e: any) {
-      window.alert(String(e.message ?? e));
-    }
-  };
 
   const stopAutoScroll = () => {
     if (!autoScroll.current) return;
@@ -195,14 +170,13 @@ export function KanbanView({
     setOver(null);
   };
 
-  const renderLane = ({ story, epic, tasks }: KanbanLane) => {
+  const renderLane = ({ story, tasks }: KanbanLane) => {
     // クローズも完了として数える。トグルで隠していても数は変えない。
     const done = tasks.filter((t) => isFinished(t.status)).length;
     return (
       <div key={story.id} style={{ display: "flex", borderBottom: "1px solid #e5e8eb" }}>
         <div style={{ width: LABEL_W, flex: "none", padding: "10px 12px", boxSizing: "border-box", position: "relative" }}>
-          {epic && <div style={{ fontSize: 11, color: "#5f6b7a" }}>{epic.title}</div>}
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 2 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
             <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{story.title}</div>
             <button onClick={() => setAdding(story)} title="タスクを追加" style={addBtn}>
               +
@@ -265,7 +239,6 @@ export function KanbanView({
                   <Card
                     key={t.id}
                     task={t}
-                    epicTitle={epic?.title ?? null}
                     storyTitle={story.title}
                     dragging={drag?.task.id === t.id}
                     selected={selectedId === t.id}
@@ -331,7 +304,7 @@ export function KanbanView({
                 <section key={p.id} style={{ marginBottom: 28 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
                     <h3 style={{ margin: 0, fontSize: 15 }}>{p.name}</h3>
-                    <button onClick={() => startAddStory(p)} style={quietBtn}>
+                    <button onClick={() => setStoryForm(p)} style={quietBtn}>
                       ストーリーを追加
                     </button>
                   </div>
@@ -348,7 +321,7 @@ export function KanbanView({
                     >
                       <div style={{ display: "flex", borderBottom: "1px solid #e5e8eb", background: "#f7f8f9" }}>
                         <div style={{ ...headerCell, width: LABEL_W, flex: "none", position: "relative" }}>
-                        エピック / ストーリー
+                        ストーリー
                         <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
                       </div>
                         {BOARD_STATUSES.map((s) => (
@@ -374,7 +347,7 @@ export function KanbanView({
           node={selected.task}
           start={toDate(selected.task.start_date)}
           end={toDate(selected.task.due_date)}
-          place={{ epic: selected.lane.epic?.title ?? null, story: selected.lane.story.title }}
+          place={{ story: selected.lane.story.title }}
           storyOptions={storyOptions}
           currentStoryId={selected.task.parent_id}
           onPickStory={(storyId) => {
@@ -415,62 +388,14 @@ export function KanbanView({
         />
       )}
 
-      {pickEpic && (
-        <div style={overlay} onMouseDown={() => setPickEpic(null)}>
-          <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>ストーリーを追加（{pickEpic.project.name}）</h3>
-            {pickEpic.epics.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#94a0ad" }}>
-                このプロジェクトにはエピックがありません。先にバックログから追加してください。
-              </div>
-            ) : (
-              <>
-                <label style={fieldLabel}>エピック</label>
-                <select value={epicId} onChange={(e) => setEpicId(e.target.value)} style={selectInput}>
-                  {pickEpic.epics.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.title}
-                      {e.activated_at ? "" : "（バックログ）"}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 6 }}>
-                  ステータスは次の画面で選べます。既定は、カンバンに出るよう進行中です。
-                </div>
-              </>
-            )}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-              <button onClick={() => setPickEpic(null)} style={quietBtn}>
-                キャンセル
-              </button>
-              <button
-                onClick={() => {
-                  const epic = pickEpic.epics.find((e) => e.id === epicId);
-                  if (!epic) return;
-                  setStoryForm({
-                    epic: { id: epic.id, project_id: pickEpic.project.id },
-                    epicTitle: epic.title,
-                  });
-                  setPickEpic(null);
-                }}
-                disabled={!epicId}
-                style={primaryBtn}
-              >
-                次へ
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {storyForm && (
         <TaskForm
-          heading={`ストーリーを追加（${storyForm.epicTitle}）`}
+          heading={`ストーリーを追加（${storyForm.name}）`}
           submitLabel="追加"
           initial={{ title: "", status: "in_progress", start_date: null, due_date: null, description: null }}
           todoHint="未着手のままだとカンバンには出ません（ガントチャートとバックログから見えます）。"
           onSubmit={(values) => {
-            onAddStory(storyForm.epic, values);
+            onAddStory(storyForm.id, values);
             setStoryForm(null);
           }}
           onCancel={() => setStoryForm(null)}
@@ -528,10 +453,9 @@ function moveMessage({ task, status, targetStory }: { task: Task; status: Status
   return `${head}${warn}\nよろしいですか？`;
 }
 
-// 上から ID / エピック - ストーリー / タイトル / 期限。上2行は弱い補助として出す。
+// 上から ID / ストーリー / タイトル / 期限。上2行は弱い補助として出す。
 function Card({
   task,
-  epicTitle,
   storyTitle,
   dragging,
   selected,
@@ -540,7 +464,6 @@ function Card({
   onDragEnd,
 }: {
   task: Task;
-  epicTitle: string | null;
   storyTitle: string;
   dragging: boolean;
   selected: boolean;
@@ -548,7 +471,6 @@ function Card({
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
-  const place = [epicTitle, storyTitle].filter(Boolean).map((t) => clip(t as string)).join(" - ");
   const closed = task.status === "closed";
   return (
     <div
@@ -579,8 +501,8 @@ function Card({
         <IdBadge id={task.id} />
         {closed && <span style={closedTag}>{STATUS_LABEL.closed}</span>}
       </div>
-      <div style={placeStyle} title={[epicTitle, storyTitle].filter(Boolean).join(" - ")}>
-        {place}
+      <div style={placeStyle} title={storyTitle}>
+        {storyTitle}
       </div>
       <div style={{ marginTop: 2 }}>{task.title}</div>
       {task.due_date && <div style={weak}>期限 {task.due_date}</div>}
@@ -588,10 +510,7 @@ function Card({
   );
 }
 
-// 長い名前はカードの幅を食うので、6文字で切って「…」を付ける。
-const clip = (text: string) => (text.length > 6 ? `${text.slice(0, 6)}…` : text);
-
-// エピック - ストーリーは「補助・ラベル」、期限はそれより弱い色で出す。
+// ストーリー名は「補助・ラベル」、期限はそれより弱い色で出す。長い名前は末尾を「…」で切る。
 const placeStyle: CSSProperties = {
   fontSize: 11,
   color: "#5f6b7a",
@@ -629,52 +548,6 @@ const quietBtn: CSSProperties = {
   fontSize: 12,
   cursor: "pointer",
   whiteSpace: "nowrap",
-};
-
-const primaryBtn: CSSProperties = {
-  background: "#0972d3",
-  color: "#fff",
-  border: "none",
-  borderRadius: 6,
-  padding: "7px 14px",
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const overlay: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(31,41,51,0.4)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 100,
-};
-
-const dialog: CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  padding: 24,
-  width: 420,
-  maxWidth: "90vw",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-};
-
-const fieldLabel: CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#5f6b7a",
-  marginBottom: 6,
-};
-
-const selectInput: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  fontSize: 13,
-  padding: "8px 10px",
-  borderRadius: 6,
-  border: "1px solid #cbd2d9",
 };
 
 // Same look as the gantt's "add story" button.

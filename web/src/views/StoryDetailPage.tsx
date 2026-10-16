@@ -1,72 +1,69 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import {
-  addStory,
-  getEpic,
   getLatestContextRevision,
-  listStories,
-  setEpicActive,
-  updateEpicContext,
-  updateEpicInfo,
+  getStory,
+  listStoryTasks,
+  setActive,
+  updateStoryContext,
+  updateStoryInfo,
 } from "../lib/api";
-import type { ContextRevision, Project, StoryInput, Task } from "../lib/types";
+import type { ContextRevision, Project, Task } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
 import { STATUS_COLOR } from "../lib/style";
-import { TaskForm } from "../components/TaskForm";
 import { IdBadge } from "../components/IdBadge";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
-// Epic detail: view / edit the context document and add stories.
-// Loads its own data through the api layer (the epic's context is only needed here).
-export function EpicDetailPage({
-  epicId,
+// Story detail: name / description, Active / InActive, the context document and the story's tasks.
+// Loads its own data through the api layer (the story's context is only needed here).
+export function StoryDetailPage({
+  storyId,
   projects,
   onError,
 }: {
-  epicId: string;
+  storyId: string;
   projects: Project[];
   onError: (message: string) => void;
 }) {
-  const [epic, setEpic] = useState<Task | null | undefined>(undefined); // undefined = loading
-  const [stories, setStories] = useState<Task[]>([]);
+  const [story, setStory] = useState<Task | null | undefined>(undefined); // undefined = loading
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [revision, setRevision] = useState<ContextRevision | null>(null);
   const [draft, setDraft] = useState<string | null>(null); // non-null while editing
   const [saving, setSaving] = useState(false);
-  const [addingStory, setAddingStory] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [pendingState, setPendingState] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [e, s, r] = await Promise.all([getEpic(epicId), listStories(epicId), getLatestContextRevision(epicId)]);
-      setEpic(e);
-      setStories(s);
+      const [s, t, r] = await Promise.all([getStory(storyId), listStoryTasks(storyId), getLatestContextRevision(storyId)]);
+      setStory(s);
+      setTasks(t);
       setRevision(r);
     } catch (err: any) {
       onError(String(err.message ?? err));
     }
-  }, [epicId, onError]);
+  }, [storyId, onError]);
 
   useEffect(() => {
-    setEpic(undefined);
+    setStory(undefined);
     setDraft(null);
     load();
   }, [load]);
 
-  if (epic === undefined) return <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>;
-  if (epic === null) return <div style={{ padding: 24, color: "#5f6b7a" }}>エピックが見つかりません。</div>;
+  if (story === undefined) return <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>;
+  if (story === null) return <div style={{ padding: 24, color: "#5f6b7a" }}>ストーリーが見つかりません。</div>;
 
-  const project = projects.find((p) => p.id === epic.project_id);
-  const active = epic.activated_at != null;
+  const project = projects.find((p) => p.id === story.project_id);
+  const active = story.activated_at != null;
   const editing = draft !== null;
-  const dirty = editing && draft !== (epic.context ?? "");
+  const dirty = editing && draft !== (story.context ?? "");
 
   const save = async () => {
     if (draft === null) return;
     setSaving(true);
     try {
-      await updateEpicContext(epic.id, draft.trim() === "" ? null : draft);
+      await updateStoryContext(story.id, draft.trim() === "" ? null : draft);
       setDraft(null);
       await load();
     } catch (err: any) {
@@ -83,7 +80,7 @@ export function EpicDetailPage({
 
   const changeState = async (next: boolean) => {
     try {
-      await setEpicActive(epic.id, next);
+      await setActive(story.id, next);
       setPendingState(null);
       await load();
     } catch (err: any) {
@@ -94,7 +91,7 @@ export function EpicDetailPage({
   // 名前と説明の変更。コンテキストの編集とは別。
   const submitInfo = async (title: string, description: string | null) => {
     try {
-      await updateEpicInfo(epic.id, title, description);
+      await updateStoryInfo(story.id, title, description);
       setEditingInfo(false);
       await load();
     } catch (err: any) {
@@ -102,32 +99,25 @@ export function EpicDetailPage({
     }
   };
 
-  const submitStory = async (values: StoryInput) => {
-    setAddingStory(false);
-    try {
-      await addStory(epic, values);
-      await load();
-    } catch (err: any) {
-      onError(String(err.message ?? err));
-    }
-  };
+  const sc = STATUS_COLOR[story.status];
 
   return (
     <div style={{ height: "100%", overflow: "auto", padding: 24, boxSizing: "border-box" }}>
-      <Link to={`/backlog?project=${epic.project_id}`} style={{ fontSize: 12, color: "#0972d3", textDecoration: "none" }}>
+      <Link to={`/backlog?project=${story.project_id}`} style={{ fontSize: 12, color: "#0972d3", textDecoration: "none" }}>
         ← バックログ{project ? `（${project.name}）` : ""}
       </Link>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>{epic.title}</h2>
+        <h2 style={{ margin: 0, fontSize: 18 }}>{story.title}</h2>
+        <span style={{ ...badge, background: sc.bg, color: sc.fg, borderColor: sc.border }}>{STATUS_LABEL[story.status]}</span>
         <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
-        <IdBadge id={epic.id} />
+        <IdBadge id={story.id} />
         <button onClick={() => setEditingInfo(true)} style={{ ...btn, marginLeft: "auto" }}>
           変更
         </button>
       </div>
-      <div style={{ fontSize: 13, color: epic.description ? "#3b4149" : "#94a0ad" }}>
-        {epic.description ?? "（説明なし）"}
+      <div style={{ fontSize: 13, color: story.description ? "#3b4149" : "#94a0ad" }}>
+        {story.description ?? "（説明なし）"}
       </div>
 
       <section style={card}>
@@ -149,7 +139,7 @@ export function EpicDetailPage({
                 </button>
               </>
             ) : (
-              <button onClick={() => setDraft(epic.context ?? "")} style={btn}>
+              <button onClick={() => setDraft(story.context ?? "")} style={btn}>
                 編集
               </button>
             )}
@@ -164,8 +154,8 @@ export function EpicDetailPage({
             placeholder={"## 背景・課題\n\n## ゴール\n\n## スコープと非スコープ\n\n## 方針\n\n## 決定事項\n\n## 未決事項"}
             style={textarea}
           />
-        ) : epic.context ? (
-          <pre style={contextView}>{epic.context}</pre>
+        ) : story.context ? (
+          <pre style={contextView}>{story.context}</pre>
         ) : (
           <div style={{ fontSize: 13, color: "#94a0ad", padding: "8px 0" }}>
             コンテキストがまだありません。「編集」から、背景・課題、ゴール、方針などを書いてください。
@@ -175,26 +165,23 @@ export function EpicDetailPage({
 
       <section style={card}>
         <div style={cardHeader}>
-          <h3 style={h3}>ストーリー</h3>
-          <span style={{ fontSize: 11, color: "#94a0ad" }}>{stories.length} 件</span>
-          <button onClick={() => setAddingStory(true)} style={{ ...primaryBtn, marginLeft: "auto" }}>
-            ストーリーを追加
-          </button>
+          <h3 style={h3}>タスク</h3>
+          <span style={{ fontSize: 11, color: "#94a0ad" }}>{tasks.length} 件</span>
         </div>
-        {stories.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#94a0ad", padding: "8px 0" }}>ストーリーはまだありません。</div>
+        {tasks.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#94a0ad", padding: "8px 0" }}>タスクはまだありません。</div>
         ) : (
           <table style={table}>
             <thead>
               <tr>
                 <th style={th}>名前</th>
                 <th style={{ ...th, width: 96 }}>ID</th>
-                <th style={{ ...th, width: 110 }}>状態</th>
+                <th style={{ ...th, width: 110 }}>ステータス</th>
                 <th style={{ ...th, width: 200 }}>期間</th>
               </tr>
             </thead>
             <tbody>
-              {stories.map((s) => {
+              {tasks.map((s) => {
                 const c = STATUS_COLOR[s.status];
                 return (
                   <tr key={s.id}>
@@ -223,8 +210,8 @@ export function EpicDetailPage({
         <ConfirmDialog
           message={
             pendingState
-              ? `「${epic.title}」を Active にします。エピックとして着手した扱いになります。よろしいですか？`
-              : `「${epic.title}」を InActive にします。バックログに戻ります。よろしいですか？`
+              ? `「${story.title}」を Active にします。ストーリーとして着手した扱いになります。よろしいですか？`
+              : `「${story.title}」を InActive にします。バックログに戻ります。よろしいですか？`
           }
           onConfirm={() => changeState(pendingState)}
           onCancel={() => setPendingState(null)}
@@ -232,21 +219,11 @@ export function EpicDetailPage({
       )}
 
       {editingInfo && (
-        <EpicInfoForm
-          initialTitle={epic.title}
-          initialDescription={epic.description}
+        <StoryInfoForm
+          initialTitle={story.title}
+          initialDescription={story.description}
           onSubmit={submitInfo}
           onCancel={() => setEditingInfo(false)}
-        />
-      )}
-
-      {addingStory && (
-        <TaskForm
-          heading={`ストーリーを追加（${epic.title}）`}
-          submitLabel="追加"
-          initial={{ title: "", status: "todo", start_date: null, due_date: null, description: null }}
-          onSubmit={submitStory}
-          onCancel={() => setAddingStory(false)}
         />
       )}
     </div>
@@ -254,7 +231,7 @@ export function EpicDetailPage({
 }
 
 // 名前（必須）と説明。コンテキストは詳細画面のエディタで編集する。
-function EpicInfoForm({
+function StoryInfoForm({
   initialTitle,
   initialDescription,
   onSubmit,
@@ -284,7 +261,7 @@ function EpicInfoForm({
   return (
     <div style={overlay} onMouseDown={onCancel}>
       <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>エピックを変更</h3>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>ストーリーを変更</h3>
 
         <label style={fieldLabel}>名前</label>
         <input

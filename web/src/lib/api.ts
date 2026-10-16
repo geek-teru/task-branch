@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { BacklogEpic, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
+import type { BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -69,83 +69,111 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
-// Backlog page: epics of a project (active and inactive), without the context document.
-export async function listEpics(projectId: string): Promise<BacklogEpic[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("id, title, description, activated_at, sort_order")
-    .eq("project_id", projectId)
-    .eq("level", "epic")
-    .order("sort_order", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+// Stories in the order the epics had them: epic order, then story order within the epic;
+// stories without a parent come last. epicOrder maps an epic id to its sort_order.
+function sortStoriesLikeEpics<S extends Pick<Task, "parent_id" | "sort_order">>(
+  stories: S[],
+  epicOrder: Map<string, number>
+): S[] {
+  const groupOrder = (s: S) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
+  return [...stories].sort(
+    (a, b) =>
+      groupOrder(a) - groupOrder(b) ||
+      (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
+      a.sort_order - b.sort_order
+  );
 }
 
-// Backlog page: add a backlog item, i.e. an inactive epic (activated_at stays null),
-// appended after the project's existing epics.
-export async function createEpic(projectId: string, title: string, description: string | null): Promise<BacklogEpic> {
+// Backlog page: stories of a project (active and inactive), without the context document.
+// Ordered as the epics were (epic order, then story order within the epic); stories without a parent come last.
+export async function listBacklogStories(projectId: string): Promise<BacklogStory[]> {
+  const [storiesRes, epicsRes] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id, parent_id, title, description, status, activated_at, sort_order")
+      .eq("project_id", projectId)
+      .eq("level", "story"),
+    supabase.from("tasks").select("id, sort_order").eq("project_id", projectId).eq("level", "epic"),
+  ]);
+  if (storiesRes.error) throw storiesRes.error;
+  if (epicsRes.error) throw epicsRes.error;
+  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
+  return sortStoriesLikeEpics((storiesRes.data ?? []) as BacklogStory[], epicOrder);
+}
+
+// Backlog page: add a backlog item, i.e. an inactive story without a parent (activated_at stays null).
+export async function createBacklogStory(projectId: string, title: string, description: string | null): Promise<void> {
+  await addRootStory(projectId, { title, description, status: "todo", start_date: null, due_date: null });
+}
+
+// Create a story without a parent, appended after the project's other stories without a parent.
+// activated_at is set to now only when active is true (the kanban adds stories as started).
+export async function addRootStory(projectId: string, input: StoryInput, active = false): Promise<Task> {
   const { data: last, error: lastError } = await supabase
     .from("tasks")
     .select("sort_order")
     .eq("project_id", projectId)
-    .eq("level", "epic")
+    .eq("level", "story")
+    .is("parent_id", null)
     .order("sort_order", { ascending: false })
     .limit(1);
   if (lastError) throw lastError;
   const { data, error } = await supabase
     .from("tasks")
     .insert({
+      ...input,
       project_id: projectId,
-      level: "epic",
-      title,
-      description,
+      level: "story",
       sort_order: (last?.[0]?.sort_order ?? 0) + 1,
+      activated_at: active ? new Date().toISOString() : null,
     })
-    .select("id, title, description, activated_at, sort_order")
+    .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-// Epic detail page: the epic including its context document.
-export async function getEpic(epicId: string): Promise<Task | null> {
+// Story detail page: the story including its context document.
+export async function getStory(storyId: string): Promise<Task | null> {
   const { data, error } = await supabase
     .from("tasks")
     .select(`${TASK_LIST_COLUMNS}, context`)
-    .eq("id", epicId)
-    .eq("level", "epic")
+    .eq("id", storyId)
+    .eq("level", "story")
     .maybeSingle()
     .overrideTypes<Task | null, { merge: false }>();
   if (error) throw error;
   return data;
 }
 
-// Saving the context adds a version to epic_context_revisions (DB trigger).
-// Rename an epic / edit its one-line description. The context document has its own function.
-export async function updateEpicInfo(epicId: string, title: string, description: string | null): Promise<void> {
-  const { error } = await supabase.from("tasks").update({ title, description }).eq("id", epicId);
+// Rename a story / edit its one-line description. The context document has its own function.
+export async function updateStoryInfo(storyId: string, title: string, description: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ title, description }).eq("id", storyId);
   if (error) throw error;
 }
 
-// Activate an epic (activated_at = now) or shelve it back to the backlog (null).
-export async function setEpicActive(epicId: string, active: boolean): Promise<void> {
+// Activate an epic or a story (activated_at = now) or shelve it back to the backlog (null).
+export async function setActive(id: string, active: boolean): Promise<void> {
   const { error } = await supabase
     .from("tasks")
     .update({ activated_at: active ? new Date().toISOString() : null })
-    .eq("id", epicId);
+    .eq("id", id);
   if (error) throw error;
 }
 
-export async function updateEpicContext(epicId: string, context: string | null): Promise<void> {
-  const { error } = await supabase.from("tasks").update({ context }).eq("id", epicId);
+// Saving the context adds a version to epic_context_revisions (DB trigger).
+export async function updateStoryContext(storyId: string, context: string | null): Promise<void> {
+  const { error } = await supabase.from("tasks").update({ context }).eq("id", storyId);
   if (error) throw error;
 }
 
-export async function getLatestContextRevision(epicId: string): Promise<ContextRevision | null> {
+// Until the table is renamed (migration stage ③), a story's revisions sit in epic_context_revisions
+// with the story id in epic_id.
+export async function getLatestContextRevision(storyId: string): Promise<ContextRevision | null> {
   const { data, error } = await supabase
     .from("epic_context_revisions")
     .select("version, edited_by_type, created_at")
-    .eq("epic_id", epicId)
+    .eq("epic_id", storyId)
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -171,12 +199,12 @@ export async function addTaskComment(taskId: string, body: string): Promise<Task
   return data as TaskComment;
 }
 
-export async function listStories(epicId: string): Promise<Task[]> {
+export async function listStoryTasks(storyId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")
     .select(TASK_LIST_COLUMNS)
-    .eq("parent_id", epicId)
-    .eq("level", "story")
+    .eq("parent_id", storyId)
+    .eq("level", "task")
     .order("sort_order", { ascending: true })
     .overrideTypes<Task[], { merge: false }>();
   if (error) throw error;
@@ -184,36 +212,25 @@ export async function listStories(epicId: string): Promise<Task[]> {
 }
 
 // Every story of a project, for pickers that move a task to another story.
+// Ordered like the backlog (see sortStoriesLikeEpics).
 export async function listProjectStories(projectId: string): Promise<Task[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_LIST_COLUMNS)
-    .eq("project_id", projectId)
-    .eq("level", "story")
-    .order("sort_order", { ascending: true })
-    .overrideTypes<Task[], { merge: false }>();
-  if (error) throw error;
-  return data ?? [];
+  const [storiesRes, epicsRes] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select(TASK_LIST_COLUMNS)
+      .eq("project_id", projectId)
+      .eq("level", "story")
+      .overrideTypes<Task[], { merge: false }>(),
+    supabase.from("tasks").select("id, sort_order").eq("project_id", projectId).eq("level", "epic"),
+  ]);
+  if (storiesRes.error) throw storiesRes.error;
+  if (epicsRes.error) throw epicsRes.error;
+  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
+  return sortStoriesLikeEpics(storiesRes.data ?? [], epicOrder);
 }
 
-// Move a story under another epic of the same project, appended after that epic's stories.
-export async function moveStory(storyId: string, targetEpicId: string): Promise<void> {
-  const { data: last, error: lastError } = await supabase
-    .from("tasks")
-    .select("sort_order")
-    .eq("parent_id", targetEpicId)
-    .eq("level", "story")
-    .order("sort_order", { ascending: false })
-    .limit(1);
-  if (lastError) throw lastError;
-  const { error } = await supabase
-    .from("tasks")
-    .update({ parent_id: targetEpicId, sort_order: (last?.[0]?.sort_order ?? 0) + 1 })
-    .eq("id", storyId);
-  if (error) throw error;
-}
-
-// Kanban: every in-progress story across projects, with its epic and child tasks.
+// Kanban: every in-progress story across projects, with its child tasks.
+// Ordered like the backlog (epic order, then story order within the epic); stories without a parent come last.
 export async function getKanbanLanes(): Promise<KanbanLane[]> {
   const { data: stories, error } = await supabase
     .from("tasks")
@@ -227,7 +244,7 @@ export async function getKanbanLanes(): Promise<KanbanLane[]> {
 
   const epicIds = [...new Set(stories.map((s) => s.parent_id).filter((id): id is string => !!id))];
   const [epicsRes, tasksRes] = await Promise.all([
-    supabase.from("tasks").select(TASK_LIST_COLUMNS).in("id", epicIds).overrideTypes<Task[], { merge: false }>(),
+    supabase.from("tasks").select("id, sort_order").in("id", epicIds),
     supabase
       .from("tasks")
       .select(TASK_LIST_COLUMNS)
@@ -239,10 +256,9 @@ export async function getKanbanLanes(): Promise<KanbanLane[]> {
   if (epicsRes.error) throw epicsRes.error;
   if (tasksRes.error) throw tasksRes.error;
 
-  const epics = new Map((epicsRes.data ?? []).map((e: Task) => [e.id, e]));
-  return stories.map((story: Task) => ({
+  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
+  return sortStoriesLikeEpics(stories, epicOrder).map((story: Task) => ({
     story,
-    epic: (story.parent_id && epics.get(story.parent_id)) || null,
     tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
   }));
 }
@@ -258,8 +274,6 @@ export async function updateTaskDates(id: string, start_date: string, due_date: 
   if (error) throw error;
 }
 
-// Persist a new epic ordering: assign sort_order = position (1-based) in the
-// given id list. Called after a drag-and-drop reorder in the gantt.
 // Move a task to another story. The column it was dropped on decides the status.
 // Tasks with dependencies are rejected by the DB trigger (dependencies are per story).
 export async function moveTask(taskId: string, targetStoryId: string, status: Status): Promise<void> {
@@ -279,14 +293,6 @@ export async function moveTask(taskId: string, targetStoryId: string, status: St
   if (error) throw error;
 }
 
-export async function reorderEpics(orderedIds: string[]): Promise<void> {
-  const results = await Promise.all(
-    orderedIds.map((id, i) => supabase.from("tasks").update({ sort_order: i + 1 }).eq("id", id))
-  );
-  const failed = results.find((r) => r.error);
-  if (failed?.error) throw failed.error;
-}
-
 export async function createTask(input: Partial<Task> & { project_id: string; level: Task["level"]; title: string }): Promise<Task> {
   const { data, error } = await supabase.from("tasks").insert(input).select().single();
   if (error) throw error;
@@ -303,11 +309,6 @@ export async function updateTask(id: string, input: StoryInput): Promise<Task> {
 export async function deleteTask(id: string): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) throw error;
-}
-
-// Create a new story under the given epic, appended after its existing stories.
-export function addStory(epic: Pick<Task, "id" | "project_id">, input: StoryInput): Promise<Task> {
-  return addChild(epic, "story", input);
 }
 
 // Create a new task under the given story, appended after its existing tasks.
