@@ -1,6 +1,6 @@
 # task-branch 設計書 (DD)
 
-AI がプランニングしたタスクを **粒度の異なる3階層のツリー** で管理し、タスクの **依存関係を DAG（ブランチ図）** として可視化するタスク管理アプリ。
+AI がプランニングしたタスクを **粒度の異なる2階層のツリー** で管理し、タスクの **依存関係を DAG（ブランチ図）** として可視化するタスク管理アプリ。
 
 - ステータス: Draft v0.3
 - 作成日: 2026-09-15
@@ -59,7 +59,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 | 関係             | 形     | 何を表すか                         | 例                                                                               |
 | ---------------- | ------ | ---------------------------------- | -------------------------------------------------------------------------------- |
-| **階層（分解）** | ツリー | 粒度の粗いオブジェクトを細かく分解 | 「決済基盤刷新(epic/数ヶ月)」→「認証移行(story/1週)」→「テストケース作成(task)」 |
+| **階層（分解）** | ツリー | 粒度の粗いオブジェクトを細かく分解 | 「認証移行(story/1週)」→「テストケース作成(task)」                             |
 | **依存（順序）** | DAG    | 「Aが終わってからB」という実行順序 | 「OAuth クライアント作成」→「Supabase 設定」→「ログイン画面作成」                |
 
 - 階層は **`parent_id` によるツリー**。
@@ -67,7 +67,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 ### 1.3 2つの粒度（level）
 
-`story > task` の順にネストする（2段）。以前は `epic > story > task` の3段だったが、個人の開発では段が多いため2段にした（§9 Q4）。移行中はエピックが残る（§1.3.1）。
+`story > task` の順にネストする（2段）。以前は `epic > story > task` の3段だったが、個人の開発では段が多いため2段にした（§9 Q4。移行の記録は §1.3.1）。
 
 | 観点                       | ストーリー（`story`）                                                                                                                                         | タスク（`task`）                                                                                              |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -83,7 +83,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 
 - 着手してからタスクへ分解する。細分化を着手の直前まで遅らせることで、計画が古くなるのを防ぐ。
 
-#### 1.3.1 2段への移行（3段階）
+#### 1.3.1 2段への移行（3段階。完了）
 
 main へのマージでマイグレーションと画面が同時に本番へデプロイされるため、旧画面を壊さない順に3段階で入れる。
 
@@ -91,13 +91,14 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | ①    | ストーリーにコンテキスト・着手日時（`activated_at`）・更新履歴を持てるようにする（`0015_story_context.sql`）                                       | そのまま動く                 |
 | ②    | エピックのデータをストーリーへ複製するマイグレーションと、画面（バックログ・ストーリー詳細・ガント・カンバン・詳細パネル）の切り替えを同じリリースで入れる | 2段の画面に切り替わる        |
-| ③    | ストーリーがないエピックをストーリーに変換し、残りのエピックを削除する。`level`・制約・トリガ・RPC・履歴テーブル名・サンプルデータを2段に揃える          | —                            |
+| ③    | ストーリーがないエピックをストーリーに変換し、残りのエピックを削除する。`level`・制約・トリガ・RPC・履歴テーブル名・サンプルデータを2段に揃える（`0019_drop_epic_level.sql`） | —                            |
 
 - エピックのコンテキストは配下の全ストーリーに複製する。更新履歴は最新版だけを各ストーリーの v1 として持ち越す。
 - エピック名は捨てる（ストーリー名に付けない、ラベル列も作らない）。
 - 配下にストーリーがないエピックは、そのままストーリーに変換する（名前・説明・コンテキスト・`activated_at` を残す）。
 - 複製を②に置くのは、①と②の間に旧画面でエピックのコンテキストを編集すると複製とずれるため。
-- 更新履歴のテーブルは、①②の間は既存の `epic_context_revisions` をそのまま使い、名前の付け替えは③で行う。
+- 更新履歴のテーブルは、①②の間は既存の `epic_context_revisions` をそのまま使い、③で `story_context_revisions`（列 `story_id`）に付け替えた。
+- ③では、ストーリーの `sort_order` をプロジェクトごとに、エピックがあったときの並び（エピック順 → エピック内の順、親なしは最後）で 1 から振り直した。
 
 ### 1.4 満たすべき要件
 
@@ -178,12 +179,12 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 所有者（ユーザー） 1 ──< projects
 projects 1 ──< tasks(自己参照ツリー parent_id)
 projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
-                 ├──< epic_context_revisions (story のドキュメントの更新履歴。移行中は epic も)
+                 ├──< story_context_revisions (story のドキュメントの更新履歴)
                  ├──< task_comments (task へのコメント。本文は編集できる)
                  └──> 担当者（人の場合。ユーザー）
 ```
 
-- `tasks` 1テーブルで3階層すべてを表現し、`level` と `parent_id` で区別する。
+- `tasks` 1テーブルで2階層すべてを表現し、`level` と `parent_id` で区別する。
 
 ### 3.2 テーブル定義
 
@@ -199,7 +200,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | updated_at  | timestamptz | default now()                                          |                                                                                   |
 
 - インデックス：(owner_id)。
-- 所有者の列を持つのは projects だけ。tasks・task_comments・epic_context_revisions は、属するプロジェクトの所有者をたどって判定する（§3.5）。
+- 所有者の列を持つのは projects だけ。tasks・task_comments・story_context_revisions は、属するプロジェクトの所有者をたどって判定する（§3.5）。
 
 #### tasks
 
@@ -207,14 +208,14 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | ------------- | ----------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | id            | uuid        | PK, default gen_random_uuid() |                                                                                                                                                                                                                                                                                                                      |
 | project_id    | uuid        | FK→projects.id, not null      |                                                                                                                                                                                                                                                                                                                      |
-| parent_id     | uuid        | FK→tasks.id, null可           | 親（階層）。null はルート（story。移行中は epic も）                                                                                                                                                                                                                                                                                  |
+| parent_id     | uuid        | FK→tasks.id, null可           | 親（階層）。story は null（ルート）、task は親の story                                                                                                                                                                                                                                                                                |
 | group_id      | uuid        | FK→story_groups.id, null可, on delete set null | **story のみ**。属するグループ（ガントチャートでまとめて見せる単位）。null はグループなし。グループを消すとグループなしに戻る                                                                                                                                                                                |
-| level         | text        | not null                      | `epic` / `story` / `task`                                                                                                                                                                                                                                                                                            |
+| level         | text        | not null                      | `story` / `task`                                                                                                                                                                                                                                                                                                     |
 | title         | text        | not null                      | 名称                                                                                                                                                                                                                                                                                                                 |
 | description   | text        |                               | 短い説明（一覧やカードに出す 1〜2 行）                                                                                                                                                                                                                                                                               |
-| context       | text        | null可                        | **story のみ**（移行中は epic も可、§1.3.1）。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `epic_context_revisions` に残す（最新版も含む）                                                                                    |
-| status        | text        | not null, default 'todo'      | `todo` / `in_progress` / `done` / `closed`（作業の進み具合）。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える。エピックは手で動かさない（§1.3） |
-| activated_at  | timestamptz | null可                        | **story のみ**（移行中は epic も可、§1.3.1）。null ＝ バックログ、日時あり ＝ 着手済み。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける                                                                                                     |
+| context       | text        | null可                        | **story のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `story_context_revisions` に残す（最新版も含む）                                                                                    |
+| status        | text        | not null, default 'todo'      | `todo` / `in_progress` / `done` / `closed`（作業の進み具合）。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える |
+| activated_at  | timestamptz | null可                        | **story のみ**。null ＝ バックログ、日時あり ＝ 着手済み。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける                                                                                                     |
 | assignee_type | text        | null可                        | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9                                                                                                                                                                                                                                                                |
 | assignee_id   | uuid        | null可                        | **task のみ**。人が担当する場合の担当者（ユーザー）                                                                                                                                                                                                                                                                  |
 | sort_order    | int         | not null, default 0           | 同階層内 / カンバン列内の表示順                                                                                                                                                                                                                                                                                      |
@@ -228,13 +229,13 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 
 制約・ルール:
 
-- `level` は CHECK で3値に固定。
-- 階層整合性は **トリガ**（`check_task_hierarchy()`）で担保。`story` はルート（親なし）に置ける。移行中は `epic > story` の親子も許す。`task` の親は `story` だけ。
+- `level` は CHECK で2値に固定。
+- 階層整合性は **トリガ**（`check_task_hierarchy()`）で担保。`story` はルート（親なし）だけに置ける。`task` の親は同じプロジェクトの `story` だけ。
 - `task` は葉。子を持たない。
 - 親の進捗は子から集約（§3.4）。
 - **拡張フィールド（`start_date` / `due_date` / `metadata`）は nullable で初期は未使用**。ガント/カレンダー等のビュー追加時にそのまま利用でき、既存機能に影響しない。
 - 見積り（`estimate`）は未導入。導入時は `estimate_value numeric` + `estimate_unit text` を追加する想定（§10）。
-- `context` は長文になるため、一覧系の取得（カンバン・ガントチャート・`get_task_graph` など）では読み込まない。詳細・バックログの画面と、AI にエピックの文脈を渡すときだけ取得する。
+- `context` は長文になるため、一覧系の取得（カンバン・ガントチャート・`get_task_graph` など）では読み込まない。詳細・バックログの画面と、AI にストーリーの文脈を渡すときだけ取得する。
 - `group_id` を持てるのは `level = 'story'` の行だけで、グループはストーリーと同じプロジェクトに属すること（トリガ `check_task_group()`）。
 
 #### story_groups
@@ -271,27 +272,27 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | updated_at  | timestamptz | not null, default now()                   |                            |
 
 - インデックス：(task_id, created_at)。
-- 対象は `level = 'task'` のみ。ストーリー・エピックには付けられない（トリガ `check_task_comment()` で弾く）。
+- 対象は `level = 'task'` のみ。ストーリーには付けられない（トリガ `check_task_comment()` で弾く）。
 - 編集・削除できるのは、書いた本人だけ（§3.5）。人と AI は別の投稿者として扱い、人も AI のコメントは編集・削除できない。変えられるのは本文だけで、`task_id` / `author_type` / `author_id` / `created_at` は変えさせない。更新時に `updated_at` を now() にする。
 - 削除は物理削除。編集履歴は持たない。
 - 本文はプレーンテキスト（Markdown は解釈しない）。
 - RLS は §3.5。
 
-#### epic_context_revisions
+#### story_context_revisions
 
-ストーリー（移行中はエピックも）のドキュメント（`context`）の更新履歴。差分の確認と巻き戻しに使う。テーブル名と `epic_id` 列は移行の段階③で付け替える（§1.3.1）。それまでは `epic_id` にストーリーの id も入る。
+ストーリーのドキュメント（`context`）の更新履歴。差分の確認と巻き戻しに使う。移行の段階③で `epic_context_revisions` から名前を付け替えた（§1.3.1）。
 
 | カラム         | 型          | 制約                          | 説明                            |
 | -------------- | ----------- | ----------------------------- | ------------------------------- |
 | id             | uuid        | PK, default gen_random_uuid() |                                 |
-| epic_id        | uuid        | FK→tasks.id, not null         | 対象のストーリー（またはエピック） |
+| story_id       | uuid        | FK→tasks.id, not null         | 対象のストーリー                |
 | version        | int         | not null                      | 版番号（対象ごとに 1 から）     |
 | context        | text        | not null                      | その版の本文                    |
 | edited_by_type | text        | not null                      | `human` / `ai`                  |
 | edited_by_id   | uuid        | null可                        | 人の場合の更新者                |
 | created_at     | timestamptz | default now()                 |                                 |
 
-- UNIQUE(epic_id, version)。
+- UNIQUE(story_id, version)。
 - `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
 - 人か AI かは、リクエストの JWT の `client_id`（あれば AI）で判定する（`current_actor_type()`、§3.5）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
 
@@ -307,7 +308,6 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 
 - `task` の完了数 / 総数 → 親 `story` の進捗率。完了数は `done` と `closed` の合計（クローズしても進捗が下がらないように）。
 - task が1件もない `story` は、自身の status が `done` か `closed` なら 1、それ以外は 0。
-- `story` の進捗率の平均 → 親 `epic` の進捗率。**エピックはこの進捗率で管理し、status を手で動かす運用はしない**（§1.3）。
 - 集約は RPC / ビューで計算し、UI に返す。ストーリー・タスクの手動 status 変更は許容。
 
 ### 3.5 RLS ポリシー
@@ -354,8 +354,8 @@ PostgREST は、リクエストの JWT の中身を `request.jwt.claims` にセ�
 
 | 関数                   | 返すもの                                                                                                          | 使う場所                                                                      |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `current_actor_type()` | `ai`（JWT に `client_id` がある）／ それ以外は `human`                                                            | `task_comments.author_type`・`epic_context_revisions.edited_by_type` の既定値 |
-| `current_actor_id()`   | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null                                                          | `task_comments.author_id`・`epic_context_revisions.edited_by_id` の既定値     |
+| `current_actor_type()` | `ai`（JWT に `client_id` がある）／ それ以外は `human`                                                            | `task_comments.author_type`・`story_context_revisions.edited_by_type` の既定値 |
+| `current_actor_id()`   | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null                                                          | `task_comments.author_id`・`story_context_revisions.edited_by_id` の既定値     |
 | `current_owner_id()`   | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人も AI も本人になる           | `projects.owner_id` の既定値、ポリシー                                        |
 
 ```sql
@@ -402,7 +402,7 @@ $$ language sql stable;
 | projects               | ログイン済みなら誰でも。`owner_id` は自分に固定 | 所有者 | 所有者。`owner_id` の付け替えは不可 | 所有者     |
 | tasks                  | 所有者                                          | 所有者 | 所有者                              | 所有者     |
 | story_groups           | 所有者                                          | 所有者 | 所有者                              | 所有者     |
-| epic_context_revisions | 所有者                                          | 所有者 | 不可                                | 不可       |
+| story_context_revisions | 所有者                                         | 所有者 | 不可                                | 不可       |
 | task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
@@ -466,23 +466,23 @@ create policy story_groups_owner on story_groups
   ));
 ```
 
-##### epic_context_revisions
+##### story_context_revisions
 
-エピック → プロジェクトをたどって所有者だけが読み、足せる。足すときは更新者が自分であることも確かめる（トリガが入れる値と一致する）。update / delete はポリシーを作らない。
+ストーリー → プロジェクトをたどって所有者だけが読み、足せる。足すときは更新者が自分であることも確かめる（トリガが入れる値と一致する）。update / delete はポリシーを作らない。
 
 ```sql
-alter table epic_context_revisions enable row level security;
+alter table story_context_revisions enable row level security;
 
-create policy epic_context_revisions_select on epic_context_revisions
+create policy story_context_revisions_select on story_context_revisions
   for select to authenticated
   using (exists (
     select 1 from tasks t
       join projects p on p.id = t.project_id
-     where t.id = epic_context_revisions.epic_id
+     where t.id = story_context_revisions.story_id
        and p.owner_id = current_owner_id()
   ));
 
-create policy epic_context_revisions_insert on epic_context_revisions
+create policy story_context_revisions_insert on story_context_revisions
   for insert to authenticated
   with check (
     edited_by_id = auth.uid()
@@ -490,7 +490,7 @@ create policy epic_context_revisions_insert on epic_context_revisions
     and exists (
       select 1 from tasks t
         join projects p on p.id = t.project_id
-       where t.id = epic_context_revisions.epic_id
+       where t.id = story_context_revisions.story_id
          and p.owner_id = current_owner_id()
     )
   );
@@ -535,7 +535,7 @@ create policy task_comments_delete on task_comments
   using (author_id = auth.uid() and author_type = current_actor_type());
 ```
 
-- `epic_context_revisions` の insert は、エピックの保存時にトリガ（`save_epic_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
+- `story_context_revisions` の insert は、ストーリーの `context` の保存時にトリガ（`save_story_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
 - RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
 - `current_actor_type()` の `client_id` 判定と、task_comments の update / delete で種別も見る条件は `0014_actor_type_oauth_client.sql` で入れた（それまでは `app_metadata.actor_type` で判定し、update / delete は `author_id` だけを見ていた）。
 - `parent_id` に他人のタスクを指定することは、トリガ `check_task_hierarchy()` が「親は同じプロジェクト」を確かめるため起きない。
@@ -562,7 +562,7 @@ create policy task_comments_delete on task_comments
 | ------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
 | `get_task_graph(project uuid)`  | 可視化用 | tasks（階層・担当・進捗込）を `{nodes}` で返す。依存（edges）と rank は依存の設計時に足す（R4/R5）               |
 | `get_critical_path(story uuid)` | CP 抽出  | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6）                                        |
-| `get_progress(project uuid)`    | 進捗集約 | epic/story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
+| `get_progress(project uuid)`    | 進捗集約 | story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 | `shift_story_dates(story uuid, days int)` | 日付移動 | ストーリーと配下のタスクの開始日・期限を同じ日数ずらす（null は null のまま）。1 トランザクションで更新し、ストーリー以外を渡すと例外。ガントのバー移動で使う |
 
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
@@ -576,9 +576,8 @@ create policy task_comments_delete on task_comments
 
 1. 作りたいものを壁打ちし、目的・スコープ・技術スタックを決める。
 2. プロジェクトを作成（`/projects`）or 選択。既存なら、バックログ・ガント・カンバンで現状を把握してから足す。
-3. エピックを登録し（`/backlog`）、決めた内容をエピックのコンテキストに書く。
-4. エピック詳細からストーリーを登録する（開始日・期限つき）。
-5. カンバン（`/kanban`）の進行中ストーリーの行からタスクを登録する。
+3. ストーリーを登録し（`/backlog`）、決めた内容をストーリーのコンテキストに書く（開始日・期限つき）。
+4. カンバン（`/kanban`）の進行中ストーリーの行からタスクを登録する。
 
 **`do` スキル（実装と進捗の更新）**
 
@@ -595,11 +594,10 @@ create policy task_comments_delete on task_comments
 ### 5.1 画面構成
 
 - **プロジェクト選択** → **ボード**（メイン）
-- **バックログ**: inactive のエピックの一覧。並び順（`sort_order`）＝優先順位。ここから active にして着手する。
-- ガントチャート・カンバン・マップ（ブランチ図）などの実行中のビューは、**active のエピック配下だけ**を表示する。inactive のエピックの下のラフなストーリーは、バックログの一覧でだけ見える。
-- 進捗率 100% のエピックは、完了として表示する（自動）。
+- **バックログ**: プロジェクトのストーリーの一覧（Active / InActive）。並び順（`sort_order`）＝優先順位。ここから Active にして着手する。
+- カンバンには `status` が `in_progress` のストーリーを出す（§9 Q11）。ガントチャートはプロジェクトのストーリーとその配下のタスクを出す。
 - ビュー切替:
-  - **階層ツリー（マインドマップ）**: epic → story → task を展開。React Flow で放射状/ツリー。
+  - **階層ツリー（マインドマップ）**: story → task を展開。React Flow で放射状/ツリー。
   - **ブランチ図（DAG）**: ストーリー配下のタスクを、依存で結んだ Git ブランチ状に表示。rank を軸に**前後関係は横（左→右）、並列（同 rank）は縦**（R4/R5）。担当（人 / AI）はアイコンで表す。
   - **リスト**: status 別（closed / done / in_progress / todo）。これから進める・終わったを一覧（R3）。
   - **クリティカルパス**: ストーリー内の CP 上の task を太線・強調色でハイライト、直列連鎖長を表示（R6）。
@@ -607,7 +605,7 @@ create policy task_comments_delete on task_comments
 ### 5.2 表現
 
 - **色**: status（todo=水色 / in_progress=青 / done=緑 / closed=グレー）。
-- **level で形状/サイズ**: epic=大, story=中, task=小（チェックボックス）。
+- **level で形状/サイズ**: story=大, task=小（チェックボックス）。
 - **枠強調**: クリティカルパス上の task。
 - **アイコン**: task の担当（人 / AI）。
 - **バッジ**: 進捗率（親）、着手可能 / 前提待ち（依存から導出。表示方法は §9 Q10）。
@@ -771,7 +769,7 @@ Claude Code は MCP の仕様に沿って、Supabase Auth の OAuth 2.1 サー�
 
 | #   | 項目                   | メモ                                                                                                                 |
 | --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Q1  | level の呼称           | `epic` / `story` / `task` で確定（表示名は日本語可）                                                                 |
+| Q1  | level の呼称           | `story` / `task` で確定（表示名は日本語可。`epic` は Q4 でなくした）                                                                 |
 | Q2  | ストーリー間の順序     | 依存は同じストーリー内のタスク間のみ。ストーリーをまたぐ順序（例: 認証 → RLS）を依存で表すか、期間の並びだけで表すか |
 | Q3  | 見積りの再導入         | 初期はホップ数 CP。時間見積りが要るなら `estimate` 追加で重み付き CP へ                                              |
 | Q4  | 階層の段数固定         | **2段（story/task）に決定**。移行は §1.3.1                                                                           |
