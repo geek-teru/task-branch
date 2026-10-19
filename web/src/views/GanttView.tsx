@@ -125,7 +125,6 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
       }
     };
 
-    // Stories are the top level, whatever epic they still sit under during the migration.
     // A group sits at the same level as the ungrouped stories. Its period is its stories'
     // earliest start to latest due, so it sorts by that start (an empty group goes last).
     const stories = sortedByStart((n) => n.level === "story");

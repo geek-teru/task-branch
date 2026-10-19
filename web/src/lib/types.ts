@@ -1,6 +1,6 @@
 // Shared domain types. Every view is a projection over these — see DESIGN.md §5.4.
 
-export type Level = "epic" | "story" | "task";
+export type Level = "story" | "task";
 export type Status = "todo" | "in_progress" | "done" | "closed";
 export type AssigneeType = "human" | "ai";
 
@@ -26,10 +26,10 @@ export interface Task {
   sort_order: number;
   start_date: string | null; // extensibility: gantt / calendar
   due_date: string | null;
-  activated_at: string | null; // epic / story: null = backlog, set = active
+  activated_at: string | null; // story only: null = backlog, set = active
   assignee_type: AssigneeType | null; // task only
   assignee_id: string | null; // task only: the human assignee
-  context?: string | null; // epic only: Markdown document. Not fetched by list queries
+  context?: string | null; // story only: Markdown document. Not fetched by list queries
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -70,10 +70,10 @@ export interface StoryGroup {
 // A row of the backlog page (stories of a project, without the context document).
 export type BacklogStory = Pick<
   Task,
-  "id" | "parent_id" | "title" | "description" | "status" | "activated_at" | "sort_order"
+  "id" | "title" | "description" | "status" | "activated_at" | "sort_order"
 >;
 
-// Latest saved version of an epic's context document (epic_context_revisions).
+// Latest saved version of a story's context document (story_context_revisions).
 export interface ContextRevision {
   version: number;
   edited_by_type: AssigneeType;
@@ -128,7 +128,6 @@ export const BOARD_STATUSES: Status[] = ["todo", "in_progress", "done"];
 export const isFinished = (status: Status) => status === "done" || status === "closed";
 
 export const LEVEL_LABEL: Record<Level, string> = {
-  epic: "エピック",
   story: "ストーリー",
   task: "タスク",
 };

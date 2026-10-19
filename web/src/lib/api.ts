@@ -47,7 +47,7 @@ export async function deleteProject(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// Every tasks column except the epic document (context), which can be long.
+// Every tasks column except the story document (context), which can be long.
 // List queries use this; fetch context explicitly where it is needed.
 const TASK_LIST_COLUMNS =
   "id, project_id, parent_id, level, title, description, status, sort_order, start_date, due_date, " +
@@ -71,44 +71,24 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
-// Stories in the order the epics had them: epic order, then story order within the epic;
-// stories without a parent come last. epicOrder maps an epic id to its sort_order.
-function sortStoriesLikeEpics<S extends Pick<Task, "parent_id" | "sort_order">>(
-  stories: S[],
-  epicOrder: Map<string, number>
-): S[] {
-  const groupOrder = (s: S) => (s.parent_id ? epicOrder.get(s.parent_id) ?? 0 : Infinity);
-  return [...stories].sort(
-    (a, b) =>
-      groupOrder(a) - groupOrder(b) ||
-      (a.parent_id ?? "").localeCompare(b.parent_id ?? "") ||
-      a.sort_order - b.sort_order
-  );
-}
-
 // Backlog page: stories of a project (active and inactive), without the context document.
-// Ordered as the epics were (epic order, then story order within the epic); stories without a parent come last.
 export async function listBacklogStories(projectId: string): Promise<BacklogStory[]> {
-  const [storiesRes, epicsRes] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("id, parent_id, title, description, status, activated_at, sort_order")
-      .eq("project_id", projectId)
-      .eq("level", "story"),
-    supabase.from("tasks").select("id, sort_order").eq("project_id", projectId).eq("level", "epic"),
-  ]);
-  if (storiesRes.error) throw storiesRes.error;
-  if (epicsRes.error) throw epicsRes.error;
-  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
-  return sortStoriesLikeEpics((storiesRes.data ?? []) as BacklogStory[], epicOrder);
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id, title, description, status, activated_at, sort_order")
+    .eq("project_id", projectId)
+    .eq("level", "story")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as BacklogStory[];
 }
 
-// Backlog page: add a backlog item, i.e. an inactive story without a parent (activated_at stays null).
+// Backlog page: add a backlog item, i.e. an inactive story (activated_at stays null).
 export async function createBacklogStory(projectId: string, title: string, description: string | null): Promise<void> {
   await addRootStory(projectId, { title, description, status: "todo", start_date: null, due_date: null });
 }
 
-// Create a story without a parent, appended after the project's other stories without a parent.
+// Create a story, appended after the project's other stories.
 // activated_at is set to now only when active is true (the kanban adds stories as started).
 export async function addRootStory(projectId: string, input: StoryInput, active = false): Promise<Task> {
   const { data: last, error: lastError } = await supabase
@@ -116,7 +96,6 @@ export async function addRootStory(projectId: string, input: StoryInput, active 
     .select("sort_order")
     .eq("project_id", projectId)
     .eq("level", "story")
-    .is("parent_id", null)
     .order("sort_order", { ascending: false })
     .limit(1);
   if (lastError) throw lastError;
@@ -186,7 +165,7 @@ export async function updateStoryInfo(storyId: string, title: string, descriptio
   if (error) throw error;
 }
 
-// Activate an epic or a story (activated_at = now) or shelve it back to the backlog (null).
+// Activate a story (activated_at = now) or shelve it back to the backlog (null).
 export async function setActive(id: string, active: boolean): Promise<void> {
   const { error } = await supabase
     .from("tasks")
@@ -195,19 +174,17 @@ export async function setActive(id: string, active: boolean): Promise<void> {
   if (error) throw error;
 }
 
-// Saving the context adds a version to epic_context_revisions (DB trigger).
+// Saving the context adds a version to story_context_revisions (DB trigger).
 export async function updateStoryContext(storyId: string, context: string | null): Promise<void> {
   const { error } = await supabase.from("tasks").update({ context }).eq("id", storyId);
   if (error) throw error;
 }
 
-// Until the table is renamed (migration stage ③), a story's revisions sit in epic_context_revisions
-// with the story id in epic_id.
 export async function getLatestContextRevision(storyId: string): Promise<ContextRevision | null> {
   const { data, error } = await supabase
-    .from("epic_context_revisions")
+    .from("story_context_revisions")
     .select("version, edited_by_type, created_at")
-    .eq("epic_id", storyId)
+    .eq("story_id", storyId)
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -259,26 +236,20 @@ export async function listStoryTasks(storyId: string): Promise<Task[]> {
   return data ?? [];
 }
 
-// Every story of a project, for pickers that move a task to another story.
-// Ordered like the backlog (see sortStoriesLikeEpics).
+// Every story of a project, for pickers that move a task to another story. Ordered like the backlog.
 export async function listProjectStories(projectId: string): Promise<Task[]> {
-  const [storiesRes, epicsRes] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select(TASK_LIST_COLUMNS)
-      .eq("project_id", projectId)
-      .eq("level", "story")
-      .overrideTypes<Task[], { merge: false }>(),
-    supabase.from("tasks").select("id, sort_order").eq("project_id", projectId).eq("level", "epic"),
-  ]);
-  if (storiesRes.error) throw storiesRes.error;
-  if (epicsRes.error) throw epicsRes.error;
-  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
-  return sortStoriesLikeEpics(storiesRes.data ?? [], epicOrder);
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_LIST_COLUMNS)
+    .eq("project_id", projectId)
+    .eq("level", "story")
+    .order("sort_order", { ascending: true })
+    .overrideTypes<Task[], { merge: false }>();
+  if (error) throw error;
+  return data ?? [];
 }
 
-// Kanban: every in-progress story across projects, with its child tasks.
-// Ordered like the backlog (epic order, then story order within the epic); stories without a parent come last.
+// Kanban: every in-progress story across projects, with its child tasks. Ordered like the backlog.
 export async function getKanbanLanes(): Promise<KanbanLane[]> {
   const { data: stories, error } = await supabase
     .from("tasks")
@@ -290,24 +261,18 @@ export async function getKanbanLanes(): Promise<KanbanLane[]> {
   if (error) throw error;
   if (!stories?.length) return [];
 
-  const epicIds = [...new Set(stories.map((s) => s.parent_id).filter((id): id is string => !!id))];
-  const [epicsRes, tasksRes] = await Promise.all([
-    supabase.from("tasks").select("id, sort_order").in("id", epicIds),
-    supabase
-      .from("tasks")
-      .select(TASK_LIST_COLUMNS)
-      .eq("level", "task")
-      .in("parent_id", stories.map((s) => s.id))
-      .order("sort_order", { ascending: true })
-      .overrideTypes<Task[], { merge: false }>(),
-  ]);
-  if (epicsRes.error) throw epicsRes.error;
-  if (tasksRes.error) throw tasksRes.error;
+  const { data: tasks, error: tasksError } = await supabase
+    .from("tasks")
+    .select(TASK_LIST_COLUMNS)
+    .eq("level", "task")
+    .in("parent_id", stories.map((s) => s.id))
+    .order("sort_order", { ascending: true })
+    .overrideTypes<Task[], { merge: false }>();
+  if (tasksError) throw tasksError;
 
-  const epicOrder = new Map((epicsRes.data ?? []).map((e) => [e.id, e.sort_order]));
-  return sortStoriesLikeEpics(stories, epicOrder).map((story: Task) => ({
+  return stories.map((story: Task) => ({
     story,
-    tasks: (tasksRes.data ?? []).filter((t: Task) => t.parent_id === story.id),
+    tasks: (tasks ?? []).filter((t: Task) => t.parent_id === story.id),
   }));
 }
 
