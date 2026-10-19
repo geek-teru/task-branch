@@ -27,10 +27,10 @@ create_node() { # level project_id parent_id title -> id
 
 for n in $(seq 1 "$COUNT"); do
   pid=$(create_project "プロジェクト$n")
-  ph=$(create_node  phase "$pid" null       "フェーズ$n")
-  tk=$(create_node  task  "$pid" "$ph"       "タスク$n-1")
-  st=$(create_node  step  "$pid" "$tk"       "ステップ$n-1-1")
-  echo "✅ プロジェクト$n  project=$pid  phase=$ph  task=$tk  step=$st"
+  st=$(create_node  story "$pid" null       "ストーリー$n")
+  t1=$(create_node  task  "$pid" "$st"       "タスク$n-1")
+  t2=$(create_node  task  "$pid" "$st"       "タスク$n-2")
+  echo "✅ プロジェクト$n  project=$pid  story=$st  task=$t1,$t2"
 done
 
 echo "完了。ブラウザ左上のプロジェクト選択に「プロジェクト1..$COUNT」が追加されます。"
