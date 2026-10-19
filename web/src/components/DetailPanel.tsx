@@ -59,7 +59,7 @@ export function DetailPanel<T extends DetailNode>({
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
   const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
   const durationDays = start && end ? diffDays(start, end) + 1 : null;
-  const canEdit = node != null && node.level !== "epic";
+  const canEdit = node != null;
   const canStart = canEdit && node != null && node.status === "todo";
   const canComplete = canEdit && node != null && node.status === "in_progress";
   const DASH = <span style={{ color: "#94a0ad" }}>-</span>;
@@ -132,7 +132,7 @@ export function DetailPanel<T extends DetailNode>({
         )}
         <Field label="ステータス">
           {node?.status ? (
-            onChangeStatus && node.level !== "epic" ? (
+            onChangeStatus ? (
               <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
             ) : (
               <StatusBadge status={node.status} />
