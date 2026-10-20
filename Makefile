@@ -8,7 +8,7 @@ SIGNING_KEYS := supabase/signing_keys.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup install-cli signing-key up down reset status web-install env dev build preview skill clean
+.PHONY: help setup install-cli signing-key up down reset status web-install env dev mcp-dev build preview skill clean
 
 help: ## このヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -49,6 +49,9 @@ web-install: ## フロントの依存をインストール
 
 dev: ## フロント開発サーバを起動（http://localhost:5173）
 	cd $(WEB) && npm run dev
+
+mcp-dev: ## Vercel の関数（/api）とフロントを一緒に起動（http://localhost:3000）
+	vercel dev --listen 3000
 
 build: ## フロントを型チェック + 本番ビルド
 	cd $(WEB) && npm run build

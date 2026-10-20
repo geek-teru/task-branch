@@ -13,3 +13,6 @@ supabase/.temp/
 
 # Supabase の JWT 署名鍵（秘密鍵）
 supabase/signing_keys.json
+
+# Vercel CLI のプロジェクト紐づけ（vercel link。Root Directory が web のためリポジトリ直下で行う）
+.vercel

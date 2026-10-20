@@ -91,6 +91,26 @@ JWT は `supabase/signing_keys.json` の ES256 鍵で署名されるため、ano
 （鍵ごとに値が変わる）。署名鍵を作り直したときや、署名鍵を入れる前の `.env` を使っているときは、
 `supabase status -o env` の `ANON_KEY` を `VITE_SUPABASE_ANON_KEY` に入れ直してください。
 
+#### Vercel の関数（/api）も一緒に動かす
+
+MCP サーバーなどの関数は `web/api/` に置きます（`_` で始まるファイル・ディレクトリは関数としてデプロイされません。
+共通のコードは `web/api/_lib/` へ）。関数も試すときは、Vite の代わりに `vercel dev` で起動します。
+
+```bash
+npm i -g vercel                      # 初回のみ
+vercel login                         # 初回のみ
+vercel link --project task-branch    # 初回のみ。リポジトリ直下で実行（Root Directory が web のため）
+make mcp-dev                         # http://localhost:3000（画面と /api を一緒に起動）
+```
+
+- 関数が読む値は `web/.env` の `SUPABASE_URL` / `SUPABASE_ANON_KEY`（`.env.example` を参照）。
+  `VITE_` を付けないので画面には出ません。ローカルの `SUPABASE_URL` は `http://127.0.0.1:54321` にします
+  （issuer が `127.0.0.1` になるため）
+- `web/package.json` が `"type": "module"` なので、関数の相対 import には拡張子を付けます（`./_lib/env.js`）。
+  付けないと実行時に `Cannot find module` になり、Windows では `vercel dev` ごと落ちます
+- 関数のファイルを追加・削除したときは `vercel dev` を起動し直してください
+- Google ログイン（Supabase の `site_url`）は今まで通り `make dev`（5173）で行います
+
 ### 3. plan スキルの配置
 
 `plan-skill/SKILL.md` を Claude Code のスキルとして配置します。
