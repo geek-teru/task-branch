@@ -38,6 +38,7 @@ AI がプランニングしたタスクを **粒度の異なる2階層のツリ�
 - [7. セキュリティ（個人用の割り切り）](#7-セキュリティ個人用の割り切り)
   - [7.1 AI のトークン](#71-ai-のトークン)
   - [7.2 MCP の OAuth 2.1 認可（動的クライアント登録）](#72-mcp-の-oauth-21-認可動的クライアント登録)
+  - [7.3 MCP サーバー](#73-mcp-サーバー)
 - [8. 拡張性設計（将来ビュー: ガント / カレンダー / カンバン）](#8-拡張性設計将来ビュー-ガント--カレンダー--カンバン)
   - [8.1 各ビューが必要とするもの](#81-各ビューが必要とするもの)
   - [8.2 拡張ポイントと方針](#82-拡張ポイントと方針)
@@ -104,7 +105,7 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 
 | #   | 要件                                    | 対応方針                                                                                                     |
 | --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| R1  | AI がプランニングしたタスクを管理       | `planning` スキルが画面を操作して登録（将来は MCP サーバー経由で REST/RPC）                                  |
+| R1  | AI がプランニングしたタスクを管理       | `planning` スキルが画面を操作して登録（MCP サーバー（§7.3）に起票のツールを足したら、そちら経由に切り替える） |
 | R2  | 並列度を上げたい                        | 依存のない `task` を並列レーンに。着手可能かどうか（前提タスクがすべて `done` か `closed` か）は依存から導出 |
 | R3  | 終わった / これから進めるタスクを見れる | status フィルタ・ビュー                                                                                      |
 | R4  | マインドマップ / Git ブランチ状に可視化 | 階層ツリー + タスクの依存DAG（ブランチ図）                                                                   |
@@ -134,7 +135,8 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 
 ![task-branch の構成（MCP サーバーとバックエンド）](architecture.drawio.png)
 
-- **バックエンドは自作しない**。Supabase が REST API・認証・ホスティングを提供。
+- **バックエンドは自作しない**。Supabase が REST API・認証・ホスティングを提供。自前のコードは MCP サーバー（Vercel の関数）だけで、利用者の JWT をそのまま Supabase の REST に渡す薄い層にとどめる（§7.3）。
+- 経路は2つ。画面は supabase-js で Supabase を直接呼ぶ。Claude Code は MCP サーバー（`/api/mcp`）を呼び、MCP サーバーが同じ JWT で Supabase の REST を呼ぶ。認可はどちらも Supabase Auth が行い、データは RLS で本人の範囲に絞る。
 - 複雑なロジック（循環検出・クリティカルパス・進捗集約）は **Postgres 関数（RPC）** に集約し、AI・フロント双方から同じ関数を呼ぶ。
 - ローカル開発は `supabase start`（Docker）。本番は同一マイグレーションを Supabase Cloud に `db push`。
 
@@ -147,7 +149,8 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 | フロント         | React 18 + TypeScript + Vite                | 軽量・高速・無料デプロイ可                   |
 | グラフ描画       | React Flow + dagre                          | 階層ツリー / DAG / CP 強調に最適             |
 | Supabase 接続    | `@supabase/supabase-js`                     | 標準クライアント                             |
-| デプロイ(将来)   | Vercel / Cloudflare Pages + Supabase Cloud  | 無料枠                                       |
+| MCP サーバー     | Vercel Functions + `@modelcontextprotocol/sdk` + `jose` | 画面と同じ Vercel のプロジェクトに置ける。SDK のステートレスな Streamable HTTP、JWKS での JWT 検証（§7.3） |
+| デプロイ         | Vercel + Supabase Cloud                     | 無料枠（§9 Q5）                              |
 
 ---
 
@@ -550,7 +553,7 @@ create policy task_comments_delete on task_comments
 
 ### 4.3 `planning` / `do` スキルの動作イメージ
 
-スキルはリポジトリの外（`~/.claude/skills/planning`、`~/.claude/skills/do`）に置く。今は API を直接呼ばず、Playwright MCP で task-branch の画面（<https://task-branch.vercel.app>）を操作して読み書きする。将来は MCP サーバー経由で REST / RPC を呼ぶ形に切り替える。
+スキルはリポジトリの外（`~/.claude/skills/planning`、`~/.claude/skills/do`）に置く。今は API を直接呼ばず、Playwright MCP で task-branch の画面（<https://task-branch.vercel.app>）を操作して読み書きする。MCP サーバー（§7.3）は Claude Code からの接続と確認用のツール（`list_projects`）まで動いている。起票・参照などのツールを足したら、スキルを MCP のツール経由に切り替える。
 
 **`planning` スキル（計画の登録）**
 
@@ -657,8 +660,13 @@ task-branch/
 ├─ supabase/
 │  ├─ config.toml
 │  └─ migrations/          # スキーマ・RPC 関数
-├─ web/                    # React + Vite フロント
+├─ web/                    # React + Vite フロント（Vercel の Root Directory）
 │  ├─ src/
+│  ├─ api/                 # Vercel の関数（MCP サーバー。§7.3）
+│  │  ├─ mcp.ts
+│  │  ├─ oauth-protected-resource.ts
+│  │  └─ _lib/             # 関数の共通コード（`_` 始まりは関数としてデプロイされない）
+│  ├─ vercel.json          # /.well-known と SPA の rewrite
 │  └─ package.json
 └─ .claude/
    └─ launch.json          # 開発サーバーの起動設定（planning / do スキルはリポジトリ外）
@@ -708,6 +716,62 @@ Claude Code は MCP の仕様に沿って、Supabase Auth の OAuth 2.1 サー�
 - ローカルの Supabase（Kong）では 6 のパスが 404 になり、メタデータは `/.well-known/oauth-authorization-server` と `/auth/v1/.well-known/oauth-authorization-server` で返る。issuer は `http://127.0.0.1:54321/auth/v1`。
 - 図のソースは PNG に埋め込んである（draw.io で開いて編集する）。
 
+### 7.3 MCP サーバー
+
+Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジェクトに、関数（`web/api/`）として置く。
+
+| 項目           | 内容                                                                                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| エンドポイント | `POST https://task-branch.vercel.app/api/mcp`（`web/api/mcp.ts`）。GET / DELETE は 405（`Allow: POST`）                                                                      |
+| 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
+| 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
+| Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。今は確認用の `list_projects`（自分のプロジェクトの id, name, description を作成順に返す）だけ                           |
+
+**JWT の検証**
+
+- `alg` は ES256 だけを受ける。`iss` は `<SUPABASE_URL>/auth/v1`、`aud` は `authenticated`。
+- `client_id` が入っていないトークン（画面のセッションのトークン）は拒否する。MCP 経由の操作を必ず AI として記録するため（§3.5）。
+- 通らないときは 401 と `WWW-Authenticate` を返す。トークンがないときは `Bearer resource_metadata="<origin>/.well-known/oauth-protected-resource/api/mcp"`、検証に失敗したときは `Bearer error="invalid_token", resource_metadata="…"`。拒否の理由は関数のログ（`[auth] トークンを拒否: …`）に出す。
+
+**保護リソースメタデータ（RFC 9728）**
+
+`/.well-known/oauth-protected-resource` と `/.well-known/oauth-protected-resource/api/mcp` の両方で、同じ JSON を返す（`web/vercel.json` の rewrite で `web/api/oauth-protected-resource.ts` に送る）。Claude Code が `WWW-Authenticate` の `resource_metadata` とルートの `/.well-known` のどちらを見ても通るようにするため。
+
+```json
+{
+  "resource": "https://task-branch.vercel.app/api/mcp",
+  "authorization_servers": ["https://<project-ref>.supabase.co/auth/v1"],
+  "bearer_methods_supported": ["header"]
+}
+```
+
+- `resource` と `resource_metadata` の origin は、環境変数ではなくリクエスト（`x-forwarded-proto` / `x-forwarded-host`）から作る。本番・プレビュー・ローカルを同じコードで動かすため。
+- CORS を開けている（`Access-Control-Allow-Origin: *`。GET / OPTIONS）。
+
+**環境変数**
+
+| 変数                | 値                                                                  |
+| ------------------- | ------------------------------------------------------------------- |
+| `SUPABASE_URL`      | 本番は `https://<project-ref>.supabase.co`、ローカルは `http://127.0.0.1:54321` |
+| `SUPABASE_ANON_KEY` | 画面と同じ publishable key（`VITE_SUPABASE_ANON_KEY` と同じ値）     |
+
+- Vercel には Production と Preview の両方に登録する（`VITE_` 付きの変数と同じ）。ローカルは `web/.env` に書く。
+- 起動時ではなく呼び出し時に読み、無ければ例外にする。未登録のまま本番に出すと、メタデータも含めて 500 になり、Claude Code は認可サーバーを見つけられない。
+- service_role キーは登録しない。
+
+**ツールの足し方**
+
+- `registerTools(server, db)` の中で `server.registerTool(名前, { title, description, inputSchema }, ハンドラ)` を呼ぶ。`db` は利用者の JWT 付きのクライアントなので、RLS がそのまま効く。
+- REST のエラーは例外にせず、`isError: true` のツールの結果として AI に返す（500 にしない）。
+- 関数のファイルを足すときは `web/api/` に置き、共通のコードは `web/api/_lib/` に置く。相対 import には拡張子（`.js`）を付ける。
+
+**本番での確認（2026-10-20）**
+
+- Claude Code（WSL）で `claude mcp add --transport http --scope user task-branch https://task-branch.vercel.app/api/mcp` → `/mcp` → Authenticate → 同意画面で許可、の順でつながり、`list_projects` が自分のプロジェクトだけを返した。
+- Claude Code は認可リクエストに `resource=https://task-branch.vercel.app/api/mcp`（RFC 8707）を付ける。Supabase はこれを受け付ける。
+- 同意画面のスコープは `email` だけだが、refresh_token も発行される。access_token の有効期間は 3600 秒。
+
 ---
 
 ## 8. 拡張性設計（将来ビュー: ガント / カレンダー / カンバン）
@@ -753,7 +817,7 @@ Claude Code は MCP の仕様に沿って、Supabase Auth の OAuth 2.1 サー�
 | Q2  | ストーリー間の順序     | 依存は同じストーリー内のタスク間のみ。ストーリーをまたぐ順序（例: 認証 → RLS）を依存で表すか、期間の並びだけで表すか |
 | Q3  | 見積りの再導入         | 初期はホップ数 CP。時間見積りが要るなら `estimate` 追加で重み付き CP へ                                              |
 | Q4  | 階層の段数固定         | **2段（story/task）に決定**。移行は §1.3.1                                                                           |
-| Q5  | フロントのデプロイ先   | Vercel / Cloudflare Pages（未定）                                                                                    |
+| Q5  | フロントのデプロイ先   | **Vercel に決定**。画面と MCP サーバー（Vercel の関数、§7.3）を同じプロジェクトに置く                              |
 | Q6  | 担当の既定値           | 新規タスクの `assignee_type` を人 / AI のどちらにするか。AI が起票するときの判断基準                                 |
 | Q7  | AI 担当の識別          | AI の場合もどのエージェント（Devin / Claude Code 等）かを持つか                                                      |
 | Q8  | 人の作業待ちの知らせ方 | 次に着手できるのが人の担当タスクだけになったとき、どう知らせるか                                                     |
@@ -768,4 +832,4 @@ Claude Code は MCP の仕様に沿って、Supabase Auth の OAuth 2.1 サー�
 1. 本 DD のレビュー・確定（特に §9）。
 2. `supabase init` + スキーマ/RPC のマイグレーション作成。
 3. React + Vite + React Flow の UI 雛形（初期4ビュー + §5.4 のビュー層）。
-4. `planning` / `do` スキルの定義（リポジトリ外。今は画面操作、将来は MCP サーバー経由で REST/RPC）。
+4. `planning` / `do` スキルの定義（リポジトリ外。今は画面操作。MCP サーバー（§7.3）に起票・参照のツールを足したら、そちら経由に切り替える）。

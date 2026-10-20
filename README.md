@@ -111,6 +111,31 @@ make mcp-dev                         # http://localhost:3000（画面と /api �
 - 関数のファイルを追加・削除したときは `vercel dev` を起動し直してください
 - Google ログイン（Supabase の `site_url`）は今まで通り `make dev`（5173）で行います
 
+ローカルの MCP サーバーは、`make dev` と `make mcp-dev` を起動したうえで、OAuth のフローを通すスクリプトで確かめます
+（動的登録 → ブラウザで同意 → トークン → MCP の `initialize` / `tools/list` / `list_projects` まで）。
+
+```bash
+bash scripts/oauth-flow-check.sh "" "" http://localhost:3000/api/mcp
+```
+
+#### Claude Code から MCP サーバーにつなぐ
+
+本番の MCP サーバー（`https://task-branch.vercel.app/api/mcp`）を Claude Code に登録します。
+構成と仕様は [DESIGN.md §7.3](./docs/DESIGN.md#73-mcp-サーバー) を参照。
+
+```bash
+claude mcp add --transport http --scope user task-branch https://task-branch.vercel.app/api/mcp
+```
+
+1. `claude` を起動して `/mcp` を開き、`task-branch` の **Authenticate** を選ぶ
+2. ブラウザで Google ログイン → 同意画面（`/oauth/consent`）で **許可**
+3. `/mcp` に `Connected to task-branch` と出たら、「task-branch の list_projects を呼んで」で自分のプロジェクトが返る
+
+- クライアントは初回に動的登録されます。Supabase 側で事前に作る必要はありません
+- ブラウザが自動で開かず URL を手でコピーするときは、`c` キーでコピーします。ターミナルで折り返された URL を
+  選んでコピーすると途中で切れ、`redirect_uri is required` などのエラーになります
+- トークン（access_token と refresh_token）は Claude Code が持ちます。止めるときは同意を取り消します（DESIGN.md §7.1）
+
 ### 3. plan スキルの配置
 
 `plan-skill/SKILL.md` を Claude Code のスキルとして配置します。
