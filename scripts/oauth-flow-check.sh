@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # OAuth 2.1 の認可コードフロー（PKCE）を MCP クライアントと同じ手順で通し、JWT の中身を確かめる。
-# 動的登録 → 認可（ブラウザで同意）→ トークン → REST 呼び出し → リフレッシュ の順に進む。
-# 使い方: bash scripts/oauth-flow-check.sh [Supabase の URL] [anon key]
+# 動的登録 → 認可（ブラウザで同意）→ トークン → REST 呼び出し → リフレッシュ（→ MCP）の順に進む。
+# 使い方: bash scripts/oauth-flow-check.sh [Supabase の URL] [anon key] [MCP の URL]
 #   既定はローカル（http://127.0.0.1:54321 と ローカル publishable key）
 #   同意画面へ進むには、フロント（make dev）も起動しておく
+#   MCP の URL（例 http://localhost:3000/api/mcp）を渡すと、取ったトークンで MCP のツールも呼ぶ（make mcp-dev）
 set -euo pipefail
 
 URL="${1:-http://127.0.0.1:54321}"
 KEY="${2:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}"
+MCP_URL="${3:-}"
 REDIRECT_URI="http://localhost:8976/callback"
 
 json() { # key -> 標準入力の JSON から値を取り出す
@@ -84,6 +86,32 @@ refreshed=$(post /auth/v1/oauth/token \
 new_access=$(echo "$refreshed" | json access_token)
 [ -n "$new_access" ] && [ "$new_access" != "$access" ] || { echo "❌ 新しい access_token が取れません" >&2; exit 1; }
 echo "新しい access_token を取得（client_id: $(jwt_part "$new_access" 1 | json client_id)）"
+
+if [ -n "$MCP_URL" ]; then
+  mcp() { # body [token] -> MCP の応答（ステータス行 + 本文）
+    local auth=()
+    [ -n "${2:-}" ] && auth=(-H "Authorization: Bearer $2")
+    curl -s -w '\nHTTP %{http_code}' "$MCP_URL" "${auth[@]}" \
+      -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "$1"
+    echo
+  }
+
+  echo
+  echo "== 7. MCP: トークンなし（401 と WWW-Authenticate）"
+  curl -s -o /dev/null -D - -X POST "$MCP_URL" | grep -iE '^(HTTP|www-authenticate)'
+
+  echo
+  echo "== 8. MCP: initialize"
+  mcp '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"oauth-flow-check","version":"0"}}}' "$new_access"
+
+  echo
+  echo "== 9. MCP: tools/list"
+  mcp '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' "$new_access"
+
+  echo
+  echo "== 10. MCP: tools/call list_projects（自分のプロジェクトだけが返る）"
+  mcp '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_projects","arguments":{}}}' "$new_access"
+fi
 
 echo
 echo "✅ 完了"

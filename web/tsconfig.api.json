@@ -9,11 +9,12 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["node"],
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["api"]
+  "include": ["api", "package.json"]
 }
