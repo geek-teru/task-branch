@@ -17,3 +17,21 @@ export function supabaseAnonKey(): string {
 export function supabaseIssuer(): string {
   return `${supabaseUrl()}/auth/v1`;
 }
+
+// Supabase Auth が公開する署名鍵（ES256 の公開鍵）。
+export function supabaseJwksUrl(): string {
+  return `${supabaseIssuer()}/.well-known/jwks.json`;
+}
+
+// 呼ばれた URL の origin。本番・プレビュー・ローカルで同じコードにするため、環境変数ではなくリクエストから作る。
+export function requestOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const proto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim() || url.protocol.replace(/:$/, "");
+  const host = req.headers.get("x-forwarded-host")?.split(",")[0].trim() || req.headers.get("host") || url.host;
+  return `${proto}://${host}`;
+}
+
+// MCP エンドポイントの保護リソースメタデータ（RFC 9728）の URL。WWW-Authenticate で案内する。
+export function resourceMetadataUrl(req: Request): string {
+  return `${requestOrigin(req)}/.well-known/oauth-protected-resource/api/mcp`;
+}
