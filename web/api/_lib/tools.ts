@@ -27,6 +27,8 @@ function withEditable(comment: CommentRow) {
   return { ...comment, editable: comment.author_type === "ai" };
 }
 
+const COMMENT_NOT_EDITABLE = "コメントが見つからないか、編集・削除できません（AI が書いたコメントだけが対象）";
+
 export function registerTools(server: McpServer, db: SupabaseClient): void {
   server.registerTool(
     "list_projects",
@@ -86,6 +88,43 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
       const { data, error } = await db.from("task_comments").insert({ task_id, body }).select(COMMENT_COLUMNS).single();
       if (error) return restError(error);
       return json(withEditable(data as CommentRow));
+    },
+  );
+
+  server.registerTool(
+    "update_task_comment",
+    {
+      title: "タスクのコメントの編集",
+      description:
+        "AI が書いたコメント（list_task_comments で editable が true のもの）の本文を書き換える。人のコメントは編集できない。更新後のコメントを返す",
+      inputSchema: {
+        comment_id: z.uuid().describe("コメントの id"),
+        body: z.string().trim().min(1).describe("新しい本文（Markdown）"),
+      },
+    },
+    async ({ comment_id, body }) => {
+      // updated_at はトリガ check_task_comment() が now() にする。RLS で弾かれた行はエラーにならず 0 行になる。
+      const { data, error } = await db.from("task_comments").update({ body }).eq("id", comment_id).select(COMMENT_COLUMNS);
+      if (error) return restError(error);
+      if (data.length === 0) return toolError(COMMENT_NOT_EDITABLE);
+      return json(withEditable(data[0] as CommentRow));
+    },
+  );
+
+  server.registerTool(
+    "delete_task_comment",
+    {
+      title: "タスクのコメントの削除",
+      description:
+        "AI が書いたコメント（list_task_comments で editable が true のもの）を削除する。物理削除で元に戻せない。人のコメントは削除できない",
+      inputSchema: { comment_id: z.uuid().describe("コメントの id") },
+    },
+    async ({ comment_id }) => {
+      // 画面の deleteTaskComment と同じく、RLS で弾かれた 0 行を失敗として扱う。
+      const { data, error } = await db.from("task_comments").delete().eq("id", comment_id).select("id");
+      if (error) return restError(error);
+      if (data.length === 0) return toolError(COMMENT_NOT_EDITABLE);
+      return json({ deleted: data[0].id });
     },
   );
 }
