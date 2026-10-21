@@ -104,8 +104,9 @@ export function TaskComments({ taskId }: { taskId: string }) {
     }
   }
 
+  // AI comments carry the human's uid (the AI acts on the human's token), so check author_type first.
   const authorLabel = (c: TaskComment) =>
-    myId && c.author_id === myId ? "自分" : c.author_type === "ai" ? "AI" : "人";
+    c.author_type === "ai" ? "AI" : myId && c.author_id === myId ? "自分" : "人";
 
   return (
     <div style={{ marginTop: 4, paddingTop: 12, borderTop: "1px solid #e5e8eb" }}>
