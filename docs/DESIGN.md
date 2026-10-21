@@ -553,7 +553,7 @@ create policy task_comments_delete on task_comments
 
 ### 4.3 `planning` / `do` スキルの動作イメージ
 
-スキルはリポジトリの外（`~/.claude/skills/planning`、`~/.claude/skills/do`）に置く。今は API を直接呼ばず、Playwright MCP で task-branch の画面（<https://task-branch.vercel.app>）を操作して読み書きする。MCP サーバー（§7.3）は Claude Code からの接続と確認用のツール（`list_projects`）まで動いている。起票・参照などのツールを足したら、スキルを MCP のツール経由に切り替える。
+スキルはリポジトリの外（`~/.claude/skills/planning`、`~/.claude/skills/do`）に置く。今は API を直接呼ばず、Playwright MCP で task-branch の画面（<https://task-branch.vercel.app>）を操作して読み書きする。MCP サーバー（§7.3）は Claude Code からの接続と、確認用のツール（`list_projects`）・コメントのツール（一覧・投稿・編集・削除）まで動いている。起票・参照などのツールを足したら、スキルを MCP のツール経由に切り替える。
 
 **`planning` スキル（計画の登録）**
 
@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。今は確認用の `list_projects`（自分のプロジェクトの id, name, description を作成順に返す）だけ                           |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects` と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -766,11 +766,40 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - REST のエラーは例外にせず、`isError: true` のツールの結果として AI に返す（500 にしない）。
 - 関数のファイルを足すときは `web/api/` に置き、共通のコードは `web/api/_lib/` に置く。相対 import には拡張子（`.js`）を付ける。
 
+**ツールの一覧**
+
+| ツール                | 入力                     | 返り値                                                                                     |
+| --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
+| `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` の配列（作成順）                        |
+| `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
+| `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
+| `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
+| `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
+
+**コメントのツール**
+
+`task_comments`（§3.2）を AI から読み書きする。作業前に経緯を確かめ、作業メモ・確認したこと・申し送りを残すのに使う。
+
+- コメントの形は `id` / `author_type`（`human` / `ai`）/ `body` / `created_at` / `updated_at` / `editable`。`author_id` は人と AI が同じ uid で見分けに使えないため返さない。
+- MCP 経由の操作は常に AI（`current_actor_type()` = `ai`、§3.5）なので、`editable` は `author_type = 'ai'` のときだけ `true` になる。RLS の `task_comments_update` / `delete` と同じ条件。
+- `add_task_comment` は `author_type` / `author_id` を送らず、DB の既定値（`current_actor_type()` / `current_actor_id()`）に任せる。画面では投稿者が「AI」と表示され、人の画面には AI のコメントの編集・削除ボタンは出ない（人と AI は別の投稿者）。
+- `body` は前後の空白を落として 1 文字以上。画面では Markdown として解釈せず、プレーンテキストで表示する（§3.2）。
+- `list_task_comments` は先にタスクを引き、見つからない（他人のものを含む）ときと、ストーリーの id を渡したときは `isError` にする。コメントが 0 件のタスクと区別するため。
+- `update_task_comment` / `delete_task_comment` は、RLS で弾かれた行がエラーにならず 0 行になるため、0 行を失敗として `isError`（「コメントが見つからないか、編集・削除できません（AI が書いたコメントだけが対象）」）にする。人のコメントの本文と `updated_at` は変わらない。
+- `updated_at` はトリガ `check_task_comment()` が now() にする。
+
 **本番での確認（2026-10-20）**
 
 - Claude Code（WSL）で `claude mcp add --transport http --scope user task-branch https://task-branch.vercel.app/api/mcp` → `/mcp` → Authenticate → 同意画面で許可、の順でつながり、`list_projects` が自分のプロジェクトだけを返した。
 - Claude Code は認可リクエストに `resource=https://task-branch.vercel.app/api/mcp`（RFC 8707）を付ける。Supabase はこれを受け付ける。
 - 同意画面のスコープは `email` だけだが、refresh_token も発行される。access_token の有効期間は 3600 秒。
+
+**本番での確認（コメントのツール、2026-10-21）**
+
+- `list_task_comments` で、人のコメントは `editable: false`、AI のコメントは `editable: true` で返った。
+- `add_task_comment` のコメントは画面で投稿者が「AI」と表示され、編集・削除ボタンは出なかった。
+- AI のコメントの `update_task_comment` / `delete_task_comment` は成功した（削除は `{"deleted": "<id>"}`）。
+- 人のコメントの編集・削除は `isError`（上記のメッセージ）になり、本文と `updated_at` は変わらなかった。
 
 ---
 
