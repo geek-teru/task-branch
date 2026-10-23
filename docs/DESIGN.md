@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -774,6 +774,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
+| `start_task`          | `task_id`                | 更新後のタスク（`id` / `title` / `status` / `updated_at` / `completed_at` / `closed_at`）。`todo` を `in_progress` にする（下記「作業進行のツール」） |
+| `complete_task`       | `task_id`, `result`      | `{ task, comment }`。`done` にし、`result`（作業結果）を AI のコメントとして投稿する（下記「作業進行のツール」） |
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
 | `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
@@ -799,6 +801,16 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - 候補が無いとき（見えないプロジェクトの id を含む）は `isError` にせず `{ task: null, message }` を返す。
 - 状態は変えない（着手は `start_task`）。タスク間の依存関係はまだ見ない（依存の設計後に足す）。
 - 親ストーリーの `status` で絞るため、ストーリーを `!inner` で埋め込んで1回の REST で取り、並べ替えは関数の中で行う（埋め込んだ列では並べられないため）。
+
+**作業進行のツール**
+
+AI がタスクに着手し、終えたら作業結果を残す。DB の変更は持たず、RLS の下で `tasks.status` を更新してコメントを投稿するだけ。
+
+- `start_task`: `todo` を `in_progress` にする。すでに `in_progress` なら何も変えずに返す（呼び直してよい）。`done` / `closed` は `isError`。
+- `complete_task`: `todo` / `in_progress` を `done` にし、`result`（前後の空白を落として 1 文字以上）を `add_task_comment` と同じく AI のコメントとして投稿する。`done` / `closed` は作業結果を二重に記録しないよう `isError`。`completed_at` はトリガ `touch_updated_at()` が入れる。
+- 状態は、引いたときの状態のままのときだけ更新する（`status in (...)` を条件に付ける）。間に別の操作で変わっていたら 0 行になり、`isError` にする。
+- 状態を `done` にしたあとでコメントの投稿に失敗したら `isError` で返し、状態は `done` になったこと・`add_task_comment` で記録し直すことを伝える。
+- 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`。`get_task_context` と同じ扱い。
 
 **コメントのツール**
 
