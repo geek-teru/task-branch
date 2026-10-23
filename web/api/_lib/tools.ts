@@ -66,6 +66,11 @@ async function lastSortOrder(db: SupabaseClient, column: "project_id" | "parent_
   return { last: (data?.[0]?.sort_order as number | undefined) ?? null, error };
 }
 
+// get_task_context で返すタスク・親ストーリー・プロジェクトの列。親とプロジェクトは外部キーの列名で埋め込む。
+// supabase-js が select の文字列から型を推論するので、連結せず1つのリテラルにする。
+const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_type, start_date, due_date, metadata, created_at, updated_at, completed_at, closed_at,
+  story:parent_id(id, title, description, status, context), project:project_id(id, name, description)`;
+
 export function registerTools(server: McpServer, db: SupabaseClient): void {
   server.registerTool(
     "list_projects",
@@ -258,6 +263,33 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
         .order("created_at", { ascending: true });
       if (error) return restError(error);
       return json((data as CommentRow[]).map(withEditable));
+    },
+  );
+
+  server.registerTool(
+    "get_task_context",
+    {
+      title: "タスクの文脈の取得",
+      description:
+        "タスクの中身と、親ストーリー（context はストーリーのドキュメントで、決定事項などの正の情報）、プロジェクト、" +
+        "コメント（過去の作業メモ・申し送り。list_task_comments と同じ形で古い順）をまとめて返す。作業を始める前に使う",
+      inputSchema: { task_id: z.uuid().describe("タスクの id（ストーリーは不可）") },
+    },
+    async ({ task_id }) => {
+      const { data: task, error: taskError } = await db.from("tasks").select(TASK_CONTEXT_COLUMNS).eq("id", task_id).maybeSingle();
+      if (taskError) return restError(taskError);
+      if (!task) return toolError(`タスクが見つかりません: ${task_id}`);
+      if (task.level === "story") return toolError(`ストーリーの id です。タスクの id を指定してください: ${task_id}`);
+
+      const { data: comments, error } = await db
+        .from("task_comments")
+        .select(COMMENT_COLUMNS)
+        .eq("task_id", task_id)
+        .order("created_at", { ascending: true });
+      if (error) return restError(error);
+
+      const { level: _level, story, project, ...rest } = task;
+      return json({ task: rest, story, project, comments: (comments as CommentRow[]).map(withEditable) });
     },
   );
 
