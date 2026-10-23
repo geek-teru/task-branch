@@ -29,6 +29,43 @@ function withEditable(comment: CommentRow) {
 
 const COMMENT_NOT_EDITABLE = "コメントが見つからないか、編集・削除できません（AI が書いたコメントだけが対象）";
 
+const externalId = z.string().trim().min(1).describe("呼び出し側で決める識別子。metadata.external_id に入れ、同じプロジェクトに同じ値があれば作らない");
+
+const planTask = z.object({
+  external_id: externalId.optional(),
+  title: z.string().trim().min(1).describe("タスク名"),
+  description: z.string().optional().describe("タスクの説明（仕様など）"),
+  start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
+  due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
+});
+
+const planStory = z.object({
+  id: z.uuid().optional().describe("既存のストーリーにタスクを足すときのストーリーの id。指定したら title などは使わない"),
+  external_id: externalId.optional(),
+  title: z.string().trim().min(1).optional().describe("ストーリー名（新規のとき必須）"),
+  description: z.string().optional().describe("ストーリーの説明"),
+  context: z.string().optional().describe("ストーリーのコンテキスト（Markdown）"),
+  start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
+  due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
+  active: z.boolean().optional().describe("true なら着手済み（カンバンに出る）。既定は false（バックログ）"),
+  tasks: z.array(planTask).optional().describe("ストーリー配下に作るタスク"),
+});
+
+type PlanRow = { id: string; external_id: string | null; title: string; created: boolean };
+type ExistingRow = { id: string; project_id: string; level: "story" | "task"; title: string; metadata: { external_id?: string } };
+
+// 末尾の sort_order。無ければ fallback（画面の addRootStory / addChild と同じ並べ方）。
+async function lastSortOrder(db: SupabaseClient, column: "project_id" | "parent_id", value: string, level: "story" | "task") {
+  const { data, error } = await db
+    .from("tasks")
+    .select("sort_order")
+    .eq(column, value)
+    .eq("level", level)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  return { last: (data?.[0]?.sort_order as number | undefined) ?? null, error };
+}
+
 // get_task_context で返すタスク・親ストーリー・プロジェクトの列。親とプロジェクトは外部キーの列名で埋め込む。
 // supabase-js が select の文字列から型を推論するので、連結せず1つのリテラルにする。
 const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_type, start_date, due_date, metadata, created_at, updated_at, completed_at, closed_at,
@@ -48,6 +85,158 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
         .order("created_at", { ascending: true });
       if (error) return restError(error);
       return json(data);
+    },
+  );
+
+  server.registerTool(
+    "create_plan",
+    {
+      title: "ストーリーとタスクの一括登録",
+      description:
+        "プロジェクトにストーリーとその配下のタスクをまとめて登録する。既存のストーリーにタスクを足すときは stories[].id を指定する。" +
+        "external_id が同じプロジェクトの既存の行と一致したら作らず、その id を created: false で返すので、失敗したら同じ入力で呼び直してよい。" +
+        "新規はすべて status todo で、既存の末尾に並ぶ",
+      inputSchema: {
+        project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）"),
+        stories: z.array(planStory).min(1).describe("登録するストーリー（配下のタスクを含む）"),
+      },
+    },
+    async ({ project_id, stories }) => {
+      for (const s of stories) {
+        if (!s.id && !s.title) return toolError("stories[] には id（既存のストーリー）か title（新規）のどちらかが要ります");
+      }
+
+      // 入力の中の external_id の重複は、どちらを正とするか決められないので弾く。
+      const inputIds = stories.flatMap((s) => [...(s.id ? [] : [s.external_id]), ...(s.tasks ?? []).map((t) => t.external_id)]);
+      const externalIds = inputIds.filter((v): v is string => v !== undefined);
+      const duplicated = externalIds.filter((v, i) => externalIds.indexOf(v) !== i);
+      if (duplicated.length > 0) return toolError(`external_id が入力の中で重複しています: ${[...new Set(duplicated)].join(", ")}`);
+
+      const { data: project, error: projectError } = await db.from("projects").select("id").eq("id", project_id).maybeSingle();
+      if (projectError) return restError(projectError);
+      if (!project) return toolError(`プロジェクトが見つかりません: ${project_id}`);
+
+      const columns = "id, project_id, level, title, metadata";
+      const byExternalId = new Map<string, ExistingRow>();
+      if (externalIds.length > 0) {
+        const { data, error } = await db
+          .from("tasks")
+          .select(columns)
+          .eq("project_id", project_id)
+          .in("metadata->>external_id", externalIds);
+        if (error) return restError(error);
+        for (const row of data as ExistingRow[]) byExternalId.set(row.metadata.external_id!, row);
+      }
+
+      const storyIds = stories.flatMap((s) => (s.id ? [s.id] : []));
+      const byId = new Map<string, ExistingRow>();
+      if (storyIds.length > 0) {
+        const { data, error } = await db.from("tasks").select(columns).in("id", storyIds);
+        if (error) return restError(error);
+        for (const row of data as ExistingRow[]) byId.set(row.id, row);
+      }
+
+      // 既存の行と level が食い違うものは、作り直しも流用もできないので何も作らずに弾く。
+      for (const s of stories) {
+        if (s.id) {
+          const row = byId.get(s.id);
+          if (!row || row.project_id !== project_id || row.level !== "story") {
+            return toolError(`このプロジェクトのストーリーが見つかりません: ${s.id}`);
+          }
+        } else if (s.external_id && byExternalId.get(s.external_id)?.level === "task") {
+          return toolError(`external_id ${s.external_id} は既存のタスクに使われています（ストーリーには使えません）`);
+        }
+        for (const t of s.tasks ?? []) {
+          if (t.external_id && byExternalId.get(t.external_id)?.level === "story") {
+            return toolError(`external_id ${t.external_id} は既存のストーリーに使われています（タスクには使えません）`);
+          }
+        }
+      }
+
+      // ストーリーを一括で作る。並びはプロジェクトのストーリーの末尾に続ける。
+      const newStories = stories.filter((s) => !s.id && !(s.external_id && byExternalId.has(s.external_id)));
+      const storyRows = new Map<(typeof stories)[number], PlanRow>();
+      if (newStories.length > 0) {
+        const { last, error: lastError } = await lastSortOrder(db, "project_id", project_id, "story");
+        if (lastError) return restError(lastError);
+        const now = new Date().toISOString();
+        const { data, error } = await db
+          .from("tasks")
+          .insert(
+            newStories.map((s, i) => ({
+              project_id,
+              level: "story",
+              title: s.title,
+              description: s.description ?? null,
+              context: s.context ?? null,
+              start_date: s.start_date ?? null,
+              due_date: s.due_date ?? null,
+              activated_at: s.active ? now : null,
+              sort_order: (last ?? 0) + 1 + i,
+              metadata: s.external_id ? { external_id: s.external_id } : {},
+            })),
+          )
+          .select("id, title");
+        if (error) return restError(error);
+        newStories.forEach((s, i) => storyRows.set(s, { id: data[i].id, external_id: s.external_id ?? null, title: data[i].title, created: true }));
+      }
+      for (const s of stories) {
+        if (storyRows.has(s)) continue;
+        const row = s.id ? byId.get(s.id)! : byExternalId.get(s.external_id!)!;
+        storyRows.set(s, { id: row.id, external_id: row.metadata.external_id ?? null, title: row.title, created: false });
+      }
+
+      // タスクを一括で作る。並びはストーリーごとに、配下のタスクの末尾に続ける。
+      const taskInserts: Record<string, unknown>[] = [];
+      const taskRows = new Map<(typeof stories)[number], (PlanRow | number)[]>();
+      for (const s of stories) {
+        const story = storyRows.get(s)!;
+        let next: number | null = null;
+        const rows: (PlanRow | number)[] = [];
+        for (const t of s.tasks ?? []) {
+          const existing = t.external_id ? byExternalId.get(t.external_id) : undefined;
+          if (existing) {
+            rows.push({ id: existing.id, external_id: t.external_id!, title: existing.title, created: false });
+            continue;
+          }
+          if (next === null) {
+            const { last, error } = story.created ? { last: null, error: null } : await lastSortOrder(db, "parent_id", story.id, "task");
+            if (error) return restError(error);
+            next = (last ?? -1) + 1;
+          }
+          rows.push(taskInserts.length);
+          taskInserts.push({
+            project_id,
+            parent_id: story.id,
+            level: "task",
+            title: t.title,
+            description: t.description ?? null,
+            start_date: t.start_date ?? null,
+            due_date: t.due_date ?? null,
+            sort_order: next++,
+            metadata: t.external_id ? { external_id: t.external_id } : {},
+          });
+        }
+        taskRows.set(s, rows);
+      }
+      let inserted: { id: string; title: string; metadata: { external_id?: string } }[] = [];
+      if (taskInserts.length > 0) {
+        const { data, error } = await db.from("tasks").insert(taskInserts).select("id, title, metadata");
+        if (error) return restError(error);
+        inserted = data;
+      }
+
+      return json({
+        project_id,
+        stories: stories.map((s) => ({
+          ...storyRows.get(s)!,
+          tasks: taskRows.get(s)!.map((r) =>
+            typeof r === "number"
+              ? { id: inserted[r].id, external_id: inserted[r].metadata.external_id ?? null, title: inserted[r].title, created: true }
+              : r,
+          ),
+        })),
+      });
     },
   );
 
