@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`get_task_context`（下記「タスクの文脈のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -773,6 +773,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` の配列（作成順）                        |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
+| `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
 | `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
@@ -787,6 +788,17 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - `comments`: `list_task_comments` と同じコメントの形の配列（古い順）。
 - タスク・親・プロジェクトは1回の REST で取る（外部キーの列名 `parent_id` / `project_id` で埋め込む）。コメントは別に引く。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`。`list_task_comments` と同じ扱い。
+
+**次のタスクのツール**
+
+`get_next_task` は、AI が次に着手するタスクを1件選んで返す。
+
+- 候補は、進行中（`status = 'in_progress'`）のストーリー配下で、`status` が `todo`、`assignee_type` が `human` でない（null か `ai`）タスク。カンバンに出ているタスクのうち、人の担当を除いたもの。
+- 並びはプロジェクトの作成順 → ストーリーの `sort_order` → タスクの `sort_order`（カンバンの並びと同じ）で、先頭を返す。`project_id` を渡したらそのプロジェクトだけから選ぶ。
+- `task` は `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`、`story` は `id` / `title`、`project` は `id` / `name`。中身を読むときは `get_task_context` を呼ぶ。
+- 候補が無いとき（見えないプロジェクトの id を含む）は `isError` にせず `{ task: null, message }` を返す。
+- 状態は変えない（着手は `start_task`）。タスク間の依存関係はまだ見ない（依存の設計後に足す）。
+- 親ストーリーの `status` で絞るため、ストーリーを `!inner` で埋め込んで1回の REST で取り、並べ替えは関数の中で行う（埋め込んだ列では並べられないため）。
 
 **コメントのツール**
 
