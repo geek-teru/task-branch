@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects` と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`get_task_context`（下記「タスクの文脈のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -772,9 +772,21 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` の配列（作成順）                        |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
+| `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
 | `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
+
+**タスクの文脈のツール**
+
+`get_task_context` は、AI が作業を始める前に読むものを1回で返す。
+
+- `task`: `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date` / `metadata` / `created_at` / `updated_at` / `completed_at` / `closed_at`。
+- `story`: 親ストーリーの `id` / `title` / `description` / `status` / `context`。`context` はストーリーのドキュメント（§3.2）で、決定事項などの正の情報。
+- `project`: `id` / `name` / `description`。
+- `comments`: `list_task_comments` と同じコメントの形の配列（古い順）。
+- タスク・親・プロジェクトは1回の REST で取る（外部キーの列名 `parent_id` / `project_id` で埋め込む）。コメントは別に引く。
+- 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`。`list_task_comments` と同じ扱い。
 
 **コメントのツール**
 
