@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`export_project`（下記「プロジェクトの全体のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`export_project`（下記「プロジェクトの全体のツール」）、`find_items`（下記「検索のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -772,6 +772,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` の配列（作成順）                        |
 | `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
+| `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
@@ -789,6 +790,16 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - `project`: `id` / `name` / `description` / `created_at`。`stories[]`: `id` / `title` / `description` / `context` / `activated_at` / `status` / `sort_order` / `start_date` / `due_date` / `progress` / `metadata` / `tasks[]`。`tasks[]`: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_id` / `sort_order` / `start_date` / `due_date` / `metadata`。
 - コメントは含まない（タスクごとに `get_task_context` で取る）。
 - 見つからない（他人のものを含む）プロジェクトは RLS で見えず RPC が `null` を返すので、`isError`（「プロジェクトが見つかりません」）にする。
+
+**検索のツール**
+
+`find_items` は、短縮 ID（「/do 2215041f」）や名前で渡されたものを id に引き直すのに使う。プロジェクトをまたいで探す。
+
+- `query`（前後の空白を落として 1 文字以上）: id は前方一致、名前（プロジェクトは `name`、ストーリー・タスクは `title`）は部分一致で、大文字小文字を区別しない。完全な uuid を渡したらその id の1件だけを返す。
+- `kind`（任意）: `project` / `story` / `task` で絞り込む。
+- `items` の各要素は `kind` / `id` と、プロジェクトは `name`、ストーリーは `title` / `status` / `project`、タスクは `title` / `status` / `story` / `project`。`story` は `id` / `title`、`project` は `id` / `name`。中身を読むときは `get_task_context` などを呼ぶ。
+- 並びはプロジェクト → ストーリー → タスクで、それぞれプロジェクトの作成順 → ストーリーの `sort_order` → タスクの `sort_order`。20 件を超えたら先頭の 20 件だけ返し、`truncated: true` にする。見つからなければ `items` は空（`isError` にしない）。
+- uuid は PostgREST で前方一致できないため、自分の `projects` と `tasks` を RLS の下で全部取り（1000 行ずつ `range` で分ける）、関数の中で絞り込む。マイグレーションは持たない。件数が増えて重くなったら、`id::text` の前方一致の RPC に移す。
 
 **タスクの文脈のツール**
 
