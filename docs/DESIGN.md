@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`find_items`（下記「検索のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`export_project`（下記「プロジェクトの全体のツール」）、`find_items`（下記「検索のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -771,6 +771,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | ツール                | 入力                     | 返り値                                                                                     |
 | --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` の配列（作成順）                        |
+| `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
@@ -780,6 +781,15 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
 | `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
+
+**プロジェクトの全体のツール**
+
+`export_project` は、計画の現状把握とタスクの一覧のために、プロジェクトを1回で返す。
+
+- RPC `export_project(project)`（画面のエクスポートと同じ）を呼び、返り値の JSON に手を加えずに返す。
+- `project`: `id` / `name` / `description` / `created_at`。`stories[]`: `id` / `title` / `description` / `context` / `activated_at` / `status` / `sort_order` / `start_date` / `due_date` / `progress` / `metadata` / `tasks[]`。`tasks[]`: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_id` / `sort_order` / `start_date` / `due_date` / `metadata`。
+- コメントは含まない（タスクごとに `get_task_context` で取る）。
+- 見つからない（他人のものを含む）プロジェクトは RLS で見えず RPC が `null` を返すので、`isError`（「プロジェクトが見つかりません」）にする。
 
 **検索のツール**
 
