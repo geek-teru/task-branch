@@ -116,6 +116,25 @@ async function updateStatus(
   return { task: data[0] as TaskStatusRow };
 }
 
+// find_items で返す件数の上限。超えたら truncated: true を付ける。
+const FIND_ITEMS_LIMIT = 20;
+
+// REST は1回に返す行数に上限（Supabase の max_rows、既定 1000）があるので、range で分けて全部取る。
+const PAGE_SIZE = 1000;
+
+type FindProjectRow = { id: string; name: string; created_at: string };
+type FindTaskRow = { id: string; project_id: string; parent_id: string | null; level: "story" | "task"; title: string; status: string; sort_order: number };
+
+async function selectAll<T>(db: SupabaseClient, table: string, columns: string, order: string) {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await db.from(table).select(columns).order(order, { ascending: true }).order("id").range(from, from + PAGE_SIZE - 1);
+    if (error) return { rows, error };
+    rows.push(...(data as T[]));
+    if (data.length < PAGE_SIZE) return { rows, error: null };
+  }
+}
+
 export function registerTools(server: McpServer, db: SupabaseClient): void {
   server.registerTool(
     "list_projects",
@@ -130,6 +149,59 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
         .order("created_at", { ascending: true });
       if (error) return restError(error);
       return json(data);
+    },
+  );
+
+  server.registerTool(
+    "find_items",
+    {
+      title: "プロジェクト・ストーリー・タスクの検索",
+      description:
+        "自分のプロジェクト・ストーリー・タスクを横断で探す。query は短縮 ID（id の先頭数桁。前方一致）か名前の一部（部分一致、大文字小文字を区別しない）。" +
+        "完全な uuid を渡したらその1件だけ返す。返り値は { items, truncated }。items の各要素は kind / id / title（プロジェクトは name）/ status（プロジェクトは無し）と、" +
+        `親の story（id, title）・project（id, name）。並びはプロジェクト → ストーリー → タスクで、${FIND_ITEMS_LIMIT} 件を超えたら先頭だけ返して truncated: true。見つからなければ items は空`,
+      inputSchema: {
+        query: z.string().trim().min(1).describe("短縮 ID（id の先頭数桁）か、名前の一部"),
+        kind: z.enum(["project", "story", "task"]).optional().describe("種類で絞り込む。省略したらすべて"),
+      },
+    },
+    async ({ query, kind }) => {
+      // uuid は PostgREST で前方一致できないので、自分の行を RLS の下で全部取って関数の中で絞り込む。
+      const projects = await selectAll<FindProjectRow>(db, "projects", "id, name, created_at", "created_at");
+      if (projects.error) return restError(projects.error);
+      const tasks = kind === "project" ? { rows: [], error: null } : await selectAll<FindTaskRow>(db, "tasks", "id, project_id, parent_id, level, title, status, sort_order", "sort_order");
+      if (tasks.error) return restError(tasks.error);
+
+      const q = query.toLowerCase();
+      const exact = z.uuid().safeParse(q).success;
+      const matches = (id: string, name: string) => (exact ? id === q : id.startsWith(q) || name.toLowerCase().includes(q));
+
+      const projectById = new Map(projects.rows.map((p) => [p.id, p]));
+      const projectOrder = new Map(projects.rows.map((p, i) => [p.id, i]));
+      const storyById = new Map(tasks.rows.filter((t) => t.level === "story").map((t) => [t.id, t]));
+      const byOrder = (a: FindTaskRow, b: FindTaskRow) => projectOrder.get(a.project_id)! - projectOrder.get(b.project_id)! || a.sort_order - b.sort_order;
+      const project = (id: string) => ({ id, name: projectById.get(id)!.name });
+
+      const items = [
+        ...(kind && kind !== "project" ? [] : projects.rows.filter((p) => matches(p.id, p.name)).map((p) => ({ kind: "project", id: p.id, name: p.name }))),
+        ...(kind && kind !== "story"
+          ? []
+          : [...storyById.values()]
+              .filter((s) => matches(s.id, s.title))
+              .sort(byOrder)
+              .map((s) => ({ kind: "story", id: s.id, title: s.title, status: s.status, project: project(s.project_id) }))),
+        ...(kind && kind !== "task"
+          ? []
+          : tasks.rows
+              .filter((t) => t.level === "task" && matches(t.id, t.title))
+              // タスクの sort_order はストーリーごとの連番なので、ストーリーの並び → タスクの並びで並べる。
+              .sort((a, b) => byOrder(storyById.get(a.parent_id!)!, storyById.get(b.parent_id!)!) || a.sort_order - b.sort_order)
+              .map((t) => {
+                const story = storyById.get(t.parent_id!)!;
+                return { kind: "task", id: t.id, title: t.title, status: t.status, story: { id: story.id, title: story.title }, project: project(t.project_id) };
+              })),
+      ];
+      return json({ items: items.slice(0, FIND_ITEMS_LIMIT), truncated: items.length > FIND_ITEMS_LIMIT });
     },
   );
 
