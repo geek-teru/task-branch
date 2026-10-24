@@ -134,6 +134,25 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
   );
 
   server.registerTool(
+    "export_project",
+    {
+      title: "プロジェクトの全体の取得",
+      description:
+        "プロジェクトと、配下のストーリー（context・activated_at・status・期間・progress 込み）とタスクを入れ子の JSON で返す" +
+        "（format task-branch/project、version 4。画面のエクスポートと同じ形）。計画の現状把握・タスクの一覧に使う。" +
+        "コメントは含まない（get_task_context で取る）",
+      inputSchema: { project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）") },
+    },
+    async ({ project_id }) => {
+      const { data, error } = await db.rpc("export_project", { project: project_id });
+      if (error) return restError(error);
+      // 他人のプロジェクトや存在しない id は RLS で見えず、RPC が null を返す。
+      if (data === null) return toolError(`プロジェクトが見つかりません: ${project_id}`);
+      return json(data);
+    },
+  );
+
+  server.registerTool(
     "create_plan",
     {
       title: "ストーリーとタスクの一括登録",
