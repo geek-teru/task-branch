@@ -770,7 +770,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 | ツール                | 入力                     | 返り値                                                                                     |
 | --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
-| `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` の配列（作成順）                        |
+| `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` / `url` / `repository_url` の配列（作成順。URL は未登録なら null） |
 | `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status` / `active`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `activated_at` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
@@ -829,7 +829,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 - `task`: `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date` / `metadata` / `created_at` / `updated_at` / `completed_at` / `closed_at`。
 - `story`: 親ストーリーの `id` / `title` / `description` / `status` / `context`。`context` はストーリーのドキュメント（§3.2）で、決定事項などの正の情報。
-- `project`: `id` / `name` / `description`。
+- `project`: `id` / `name` / `description` / `url` / `repository_url`。`url` / `repository_url` は未登録なら null。作業するリポジトリは `repository_url` から決める。
 - `comments`: `list_task_comments` と同じコメントの形の配列（古い順）。
 - タスク・親・プロジェクトは1回の REST で取る（外部キーの列名 `parent_id` / `project_id` で埋め込む）。コメントは別に引く。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`。`list_task_comments` と同じ扱い。
@@ -840,7 +840,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 - 候補は、進行中（`status = 'in_progress'`）のストーリー配下で、`status` が `todo`、`assignee_type` が `human` でない（null か `ai`）タスク。カンバンに出ているタスクのうち、人の担当を除いたもの。
 - 並びはプロジェクトの作成順 → ストーリーの `sort_order` → タスクの `sort_order`（カンバンの並びと同じ）で、先頭を返す。`project_id` を渡したらそのプロジェクトだけから選ぶ。
-- `task` は `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`、`story` は `id` / `title`、`project` は `id` / `name`。中身を読むときは `get_task_context` を呼ぶ。
+- `task` は `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`、`story` は `id` / `title`、`project` は `id` / `name` / `url` / `repository_url`（未登録なら null。取ったタスクからすぐリポジトリを決められるように）。中身を読むときは `get_task_context` を呼ぶ。
 - 候補が無いとき（見えないプロジェクトの id を含む）は `isError` にせず `{ task: null, message }` を返す。
 - 状態は変えない（着手は `start_task`）。タスク間の依存関係はまだ見ない（依存の設計後に足す）。
 - 親ストーリーの `status` で絞るため、ストーリーを `!inner` で埋め込んで1回の REST で取り、並べ替えは関数の中で行う（埋め込んだ列では並べられないため）。
