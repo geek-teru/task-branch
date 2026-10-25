@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`export_project`（下記「プロジェクトの全体のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`export_project`（下記「プロジェクトの全体のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -774,6 +774,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status` / `active`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `activated_at` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
+| `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
@@ -812,6 +813,15 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - 期間（`start_date` / `due_date`）を変えても、配下のタスクの期間はずらさない（`shift_story_dates` は使わない）。
 - 書き換える値が無いとき（着手済みに `active: true` だけを渡したなど）は、更新せずに今のストーリーを返す。
 - 見つからない（他人のものを含む）ストーリーと、タスクの id は `isError`。
+
+**タスクの更新のツール**
+
+`update_task` は、作業の結果や仕様の決定に合わせて、タスクの名前・説明・期間を書き換える。DB の変更は持たず、RLS の下で `tasks`（`level = 'task'` の行）を更新するだけ。
+
+- 渡した項目だけ書き換える。ひとつも無ければ `isError`。`title` は前後の空白を落として 1 文字以上。
+- `description` は置き換え。追記は、呼び出し側が `get_task_context` で今の説明を取り、末尾に足して渡す（ツールに追記の機能は持たせない）。
+- `status` は入力に含めない。状態は `start_task` / `complete_task` で変える。
+- 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`（ストーリーには `update_story` を使うよう伝える）。`start_task` と同じ `findTask` で引く。
 
 **タスクの文脈のツール**
 

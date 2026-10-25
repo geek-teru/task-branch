@@ -94,11 +94,15 @@ const TASK_STATUS_COLUMNS = "id, title, status, updated_at, completed_at, closed
 type TaskStatusRow = { id: string; title: string; status: "todo" | "in_progress" | "done" | "closed"; updated_at: string; completed_at: string | null; closed_at: string | null };
 
 // 状態を変える前にタスクを引く。見つからない（他人のものを含む）タスクとストーリーの id は get_task_context と同じく isError。
-async function findTask(db: SupabaseClient, task_id: string): Promise<{ task: TaskStatusRow } | { error: CallToolResult }> {
+async function findTask(
+  db: SupabaseClient,
+  task_id: string,
+  storyHint = "タスクの id を指定してください",
+): Promise<{ task: TaskStatusRow } | { error: CallToolResult }> {
   const { data, error } = await db.from("tasks").select(`${TASK_STATUS_COLUMNS}, level`).eq("id", task_id).maybeSingle();
   if (error) return { error: restError(error) };
   if (!data) return { error: toolError(`タスクが見つかりません: ${task_id}`) };
-  if (data.level === "story") return { error: toolError(`ストーリーの id です。タスクの id を指定してください: ${task_id}`) };
+  if (data.level === "story") return { error: toolError(`ストーリーの id です。${storyHint}: ${task_id}`) };
   const { level: _level, ...task } = data;
   return { task: task as TaskStatusRow };
 }
@@ -118,6 +122,9 @@ async function updateStatus(
 
 // update_story で返すストーリーの列。
 const STORY_COLUMNS = "id, title, description, context, status, activated_at, start_date, due_date";
+
+// update_task で返すタスクの列。
+const TASK_COLUMNS = "id, title, description, status, start_date, due_date";
 
 // find_items で返す件数の上限。超えたら truncated: true を付ける。
 const FIND_ITEMS_LIMIT = 20;
@@ -420,6 +427,38 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
       const { data, error } = await db.from("tasks").update(patch).eq("id", story_id).select(STORY_COLUMNS);
       if (error) return restError(error);
       if (data.length === 0) return toolError(`ストーリーを更新できませんでした: ${story_id}`);
+      return json(data[0]);
+    },
+  );
+
+  server.registerTool(
+    "update_task",
+    {
+      title: "タスクの更新",
+      description:
+        "タスクの名前・説明・期間を更新し、更新後のタスクを返す。渡した項目だけ書き換える。" +
+        "description は置き換えなので、追記するときは get_task_context で今の説明を取り、末尾に足して渡す。" +
+        "状態は変えない（着手は start_task、完了は complete_task）",
+      inputSchema: {
+        task_id: z.uuid().describe("タスクの id（ストーリーは不可）"),
+        title: z.string().trim().min(1).optional().describe("タスク名"),
+        description: z.string().optional().describe("タスクの説明（Markdown。置き換え）"),
+        start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
+        due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
+      },
+    },
+    async ({ task_id, ...fields }) => {
+      const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      if (Object.keys(patch).length === 0) {
+        return toolError("更新する項目がありません。title / description / start_date / due_date のどれかを渡してください");
+      }
+
+      const found = await findTask(db, task_id, "update_story を使ってください");
+      if ("error" in found) return found.error;
+
+      const { data, error } = await db.from("tasks").update(patch).eq("id", task_id).select(TASK_COLUMNS);
+      if (error) return restError(error);
+      if (data.length === 0) return toolError(`タスクを更新できませんでした: ${task_id}`);
       return json(data[0]);
     },
   );
