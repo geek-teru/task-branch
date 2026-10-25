@@ -69,11 +69,11 @@ async function lastSortOrder(db: SupabaseClient, column: "project_id" | "parent_
 // get_task_context で返すタスク・親ストーリー・プロジェクトの列。親とプロジェクトは外部キーの列名で埋め込む。
 // supabase-js が select の文字列から型を推論するので、連結せず1つのリテラルにする。
 const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_type, start_date, due_date, metadata, created_at, updated_at, completed_at, closed_at,
-  story:parent_id(id, title, description, status, context), project:project_id(id, name, description)`;
+  story:parent_id(id, title, description, status, context), project:project_id(id, name, description, url, repository_url)`;
 
 // get_next_task の候補の列。並べ替えに使う sort_order / created_at も取る。
 const NEXT_TASK_COLUMNS = `id, title, description, status, assignee_type, start_date, due_date, sort_order,
-  story:parent_id!inner(id, title, status, sort_order), project:project_id(id, name, created_at)`;
+  story:parent_id!inner(id, title, status, sort_order), project:project_id(id, name, url, repository_url, created_at)`;
 
 type NextTaskRow = {
   id: string;
@@ -85,7 +85,7 @@ type NextTaskRow = {
   due_date: string | null;
   sort_order: number;
   story: { id: string; title: string; status: string; sort_order: number };
-  project: { id: string; name: string; created_at: string };
+  project: { id: string; name: string; url: string | null; repository_url: string | null; created_at: string };
 };
 
 // start_task / complete_task で返すタスクの列。
@@ -150,12 +150,12 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
     "list_projects",
     {
       title: "プロジェクトの一覧",
-      description: "自分のプロジェクトの id, name, description を作成順に返す",
+      description: "自分のプロジェクトの id, name, description, url, repository_url を作成順に返す。url / repository_url は未登録なら null",
     },
     async () => {
       const { data, error } = await db
         .from("projects")
-        .select("id, name, description")
+        .select("id, name, description, url, repository_url")
         .order("created_at", { ascending: true });
       if (error) return restError(error);
       return json(data);
@@ -552,7 +552,8 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
       if (!next) return json({ task: null, message: "着手できるタスクがありません（進行中のストーリー配下に、未着手で人の担当でないタスクがない）" });
 
       const { story, project, sort_order: _sortOrder, ...task } = next;
-      return json({ task, story: { id: story.id, title: story.title }, project: { id: project.id, name: project.name } });
+      const { created_at: _createdAt, ...projectFields } = project;
+      return json({ task, story: { id: story.id, title: story.title }, project: projectFields });
     },
   );
 
