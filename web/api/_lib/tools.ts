@@ -116,6 +116,9 @@ async function updateStatus(
   return { task: data[0] as TaskStatusRow };
 }
 
+// update_story で返すストーリーの列。
+const STORY_COLUMNS = "id, title, description, context, status, activated_at, start_date, due_date";
+
 // find_items で返す件数の上限。超えたら truncated: true を付ける。
 const FIND_ITEMS_LIMIT = 20;
 
@@ -373,6 +376,51 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
           ),
         })),
       });
+    },
+  );
+
+  server.registerTool(
+    "update_story",
+    {
+      title: "ストーリーの更新",
+      description:
+        "ストーリーの名前・説明・コンテキスト・期間・状態・着手（Active / InActive）を更新し、更新後のストーリーを返す。渡した項目だけ書き換える。" +
+        "context を書き換えると、ストーリー詳細に AI が更新した版として履歴が残る。" +
+        "active は true で着手済み（Active。すでに着手済みなら activated_at は変えない）、false でバックログ（InActive）に戻す。" +
+        "期間を変えても配下のタスクの期間は変わらない",
+      inputSchema: {
+        story_id: z.uuid().describe("ストーリーの id（タスクは不可）"),
+        title: z.string().trim().min(1).optional().describe("ストーリー名"),
+        description: z.string().optional().describe("ストーリーの説明（置き換え）"),
+        context: z.string().optional().describe("ストーリーのコンテキスト（Markdown。置き換え）"),
+        start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
+        due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
+        status: z.enum(["todo", "in_progress", "done", "closed"]).optional().describe("状態"),
+        active: z.boolean().optional().describe("true なら着手済み、false ならバックログ"),
+      },
+    },
+    async ({ story_id, active, ...fields }) => {
+      if (active === undefined && Object.values(fields).every((v) => v === undefined)) {
+        return toolError("更新する項目がありません。title / description / context / start_date / due_date / status / active のどれかを渡してください");
+      }
+
+      const { data: story, error: storyError } = await db.from("tasks").select(`${STORY_COLUMNS}, level`).eq("id", story_id).maybeSingle();
+      if (storyError) return restError(storyError);
+      if (!story) return toolError(`ストーリーが見つかりません: ${story_id}`);
+      if (story.level === "task") return toolError(`タスクの id です。ストーリーの id を指定してください: ${story_id}`);
+
+      // 画面の setActive と同じく activated_at で表す。着手済みに true を渡しても着手日時は上書きしない。
+      const patch: Record<string, unknown> = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      if (active === false) patch.activated_at = null;
+      if (active === true && story.activated_at === null) patch.activated_at = new Date().toISOString();
+      const { level: _level, ...current } = story;
+      if (Object.keys(patch).length === 0) return json(current);
+
+      // context の版はトリガが story_context_revisions に残す（編集者は AI になる）。
+      const { data, error } = await db.from("tasks").update(patch).eq("id", story_id).select(STORY_COLUMNS);
+      if (error) return restError(error);
+      if (data.length === 0) return toolError(`ストーリーを更新できませんでした: ${story_id}`);
+      return json(data[0]);
     },
   );
 
