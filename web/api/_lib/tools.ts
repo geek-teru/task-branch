@@ -66,6 +66,9 @@ async function lastSortOrder(db: SupabaseClient, column: "project_id" | "parent_
   return { last: (data?.[0]?.sort_order as number | undefined) ?? null, error };
 }
 
+// list_projects / create_project で返すプロジェクトの列。
+const PROJECT_COLUMNS = "id, name, description, url, repository_url";
+
 // get_task_context で返すタスク・親ストーリー・プロジェクトの列。親とプロジェクトは外部キーの列名で埋め込む。
 // supabase-js が select の文字列から型を推論するので、連結せず1つのリテラルにする。
 const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_type, start_date, due_date, metadata, created_at, updated_at, completed_at, closed_at,
@@ -155,8 +158,30 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
     async () => {
       const { data, error } = await db
         .from("projects")
-        .select("id, name, description, url, repository_url")
+        .select(PROJECT_COLUMNS)
         .order("created_at", { ascending: true });
+      if (error) return restError(error);
+      return json(data);
+    },
+  );
+
+  server.registerTool(
+    "create_project",
+    {
+      title: "プロジェクトの作成",
+      description:
+        "プロジェクトを作り、作ったプロジェクトの id, name, description, url, repository_url を返す。持ち主は自分（AI なら持ち主の人）になる。" +
+        "同じ名前のプロジェクトがあっても作るので、作る前に list_projects で重複を確かめる",
+      inputSchema: {
+        name: z.string().trim().min(1).describe("プロジェクト名"),
+        description: z.string().optional().describe("プロジェクトの説明"),
+        url: z.url().optional().describe("デプロイ先などの URL"),
+        repository_url: z.url().optional().describe("GitHub などのリポジトリ URL"),
+      },
+    },
+    async (fields) => {
+      // owner_id は送らず、DB の既定値 current_owner_id() に任せる（AI の JWT なら持ち主の人の id になる）。
+      const { data, error } = await db.from("projects").insert(fields).select(PROJECT_COLUMNS).single();
       if (error) return restError(error);
       return json(data);
     },
