@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`export_project`（下記「プロジェクトの全体のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -771,6 +771,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | ツール                | 入力                     | 返り値                                                                                     |
 | --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
 | `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` / `url` / `repository_url` の配列（作成順。URL は未登録なら null） |
+| `create_project`      | `name`, `description` / `url` / `repository_url`（いずれも任意） | 作ったプロジェクト（`id` / `name` / `description` / `url` / `repository_url`）。持ち主は人のユーザーになる（下記「プロジェクトの作成のツール」） |
 | `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status` / `active`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `activated_at` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
@@ -783,6 +784,14 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
 | `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
+
+**プロジェクトの作成のツール**
+
+`create_project` は、計画の立ち上げで AI がプロジェクトを作るのに使う。DB の変更は持たず、RLS の下で `projects` に1行入れるだけ。
+
+- `name` は前後の空白を落として 1 文字以上。`url` / `repository_url` は URL の形でなければ入力エラー。
+- `owner_id` は送らず、DB の既定値 `current_owner_id()`（§3.5）に任せる。AI の JWT では `app_metadata.owner_id` が入るので、持ち主の人のプロジェクトになり、画面の `/projects` にそのまま出る。`is_active` は既定の `true`。
+- 同じ名前のプロジェクトは弾かない（画面と同じ）。ツールの説明で、作る前に `list_projects` で重複を確かめるよう伝える。
 
 **プロジェクトの全体のツール**
 
