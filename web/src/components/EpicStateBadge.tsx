@@ -1,4 +1,6 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
+import { cn } from "../lib/cn";
+import { Badge } from "./ui/Badge";
 
 // Active / InActive のバッジ。onPick があるとクリックでプルダウンを出し、
 // 選んだ状態を返す（確認モーダルは呼び出し側が出す）。
@@ -7,49 +9,45 @@ export function EpicStateBadge({ active, onPick }: { active: boolean; onPick?: (
   // （表は角丸のため overflow: hidden になっている）。
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const label = active ? "Active" : "InActive";
+  const badge = <Badge tone={active ? "brand" : "neutral"}>{label}</Badge>;
 
-  if (!onPick) return <span style={active ? activeBadge : inactiveBadge}>{label}</span>;
+  if (!onPick) return badge;
 
   return (
-    <span style={{ position: "relative", display: "inline-block" }}>
+    <span className="relative inline-block">
       <button
+        type="button"
         onClick={(e) => {
           if (at) return setAt(null);
           const r = e.currentTarget.getBoundingClientRect();
           setAt({ left: r.left, top: r.bottom + 4 });
         }}
         title="クリックで状態を変更"
-        style={pickerBtn}
+        className="m-0 inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0"
       >
-        <span style={active ? activeBadge : inactiveBadge}>{label}</span>
-        <span style={{ fontSize: 10, color: "#5f6b7a" }}>▾</span>
+        {badge}
+        <span className="text-[10px] text-fg-muted">▾</span>
       </button>
       {at && (
         <>
           {/* click-away closes the menu */}
-          <span onClick={() => setAt(null)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
-          <span style={{ ...menu, left: at.left, top: at.top }}>
+          <span onClick={() => setAt(null)} className="fixed inset-0 z-[19]" />
+          <span
+            className="fixed z-20 min-w-24 rounded-md border border-border bg-surface p-1 shadow-md"
+            style={{ left: at.left, top: at.top }}
+          >
             {[true, false].map((value) => (
               <button
+                type="button"
                 key={String(value)}
                 onClick={() => {
                   setAt(null);
                   if (value !== active) onPick(value);
                 }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "5px 10px",
-                  border: "none",
-                  borderRadius: 4,
-                  background: value === active ? "#eef1f3" : "transparent",
-                  color: "#1f2933",
-                  fontSize: 12,
-                  fontWeight: value === active ? 600 : 400,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
+                className={cn(
+                  "m-0 block w-full cursor-pointer whitespace-nowrap rounded border-0 px-2.5 py-1 text-left text-xs text-fg hover:bg-surface-muted",
+                  value === active ? "bg-surface-muted font-medium" : "bg-transparent",
+                )}
               >
                 {value ? "Active" : "InActive"}
               </button>
@@ -60,36 +58,3 @@ export function EpicStateBadge({ active, onPick }: { active: boolean; onPick?: (
     </span>
   );
 }
-
-const pickerBtn: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  background: "none",
-  border: "none",
-  padding: 0,
-  cursor: "pointer",
-};
-
-const menu: CSSProperties = {
-  position: "fixed",
-  zIndex: 20,
-  minWidth: 96,
-  background: "#fff",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
-  padding: 4,
-};
-
-const badge: CSSProperties = {
-  display: "inline-block",
-  fontSize: 12,
-  padding: "2px 8px",
-  borderRadius: 10,
-  border: "1px solid",
-  whiteSpace: "nowrap",
-};
-
-const activeBadge: CSSProperties = { ...badge, background: "#eaf2fc", color: "#0b4a8a", borderColor: "#0972d3" };
-const inactiveBadge: CSSProperties = { ...badge, background: "#f4f5f6", color: "#5f6b7a", borderColor: "#cbd2d9" };
