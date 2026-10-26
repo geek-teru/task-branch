@@ -3,6 +3,7 @@ import { addTaskComment, deleteTaskComment, listTaskComments, updateTaskComment 
 import type { TaskComment } from "../lib/types";
 import { useSession } from "../lib/useSession";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DeleteIcon, EditIcon, withIcon } from "./Icons";
 
 const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
 
@@ -125,10 +126,12 @@ export function TaskComments({ taskId }: { taskId: string }) {
             </span>
             {canModify(c) && editingId !== c.id && (
               <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button onClick={() => startEdit(c)} style={textBtn}>
+                <button onClick={() => startEdit(c)} style={{ ...textBtn, ...withIcon, gap: 2 }}>
+                  <EditIcon size={11} />
                   編集
                 </button>
-                <button onClick={() => setDeletingId(c.id)} style={textBtn}>
+                <button onClick={() => setDeletingId(c.id)} style={{ ...textBtn, ...withIcon, gap: 2 }}>
+                  <DeleteIcon size={11} />
                   削除
                 </button>
               </span>

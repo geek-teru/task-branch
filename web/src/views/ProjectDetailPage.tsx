@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { Project, ProjectInput } from "../lib/types";
 import { ProjectForm } from "../components/ProjectForm";
 import { IdBadge } from "../components/IdBadge";
+import { EditIcon, withIcon } from "../components/Icons";
 
 // Project detail: view / edit the project itself. Everything except 変更 lives in
 // the "…" menu next to it (jump to a view, export, archive, delete).
@@ -58,7 +59,8 @@ export function ProjectDetailPage({
         <IdBadge id={project.id} />
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setEditing(true)} style={btn}>
+          <button onClick={() => setEditing(true)} style={{ ...btn, ...withIcon }}>
+            <EditIcon size={13} />
             変更
           </button>
           <ActionMenu

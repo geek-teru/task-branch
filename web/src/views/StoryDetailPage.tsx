@@ -14,6 +14,7 @@ import { STATUS_COLOR } from "../lib/style";
 import { IdBadge } from "../components/IdBadge";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { EditIcon, withIcon } from "../components/Icons";
 
 // Story detail: name / description, Active / InActive, the context document and the story's tasks.
 // Loads its own data through the api layer (the story's context is only needed here).
@@ -112,7 +113,8 @@ export function StoryDetailPage({
         <span style={{ ...badge, background: sc.bg, color: sc.fg, borderColor: sc.border }}>{STATUS_LABEL[story.status]}</span>
         <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
         <IdBadge id={story.id} />
-        <button onClick={() => setEditingInfo(true)} style={{ ...btn, marginLeft: "auto" }}>
+        <button onClick={() => setEditingInfo(true)} style={{ ...btn, ...withIcon, marginLeft: "auto" }}>
+          <EditIcon size={13} />
           変更
         </button>
       </div>
@@ -139,7 +141,8 @@ export function StoryDetailPage({
                 </button>
               </>
             ) : (
-              <button onClick={() => setDraft(story.context ?? "")} style={btn}>
+              <button onClick={() => setDraft(story.context ?? "")} style={{ ...btn, ...withIcon }}>
+                <EditIcon size={13} />
                 編集
               </button>
             )}

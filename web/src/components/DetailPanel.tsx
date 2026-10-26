@@ -6,6 +6,7 @@ import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 import { IdBadge } from "./IdBadge";
 import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
+import { DeleteIcon, EditIcon, withIcon } from "./Icons";
 
 // A story or task shown in the panel; progress is present for graph nodes only.
 export type DetailNode = Task & { progress?: number | null };
@@ -188,12 +189,14 @@ export function DetailPanel<T extends DetailNode>({
           {(onEdit || onDelete) && (
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               {onEdit && (
-                <button onClick={() => onEdit(node)} style={panelBtn}>
+                <button onClick={() => onEdit(node)} style={{ ...panelBtn, ...withIcon }}>
+                  <EditIcon size={14} />
                   変更
                 </button>
               )}
               {onDelete && (
-                <button onClick={() => onDelete(node)} style={{ ...panelBtn, marginLeft: "auto", color: "#a3210b", borderColor: "#f0c2ba" }}>
+                <button onClick={() => onDelete(node)} style={{ ...panelBtn, ...withIcon, marginLeft: "auto", color: "#a3210b", borderColor: "#f0c2ba" }}>
+                  <DeleteIcon size={14} />
                   削除
                 </button>
               )}
