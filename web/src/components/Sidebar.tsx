@@ -11,7 +11,7 @@ const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
   { key: "projects", label: "Projects", icon: <ProjectIcon /> },
   { key: "backlog", label: "Backlog", icon: <BacklogIcon /> },
   { key: "gantt", label: "Gantt", icon: <GanttIcon /> },
-  { key: "kanban", label: "Kanban", icon: <KanbanIcon /> },
+  { key: "kanban", label: "Board", icon: <KanbanIcon /> },
 ];
 
 const COLLAPSED_W = 52;
