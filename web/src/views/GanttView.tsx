@@ -9,6 +9,7 @@ import { GroupForm } from "../components/GroupForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
+import { AddIcon, DeleteIcon, EditIcon, withIcon } from "../components/Icons";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
@@ -542,9 +543,9 @@ export function GanttView({
                       setForm({ mode: "create", prevEnd: lastStoryEnd });
                     }}
                     title="ストーリーを追加"
-                    style={addBtn}
+                    style={{ ...addBtn, ...withIcon }}
                   >
-                    +
+                    <AddIcon size={12} />
                   </button>
                 )}
                 {r.kind === "project" && onAddGroup && (
@@ -554,8 +555,9 @@ export function GanttView({
                       setGroupForm({ id: null, name: "" });
                     }}
                     title="グループを追加"
-                    style={textBtn}
+                    style={{ ...textBtn, ...withIcon, gap: 2 }}
                   >
+                    <AddIcon size={10} />
                     グループを追加
                   </button>
                 )}
@@ -566,8 +568,9 @@ export function GanttView({
                       setGroupForm({ id: r.groupId, name: r.label });
                     }}
                     title="グループ名を変更"
-                    style={textBtn}
+                    style={{ ...textBtn, ...withIcon, gap: 2 }}
                   >
+                    <EditIcon size={10} />
                     変更
                   </button>
                 )}
@@ -583,8 +586,9 @@ export function GanttView({
                       });
                     }}
                     title="グループを削除"
-                    style={{ ...textBtn, color: "#d13212" }}
+                    style={{ ...textBtn, ...withIcon, gap: 2, color: "#d13212" }}
                   >
+                    <DeleteIcon size={10} />
                     削除
                   </button>
                 )}
@@ -595,9 +599,9 @@ export function GanttView({
                       setForm({ mode: "create-task", story: r.node! });
                     }}
                     title="タスクを追加"
-                    style={addBtn}
+                    style={{ ...addBtn, ...withIcon }}
                   >
-                    +
+                    <AddIcon size={12} />
                   </button>
                 )}
                 <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />

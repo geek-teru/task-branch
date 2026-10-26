@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
+import { AddIcon, withIcon } from "../components/Icons";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
@@ -178,8 +179,8 @@ export function KanbanView({
         <div style={{ width: LABEL_W, flex: "none", padding: "10px 12px", boxSizing: "border-box", position: "relative" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
             <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{story.title}</div>
-            <button onClick={() => setAdding(story)} title="タスクを追加" style={addBtn}>
-              +
+            <button onClick={() => setAdding(story)} title="タスクを追加" style={{ ...addBtn, ...withIcon }}>
+              <AddIcon size={12} />
             </button>
           </div>
           <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 4 }}>
@@ -304,7 +305,8 @@ export function KanbanView({
                 <section key={p.id} style={{ marginBottom: 28 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
                     <h3 style={{ margin: 0, fontSize: 15 }}>{p.name}</h3>
-                    <button onClick={() => setStoryForm(p)} style={quietBtn}>
+                    <button onClick={() => setStoryForm(p)} style={{ ...quietBtn, ...withIcon }}>
+                      <AddIcon size={13} />
                       ストーリーを追加
                     </button>
                   </div>

@@ -1,14 +1,15 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
+import { BacklogIcon, GanttIcon, KanbanIcon, ProjectIcon } from "./Icons";
 
 export type MenuKey = "projects" | "backlog" | "gantt" | "kanban";
 
-// icon: shown instead of the label while the sidebar is collapsed.
-const MENU: { key: MenuKey; label: string; icon: string }[] = [
-  { key: "projects", label: "プロジェクト", icon: "▦" },
-  { key: "backlog", label: "バックログ", icon: "≡" },
-  { key: "gantt", label: "ガントチャート", icon: "▬" },
-  { key: "kanban", label: "カンバン", icon: "▥" },
+// icon: shown next to the label, and alone while the sidebar is collapsed.
+const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
+  { key: "projects", label: "プロジェクト", icon: <ProjectIcon /> },
+  { key: "backlog", label: "バックログ", icon: <BacklogIcon /> },
+  { key: "gantt", label: "ガントチャート", icon: <GanttIcon /> },
+  { key: "kanban", label: "カンバン", icon: <KanbanIcon /> },
 ];
 
 const COLLAPSED_W = 52;
@@ -63,7 +64,8 @@ export function Sidebar({
               title={m.label}
               style={menuBtn(isActive, collapsed)}
             >
-              {collapsed ? m.icon : m.label}
+              {m.icon}
+              {!collapsed && m.label}
             </button>
           );
         })}
@@ -101,6 +103,7 @@ function menuBtn(isActive: boolean, collapsed: boolean): CSSProperties {
     display: "flex",
     alignItems: "center",
     justifyContent: collapsed ? "center" : "flex-start",
+    gap: 10,
     width: "100%",
     textAlign: collapsed ? "center" : "left",
     background: isActive ? "#0972d3" : "transparent",

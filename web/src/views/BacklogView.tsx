@@ -6,6 +6,7 @@ import { STATUS_COLOR } from "../lib/style";
 import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { AddIcon, withIcon } from "../components/Icons";
 
 // Stories of one project: active ones and inactive ones (バックログ).
 // Only name / description / status / state are shown; the document (context) is not loaded here.
@@ -74,7 +75,8 @@ export function BacklogView({
           <option value="active">Active</option>
           <option value="inactive">InActive</option>
         </select>
-        <button onClick={() => setAdding(true)} style={{ ...primaryBtn, marginLeft: "auto" }}>
+        <button onClick={() => setAdding(true)} style={{ ...primaryBtn, ...withIcon, marginLeft: "auto" }}>
+          <AddIcon size={14} />
           バックログを追加
         </button>
       </div>

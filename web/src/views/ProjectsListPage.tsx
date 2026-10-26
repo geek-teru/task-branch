@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import type { Project, ProjectInput } from "../lib/types";
 import { ProjectForm } from "../components/ProjectForm";
+import { AddIcon, BacklogIcon, GanttIcon, KanbanIcon, withIcon } from "../components/Icons";
 
 // Project list: navigate only. Editing / deleting / exporting lives on the detail page.
 export function ProjectsListPage({
@@ -34,7 +35,8 @@ export function ProjectsListPage({
             InActive も表示（{inactiveCount}）
           </label>
         )}
-        <button onClick={() => setCreating(true)} style={primaryBtn}>
+        <button onClick={() => setCreating(true)} style={{ ...primaryBtn, ...withIcon }}>
+          <AddIcon size={14} />
           新規プロジェクト
         </button>
       </div>
@@ -96,13 +98,16 @@ export function ProjectsListPage({
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
-                <button onClick={() => onShowBacklog(p.id)} style={cardBtn}>
+                <button onClick={() => onShowBacklog(p.id)} style={{ ...cardBtn, ...withIcon }}>
+                  <BacklogIcon size={13} />
                   バックログ
                 </button>
-                <button onClick={() => onShowGantt(p.id)} style={cardBtn}>
+                <button onClick={() => onShowGantt(p.id)} style={{ ...cardBtn, ...withIcon }}>
+                  <GanttIcon size={13} />
                   ガントチャート
                 </button>
-                <button onClick={() => onShowKanban(p.id)} style={cardBtn}>
+                <button onClick={() => onShowKanban(p.id)} style={{ ...cardBtn, ...withIcon }}>
+                  <KanbanIcon size={13} />
                   カンバン
                 </button>
               </div>

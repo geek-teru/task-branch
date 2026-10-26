@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ServiceIcon } from "./Icons";
 
 export const HEADER_H = 48;
 
@@ -27,7 +28,7 @@ export function GlobalHeader({
       }}
     >
       <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 16, whiteSpace: "nowrap" }}>
-        <BranchIcon />
+        <ServiceIcon />
         task-branch
       </span>
       <span
@@ -40,24 +41,6 @@ export function GlobalHeader({
         ログアウト
       </button>
     </header>
-  );
-}
-
-// A trunk with one branch forking off, on a rounded tile.
-function BranchIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <rect width="24" height="24" rx="6" fill="#0972d3" />
-      <g fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
-        <path d="M8 6.5v11" />
-        <path d="M16 9c0 4-8 3-8 6" />
-      </g>
-      <g fill="#fff">
-        <circle cx="8" cy="6.5" r="1.9" />
-        <circle cx="8" cy="17.5" r="1.9" />
-        <circle cx="16" cy="7.5" r="1.9" />
-      </g>
-    </svg>
   );
 }
 
