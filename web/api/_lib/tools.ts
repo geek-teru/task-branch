@@ -138,10 +138,17 @@ const PAGE_SIZE = 1000;
 type FindProjectRow = { id: string; name: string; created_at: string };
 type FindTaskRow = { id: string; project_id: string; parent_id: string | null; level: "story" | "task"; title: string; status: string; sort_order: number };
 
-async function selectAll<T>(db: SupabaseClient, table: string, columns: string, order: string) {
+// list_stories で返すストーリーの列と、タスク数を数えるためのタスクの列。
+type ListStoryRow = { id: string; title: string; description: string | null; status: string; activated_at: string | null; start_date: string | null; due_date: string | null };
+type ListTaskRow = { parent_id: string; status: string };
+
+// eq は等価条件（列 → 値）で、全部を満たす行だけ取る。
+async function selectAll<T>(db: SupabaseClient, table: string, columns: string, order: string, eq: Record<string, string> = {}) {
   const rows: T[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await db.from(table).select(columns).order(order, { ascending: true }).order("id").range(from, from + PAGE_SIZE - 1);
+    let query = db.from(table).select(columns);
+    for (const [column, value] of Object.entries(eq)) query = query.eq(column, value);
+    const { data, error } = await query.order(order, { ascending: true }).order("id").range(from, from + PAGE_SIZE - 1);
     if (error) return { rows, error };
     rows.push(...(data as T[]));
     if (data.length < PAGE_SIZE) return { rows, error: null };
@@ -203,6 +210,57 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
       // 他人のプロジェクトや存在しない id は RLS で見えず、RPC が null を返す。
       if (data === null) return toolError(`プロジェクトが見つかりません: ${project_id}`);
       return json(data);
+    },
+  );
+
+  server.registerTool(
+    "list_stories",
+    {
+      title: "ストーリーの一覧",
+      description:
+        "プロジェクトのストーリーを並び順で一覧にする。計画の現状把握はまずこれ。中身（context と配下タスク）は get_story で取る。" +
+        "返り値は { project: { id, name }, stories }。stories の各要素は id / title / description / status / active（着手済みか）/ " +
+        "start_date / due_date / progress（0〜1）/ task_count（配下タスク数）/ done_count（done と closed の数）",
+      inputSchema: { project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）") },
+    },
+    async ({ project_id }) => {
+      const { data: project, error: projectError } = await db.from("projects").select("id, name").eq("id", project_id).maybeSingle();
+      if (projectError) return restError(projectError);
+      if (!project) return toolError(`プロジェクトが見つかりません: ${project_id}`);
+
+      const stories = await selectAll<ListStoryRow>(db, "tasks", "id, title, description, status, activated_at, start_date, due_date", "sort_order", {
+        project_id,
+        level: "story",
+      });
+      if (stories.error) return restError(stories.error);
+      const tasks = await selectAll<ListTaskRow>(db, "tasks", "parent_id, status", "sort_order", { project_id, level: "task" });
+      if (tasks.error) return restError(tasks.error);
+      const { data: progress, error: progressError } = await db.rpc("get_progress", { project: project_id });
+      if (progressError) return restError(progressError);
+
+      const progressById = new Map((progress as { id: string; progress: number }[]).map((p) => [p.id, Number(p.progress)]));
+      const counts = new Map<string, { task_count: number; done_count: number }>();
+      for (const t of tasks.rows) {
+        const c = counts.get(t.parent_id) ?? { task_count: 0, done_count: 0 };
+        c.task_count++;
+        if (t.status === "done" || t.status === "closed") c.done_count++;
+        counts.set(t.parent_id, c);
+      }
+
+      return json({
+        project,
+        stories: stories.rows.map((s) => ({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          status: s.status,
+          active: s.activated_at !== null,
+          start_date: s.start_date,
+          due_date: s.due_date,
+          progress: progressById.get(s.id) ?? 0,
+          ...(counts.get(s.id) ?? { task_count: 0, done_count: 0 }),
+        })),
+      });
     },
   );
 
