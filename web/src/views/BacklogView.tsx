@@ -102,7 +102,7 @@ export function BacklogView({
                         <Link
                           to={`/stories/${s.id}`}
                           title="詳細を開く"
-                          className="text-sm font-medium text-fg no-underline hover:underline"
+                          className="font-medium text-fg no-underline hover:underline"
                         >
                           {s.title}
                         </Link>
