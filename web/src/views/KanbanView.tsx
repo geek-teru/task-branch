@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { listProjectStories } from "../lib/api";
 import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
-import { STATUS_COLOR } from "../lib/style";
+import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
-import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
-import { AddIcon, withIcon } from "../components/Icons";
+import { useResizableWidth } from "../lib/useResizableWidth";
+import { AddIcon } from "../components/Icons";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Badge } from "../components/ui/Badge";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
@@ -21,14 +24,13 @@ const AUTO_SCROLL_MAX_STEP = 18;
 const SHOW_CLOSED_KEY = "kanban.showClosed";
 
 // One board per project: a swimlane per in-progress story, columns = task status.
-// The project filter (null = all projects) is owned by the caller (kept in the URL).
+// The project filter (null = all projects) is owned by the caller (kept in the URL, switched from the header).
 // A card can only move between columns of its own story (its parent is fixed),
 // and a drop is applied only after the user confirms it.
 export function KanbanView({
   projects,
   lanes,
   projectFilter,
-  onChangeProjectFilter,
   onChangeStatus,
   onMoveTask,
   onAddStory,
@@ -39,7 +41,6 @@ export function KanbanView({
   projects: Project[];
   lanes: KanbanLane[];
   projectFilter: string | null;
-  onChangeProjectFilter: (projectId: string | null) => void;
   onChangeStatus: (taskId: string, status: Status) => void;
   onMoveTask: (taskId: string, storyId: string, status: Status) => void;
   onAddStory: (projectId: string, values: StoryInput) => void;
@@ -171,23 +172,37 @@ export function KanbanView({
     setOver(null);
   };
 
+  // クローズは列を持たない。トグルが入っているときだけ完了列の下に薄く出す。
+  const cardsIn = (tasks: Task[], s: Status) =>
+    tasks
+      .filter((t) => t.status === s || (s === "done" && showClosed && t.status === "closed"))
+      .sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"));
+
   const renderLane = ({ story, tasks }: KanbanLane) => {
     // クローズも完了として数える。トグルで隠していても数は変えない。
     const done = tasks.filter((t) => isFinished(t.status)).length;
     return (
-      <div key={story.id} style={{ display: "flex", borderBottom: "1px solid #e5e8eb" }}>
-        <div style={{ width: LABEL_W, flex: "none", padding: "10px 12px", boxSizing: "border-box", position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{story.title}</div>
-            <button onClick={() => setAdding(story)} title="タスクを追加" style={{ ...addBtn, ...withIcon }}>
+      <div key={story.id} className="flex border-b border-border last:border-b-0">
+        <div className="relative box-border flex-none px-3 py-2.5" style={{ width: LABEL_W }}>
+          <div className="flex items-start gap-1.5">
+            <div className="flex-1 text-sm font-medium text-fg">{story.title}</div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAdding(story)}
+              title="タスクを追加"
+              aria-label="タスクを追加"
+              className="h-6 w-6 px-0 text-fg-muted"
+            >
               <AddIcon size={12} />
-            </button>
+            </Button>
           </div>
-          <div style={{ fontSize: 11, color: "#94a0ad", marginTop: 4 }}>
-            {tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-fg-muted">
+            <IdBadge id={story.id} />
+            <span>{tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}</span>
           </div>
           {/* same handle as the header, so the column can be dragged from any lane */}
-          <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+          <ResizeHandle onMouseDown={startResize} />
         </div>
 
         {BOARD_STATUSES.map((s) => {
@@ -199,45 +214,35 @@ export function KanbanView({
             !(drag.storyId === story.id && drag.task.status === s);
           const isOver = canDrop && over?.storyId === story.id && over.status === s;
           return (
-            <div
-              key={s}
-              onDragOver={
-                canDrop
-                  ? (e) => {
-                      e.preventDefault();
-                      if (!isOver) setOver({ storyId: story.id, status: s });
-                    }
-                  : undefined
-              }
-              onDragLeave={() => setOver((cur) => (cur?.storyId === story.id && cur.status === s ? null : cur))}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (canDrop && drag) {
-                  setPendingMove({
-                    task: drag.task,
-                    status: s,
-                    targetStory: drag.storyId === story.id ? undefined : story,
-                  });
+            <div key={s} className="min-w-0 flex-1 p-1.5">
+              <div
+                onDragOver={
+                  canDrop
+                    ? (e) => {
+                        e.preventDefault();
+                        if (!isOver) setOver({ storyId: story.id, status: s });
+                      }
+                    : undefined
                 }
-                endDrag();
-              }}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                minHeight: 64,
-                padding: 8,
-                borderLeft: "1px solid #e5e8eb",
-                background: isOver ? "#eaf2fc" : canDrop ? "#f7fafe" : undefined,
-                outline: isOver ? "2px solid #0972d3" : "none",
-                outlineOffset: -4,
-              }}
-            >
-              {tasks
-                // クローズは列を持たない。トグルが入っているときだけ完了列の下に薄く出す。
-                .filter((t) => t.status === s || (s === "done" && showClosed && t.status === "closed"))
-                .sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"))
-                .map((t) => (
-                  <Card
+                onDragLeave={() => setOver((cur) => (cur?.storyId === story.id && cur.status === s ? null : cur))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (canDrop && drag) {
+                    setPendingMove({
+                      task: drag.task,
+                      status: s,
+                      targetStory: drag.storyId === story.id ? undefined : story,
+                    });
+                  }
+                  endDrag();
+                }}
+                className={cn(
+                  "box-border flex h-full min-h-16 flex-col gap-1.5 rounded-md p-1.5 transition-colors",
+                  isOver ? "bg-brand/10 ring-2 ring-inset ring-brand" : canDrop ? "bg-brand/5" : "bg-surface-muted",
+                )}
+              >
+                {cardsIn(tasks, s).map((t) => (
+                  <TaskCard
                     key={t.id}
                     task={t}
                     storyTitle={story.title}
@@ -248,6 +253,7 @@ export function KanbanView({
                     onDragEnd={endDrag}
                   />
                 ))}
+              </div>
             </div>
           );
         })}
@@ -256,34 +262,16 @@ export function KanbanView({
   };
 
   return (
-    <div style={{ display: "flex", height: "100%" }}>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 12px",
-            borderBottom: "1px solid #e5e8eb",
-            background: "#fff",
-            flexShrink: 0,
-          }}
-        >
-          <label style={{ fontSize: 12, color: "#5f6b7a" }}>プロジェクト</label>
-          <select
-            value={projectFilter ?? ""}
-            onChange={(e) => onChangeProjectFilter(e.target.value || null)}
-            style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd2d9" }}
-          >
-            <option value="">すべてのプロジェクト</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, fontSize: 12, color: "#5f6b7a" }}>
-            <input type="checkbox" checked={showClosed} onChange={(e) => toggleShowClosed(e.target.checked)} />
+    <div className="flex h-full text-sm text-fg">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-fg-muted">
+            <input
+              type="checkbox"
+              checked={showClosed}
+              onChange={(e) => toggleShowClosed(e.target.checked)}
+              className="m-0 h-3.5 w-3.5 cursor-pointer accent-brand"
+            />
             クローズしたタスクも表示
           </label>
         </div>
@@ -292,44 +280,43 @@ export function KanbanView({
           ref={boardRef}
           onDragOver={(e) => updateAutoScroll(e.clientY)}
           onDrop={stopAutoScroll}
-          style={{ flex: 1, minHeight: 0, padding: 24, overflow: "auto", boxSizing: "border-box" }}
+          className="box-border min-h-0 flex-1 overflow-auto p-6"
         >
           {visibleProjects.length === 0 ? (
-            <div style={{ color: "#5f6b7a" }}>
+            <div className="text-fg-muted">
               {projectFilter ? "プロジェクトが見つかりません。" : "プロジェクトがありません。"}
             </div>
           ) : (
             visibleProjects.map((p) => {
               const projectLanes = lanesByProject.get(p.id) ?? [];
               return (
-                <section key={p.id} style={{ marginBottom: 28 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-                    <h3 style={{ margin: 0, fontSize: 15 }}>{p.name}</h3>
-                    <button onClick={() => setStoryForm(p)} style={{ ...quietBtn, ...withIcon }}>
-                      <AddIcon size={13} />
+                <section key={p.id} className="mb-7">
+                  <div className="mb-2 flex items-center gap-2.5">
+                    <h3 className="m-0 text-[15px] font-semibold">{p.name}</h3>
+                    <Button size="sm" icon={<AddIcon size={13} />} onClick={() => setStoryForm(p)}>
                       ストーリーを追加
-                    </button>
+                    </Button>
                   </div>
                   {projectLanes.length === 0 ? (
-                    <div style={{ fontSize: 13, color: "#5f6b7a" }}>進行中のストーリーがありません。</div>
+                    <div className="text-[13px] text-fg-muted">進行中のストーリーがありません。</div>
                   ) : (
-                    <div
-                      style={{
-                        minWidth: LABEL_W + 3 * 220,
-                        border: "1px solid #e5e8eb",
-                        borderRadius: 10,
-                        background: "#fff",
-                      }}
-                    >
-                      <div style={{ display: "flex", borderBottom: "1px solid #e5e8eb", background: "#f7f8f9" }}>
-                        <div style={{ ...headerCell, width: LABEL_W, flex: "none", position: "relative" }}>
-                        ストーリー
-                        <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
-                      </div>
+                    <div className="rounded-md border border-border bg-surface" style={{ minWidth: LABEL_W + 3 * 220 }}>
+                      <div className="flex border-b border-border">
+                        <div
+                          className="relative flex flex-none items-center px-3 py-2 text-xs font-medium text-fg-muted"
+                          style={{ width: LABEL_W }}
+                        >
+                          ストーリー
+                          <ResizeHandle onMouseDown={startResize} />
+                        </div>
                         {BOARD_STATUSES.map((s) => (
-                          <div key={s} style={{ ...headerCell, flex: 1, minWidth: 0, borderLeft: "1px solid #e5e8eb" }}>
-                            <span style={{ ...dot, background: STATUS_COLOR[s].border }} />
-                            {STATUS_LABEL[s]}
+                          <div
+                            key={s}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-2 text-xs font-medium text-fg-muted"
+                          >
+                            <span className={cn("inline-block h-2 w-2 rounded-full", STATUS_DOT[s])} />
+                            <span className="text-fg">{STATUS_LABEL[s]}</span>
+                            <span>{projectLanes.reduce((n, lane) => n + cardsIn(lane.tasks, s).length, 0)}</span>
                           </div>
                         ))}
                       </div>
@@ -456,7 +443,7 @@ function moveMessage({ task, status, targetStory }: { task: Task; status: Status
 }
 
 // 上から ID / ストーリー / タイトル / 期限。上2行は弱い補助として出す。
-function Card({
+function TaskCard({
   task,
   storyTitle,
   dragging,
@@ -475,7 +462,8 @@ function Card({
 }) {
   const closed = task.status === "closed";
   return (
-    <div
+    <Card
+      interactive
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
@@ -484,102 +472,45 @@ function Card({
       onDragEnd={onDragEnd}
       onClick={onSelect}
       title={task.description ?? task.title}
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e8eb",
-        borderRadius: 6,
-        padding: "6px 8px",
-        marginBottom: 6,
-        fontSize: 12,
-        color: "#1f2933",
-        cursor: "pointer",
-        outline: selected ? "2px solid #1f2933" : "none",
-        outlineOffset: 1,
-        opacity: dragging ? 0.4 : closed ? 0.6 : 1,
-        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-      }}
+      className={cn(
+        "px-2 py-1.5 text-xs text-fg",
+        selected && "border-brand ring-2 ring-brand/30 hover:border-brand",
+        dragging ? "opacity-40" : closed && "opacity-60",
+      )}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a0ad", lineHeight: 1.6 }}>
+      <div className="flex items-center gap-1.5 text-[11px] leading-relaxed text-fg-muted">
         <IdBadge id={task.id} />
-        {closed && <span style={closedTag}>{STATUS_LABEL.closed}</span>}
+        {closed && (
+          <Badge tone="closed" className="ml-auto h-4 px-1.5 text-[10px]">
+            {STATUS_LABEL.closed}
+          </Badge>
+        )}
       </div>
-      <div style={placeStyle} title={storyTitle}>
+      {/* ストーリー名は「補助・ラベル」、期限はそれより弱く出す。長い名前は末尾を「…」で切る。 */}
+      <div className="truncate text-[11px] text-fg-muted" title={storyTitle}>
         {storyTitle}
       </div>
-      <div style={{ marginTop: 2 }}>{task.title}</div>
-      {task.due_date && <div style={weak}>期限 {task.due_date}</div>}
-    </div>
+      <div className="mt-0.5">{task.title}</div>
+      {task.due_date && <div className="truncate text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
+    </Card>
   );
 }
 
-// ストーリー名は「補助・ラベル」、期限はそれより弱い色で出す。長い名前は末尾を「…」で切る。
-const placeStyle: CSSProperties = {
-  fontSize: 11,
-  color: "#5f6b7a",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
+// 列幅を変えるつまみ。見出しと各レーンのストーリー列の右端に置く（サイドナビと同じ形）。
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      title="ドラッグで幅を変更"
+      className="absolute inset-y-0 -right-[3px] z-5 w-[7px] cursor-col-resize select-none"
+    />
+  );
+}
 
-// クローズしたカード（トグルで出したとき）の印。ステータスバッジと同じ色。
-const closedTag: CSSProperties = {
-  marginLeft: "auto",
-  padding: "0 6px",
-  borderRadius: 8,
-  fontSize: 10,
-  lineHeight: "16px",
-  background: STATUS_COLOR.closed.bg,
-  color: STATUS_COLOR.closed.fg,
-  border: `1px solid ${STATUS_COLOR.closed.border}`,
-};
-
-const weak: CSSProperties = {
-  fontSize: 11,
-  color: "#94a0ad",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const quietBtn: CSSProperties = {
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "5px 10px",
-  fontSize: 12,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
-// Same look as the gantt's "add story" button.
-const addBtn: CSSProperties = {
-  flexShrink: 0,
-  width: 18,
-  height: 18,
-  lineHeight: "16px",
-  padding: 0,
-  border: "1px solid #cbd2d9",
-  borderRadius: 4,
-  background: "#fff",
-  color: "#0972d3",
-  cursor: "pointer",
-  fontSize: 13,
-};
-
-const headerCell: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "8px 12px",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#5f6b7a",
-};
-
-const dot: CSSProperties = {
-  display: "inline-block",
-  width: 8,
-  height: 8,
-  borderRadius: 4,
+// 列の見出しの丸。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
+const STATUS_DOT: Record<Status, string> = {
+  todo: "bg-status-todo-border",
+  in_progress: "bg-status-in_progress-border",
+  done: "bg-status-done-border",
+  closed: "bg-status-closed-border",
 };
