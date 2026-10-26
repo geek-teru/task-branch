@@ -142,6 +142,10 @@ type FindTaskRow = { id: string; project_id: string; parent_id: string | null; l
 type ListStoryRow = { id: string; title: string; description: string | null; status: string; activated_at: string | null; start_date: string | null; due_date: string | null };
 type ListTaskRow = { parent_id: string; status: string };
 
+// get_story で返すストーリーの列と配下のタスクの列。
+const GET_STORY_COLUMNS = "id, project_id, level, title, description, context, status, activated_at, start_date, due_date";
+const STORY_TASK_COLUMNS = "id, title, description, status, assignee_type, start_date, due_date";
+
 // eq は等価条件（列 → 値）で、全部を満たす行だけ取る。
 async function selectAll<T>(db: SupabaseClient, table: string, columns: string, order: string, eq: Record<string, string> = {}) {
   const rows: T[] = [];
@@ -200,8 +204,8 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
       title: "プロジェクトの全体の取得",
       description:
         "プロジェクトと、配下のストーリー（context・activated_at・status・期間・progress 込み）とタスクを入れ子の JSON で返す" +
-        "（format task-branch/project、version 4。画面のエクスポートと同じ形）。計画の現状把握・タスクの一覧に使う。" +
-        "コメントは含まない（get_task_context で取る）",
+        "（format task-branch/project、version 4。画面のエクスポートと同じ形）。プロジェクト全体の書き出し用。" +
+        "大きいので、計画の現状把握は list_stories と get_story を使う。コメントは含まない（get_task_context で取る）",
       inputSchema: { project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）") },
     },
     async ({ project_id }) => {
@@ -260,6 +264,50 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
           progress: progressById.get(s.id) ?? 0,
           ...(counts.get(s.id) ?? { task_count: 0, done_count: 0 }),
         })),
+      });
+    },
+  );
+
+  server.registerTool(
+    "get_story",
+    {
+      title: "ストーリーの中身の取得",
+      description:
+        "ストーリー1件のコンテキストと配下のタスクを返す。list_stories で一覧を見て、中身が要るストーリーだけこれで読む。" +
+        "返り値は { story, project: { id, name }, tasks }。story は id / title / description / context / status / active（着手済みか）/ " +
+        "activated_at / start_date / due_date / progress（0〜1）。tasks は並び順で id / title / description / status / assignee_type / start_date / due_date。" +
+        "コメントは含まない（get_task_context で取る）",
+      inputSchema: { story_id: z.uuid().describe("ストーリーの id（タスクは不可）") },
+    },
+    async ({ story_id }) => {
+      const { data: story, error: storyError } = await db.from("tasks").select(GET_STORY_COLUMNS).eq("id", story_id).maybeSingle();
+      if (storyError) return restError(storyError);
+      if (!story) return toolError(`ストーリーが見つかりません: ${story_id}`);
+      if (story.level === "task") return toolError(`タスクの id です。ストーリーの id を指定してください: ${story_id}`);
+
+      const { data: project, error: projectError } = await db.from("projects").select("id, name").eq("id", story.project_id).single();
+      if (projectError) return restError(projectError);
+      const tasks = await selectAll(db, "tasks", STORY_TASK_COLUMNS, "sort_order", { parent_id: story_id, level: "task" });
+      if (tasks.error) return restError(tasks.error);
+      const { data: progress, error: progressError } = await db.rpc("get_progress", { project: story.project_id });
+      if (progressError) return restError(progressError);
+
+      const storyProgress = (progress as { id: string; progress: number }[]).find((p) => p.id === story_id)?.progress;
+      return json({
+        story: {
+          id: story.id,
+          title: story.title,
+          description: story.description,
+          context: story.context,
+          status: story.status,
+          active: story.activated_at !== null,
+          activated_at: story.activated_at,
+          start_date: story.start_date,
+          due_date: story.due_date,
+          progress: Number(storyProgress ?? 0),
+        },
+        project,
+        tasks: tasks.rows,
       });
     },
   );
