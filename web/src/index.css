@@ -1,10 +1,50 @@
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
-    "Noto Sans JP", Meiryo, sans-serif;
-  color: #16191d;
-  background: #f4f5f6;
+/* Preflight is left out until the screens move from inline styles to className:
+   its resets (heading sizes, margins, button styles) would change the current screens. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* static: emit every token, since inline styles read them through var(). */
+@theme static {
+  --color-bg: #fcfcfc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8f8f8;
+  --color-border: #e6e6e6;
+  --color-border-strong: #d4d4d4;
+  --color-fg: #171717;
+  --color-fg-muted: #707070;
+  /* White text on brand is about 5.3:1. */
+  --color-brand: #1f7a4d;
+  --color-brand-hover: #18633e;
+  --color-accent: #3ecf8e;
+  --color-danger: #c4352b;
+
+  /* Status colors (DESIGN.md 5.2): same hues as before, lower saturation. */
+  --color-status-todo-bg: #e8f3f7;
+  --color-status-todo-border: #5aa5ba;
+  --color-status-todo-fg: #1f5a69;
+  --color-status-in_progress-bg: #ebf1f8;
+  --color-status-in_progress-border: #3f78b5;
+  --color-status-in_progress-fg: #24507e;
+  --color-status-done-bg: #ecf4ee;
+  --color-status-done-border: #4a8a5c;
+  --color-status-done-fg: #2a5e39;
+  --color-status-closed-bg: #f3f3f3;
+  --color-status-closed-border: #9a9a9a;
+  --color-status-closed-fg: #616161;
+
+  --font-sans: Inter, "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-button { font-family: inherit; }
-code { background: #eff1f3; padding: 1px 4px; border-radius: 4px; font-size: 0.9em; }
+
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-fg);
+    background: var(--color-bg);
+  }
+  button { font-family: inherit; }
+  code { background: var(--color-surface-muted); padding: 1px 4px; border-radius: 4px; font-size: 0.9em; font-family: var(--font-mono); }
+}
