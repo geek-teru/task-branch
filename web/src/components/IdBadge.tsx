@@ -1,7 +1,8 @@
-import { useState, type CSSProperties, type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
+import { cn } from "../lib/cn";
 
 // Shows a shortened uuid; click to copy the full value (used to hand ids to the AI / MCP).
-// Rendered as plain inline text so it blends into the surrounding layout.
+// Looks like a neutral Badge in a monospace font.
 export function IdBadge({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -17,27 +18,18 @@ export function IdBadge({ id }: { id: string }) {
   };
 
   return (
-    <button onClick={copy} title={`${id}\nクリックでコピー`} style={copied ? { ...style, ...copiedStyle } : style}>
+    <button
+      type="button"
+      onClick={copy}
+      title={`${id}\nクリックでコピー`}
+      className={cn(
+        "m-0 inline-flex h-5 shrink-0 cursor-pointer items-center whitespace-nowrap rounded border px-1.5 text-[11px] leading-none transition-colors",
+        copied
+          ? "border-accent bg-accent/10 font-sans text-brand"
+          : "border-border bg-surface-muted font-mono text-fg-muted hover:border-border-strong hover:text-fg",
+      )}
+    >
       {copied ? "コピーしました" : id.slice(0, 8)}
     </button>
   );
 }
-
-const style: CSSProperties = {
-  background: "none",
-  border: "none",
-  borderBottom: "1px dotted #cbd2d9",
-  padding: 0,
-  fontSize: 11,
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  color: "#94a0ad",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  lineHeight: 1.6,
-};
-
-const copiedStyle: CSSProperties = {
-  borderBottomColor: "transparent",
-  color: "#1a7f37",
-  fontFamily: "inherit",
-};

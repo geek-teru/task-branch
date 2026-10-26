@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   getLatestContextRevision,
@@ -10,11 +10,18 @@ import {
 } from "../lib/api";
 import type { ContextRevision, Project, Task } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
-import { STATUS_COLOR } from "../lib/style";
+import { cn } from "../lib/cn";
 import { IdBadge } from "../components/IdBadge";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { EditIcon, withIcon } from "../components/Icons";
+import { Markdown } from "../components/Markdown";
+import { EditIcon } from "../components/Icons";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Dialog } from "../components/ui/Dialog";
+import { Input } from "../components/ui/Input";
+import { Textarea } from "../components/ui/Textarea";
 
 // Story detail: name / description, Active / InActive, the context document and the story's tasks.
 // Loads its own data through the api layer (the story's context is only needed here).
@@ -52,8 +59,8 @@ export function StoryDetailPage({
     load();
   }, [load]);
 
-  if (story === undefined) return <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>;
-  if (story === null) return <div style={{ padding: 24, color: "#5f6b7a" }}>ストーリーが見つかりません。</div>;
+  if (story === undefined) return <div className="p-6 text-[13px] text-fg-muted">読み込み中…</div>;
+  if (story === null) return <div className="p-6 text-[13px] text-fg-muted">ストーリーが見つかりません。</div>;
 
   const project = projects.find((p) => p.id === story.project_id);
   const active = story.activated_at != null;
@@ -100,114 +107,113 @@ export function StoryDetailPage({
     }
   };
 
-  const sc = STATUS_COLOR[story.status];
-
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: 24, boxSizing: "border-box" }}>
-      <Link to={`/backlog?project=${story.project_id}`} style={{ fontSize: 12, color: "#0972d3", textDecoration: "none" }}>
-        ← バックログ{project ? `（${project.name}）` : ""}
-      </Link>
+    <div className="h-full overflow-auto">
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <Link to={`/backlog?project=${story.project_id}`} className="text-xs text-fg-muted no-underline hover:text-fg">
+          ← バックログ{project ? `（${project.name}）` : ""}
+        </Link>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>{story.title}</h2>
-        <span style={{ ...badge, background: sc.bg, color: sc.fg, borderColor: sc.border }}>{STATUS_LABEL[story.status]}</span>
-        <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
-        <IdBadge id={story.id} />
-        <button onClick={() => setEditingInfo(true)} style={{ ...btn, ...withIcon, marginLeft: "auto" }}>
-          <EditIcon size={13} />
-          変更
-        </button>
-      </div>
-      <div style={{ fontSize: 13, color: story.description ? "#3b4149" : "#94a0ad" }}>
-        {story.description ?? "（説明なし）"}
-      </div>
+        <div className="mt-3 flex items-start gap-3">
+          <h1 className="m-0 min-w-0 flex-1 text-2xl font-medium leading-tight text-fg">{story.title}</h1>
+          <Button icon={<EditIcon size={14} />} onClick={() => setEditingInfo(true)}>
+            変更
+          </Button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
+          <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
+          <span className="text-xs text-fg-muted">{period(story)}</span>
+          <IdBadge id={story.id} />
+        </div>
+        <p className={cn("m-0 mt-3 text-sm", story.description ? "text-fg" : "text-fg-muted")}>
+          {story.description ?? "（説明なし）"}
+        </p>
 
-      <section style={card}>
-        <div style={cardHeader}>
-          <h3 style={h3}>コンテキスト</h3>
-          <span style={{ fontSize: 11, color: "#94a0ad" }}>
-            {revision
-              ? `版 ${revision.version}・${new Date(revision.created_at).toLocaleString("ja-JP")}・${revision.edited_by_type === "ai" ? "AI" : "人"}が更新`
-              : "未作成"}
-          </span>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+        <Card className="mt-6">
+          <CardHeader
+            title="コンテキスト"
+            meta={
+              revision
+                ? `版 ${revision.version}・${new Date(revision.created_at).toLocaleString("ja-JP")}・${revision.edited_by_type === "ai" ? "AI" : "人"}が更新`
+                : "未作成"
+            }
+          >
             {editing ? (
               <>
-                <button onClick={cancel} disabled={saving} style={btn}>
+                <Button size="sm" onClick={cancel} disabled={saving}>
                   キャンセル
-                </button>
-                <button onClick={save} disabled={saving || !dirty} style={primaryBtn}>
+                </Button>
+                <Button size="sm" variant="primary" onClick={save} disabled={saving || !dirty}>
                   {saving ? "保存中…" : "保存"}
-                </button>
+                </Button>
               </>
             ) : (
-              <button onClick={() => setDraft(story.context ?? "")} style={{ ...btn, ...withIcon }}>
-                <EditIcon size={13} />
+              <Button size="sm" icon={<EditIcon size={13} />} onClick={() => setDraft(story.context ?? "")}>
                 編集
-              </button>
+              </Button>
+            )}
+          </CardHeader>
+          <div className="px-5 py-4 text-[13px]">
+            {editing ? (
+              <Textarea
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={20}
+                placeholder={"## 背景・課題\n\n## ゴール\n\n## スコープと非スコープ\n\n## 方針\n\n## 決定事項\n\n## 未決事項"}
+                // ! beats fieldClass's font-sans (cn does not resolve conflicting utilities).
+                className="px-3 py-2.5 font-mono!"
+              />
+            ) : story.context ? (
+              <Markdown>{story.context}</Markdown>
+            ) : (
+              <div className="text-fg-muted">
+                コンテキストがまだありません。「編集」から、背景・課題、ゴール、方針などを書いてください。
+              </div>
             )}
           </div>
-        </div>
-        {editing ? (
-          <textarea
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={20}
-            placeholder={"## 背景・課題\n\n## ゴール\n\n## スコープと非スコープ\n\n## 方針\n\n## 決定事項\n\n## 未決事項"}
-            style={textarea}
-          />
-        ) : story.context ? (
-          <pre style={contextView}>{story.context}</pre>
-        ) : (
-          <div style={{ fontSize: 13, color: "#94a0ad", padding: "8px 0" }}>
-            コンテキストがまだありません。「編集」から、背景・課題、ゴール、方針などを書いてください。
-          </div>
-        )}
-      </section>
+        </Card>
 
-      <section style={card}>
-        <div style={cardHeader}>
-          <h3 style={h3}>タスク</h3>
-          <span style={{ fontSize: 11, color: "#94a0ad" }}>{tasks.length} 件</span>
-        </div>
-        {tasks.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#94a0ad", padding: "8px 0" }}>タスクはまだありません。</div>
-        ) : (
-          <table style={table}>
-            <thead>
-              <tr>
-                <th style={th}>名前</th>
-                <th style={{ ...th, width: 96 }}>ID</th>
-                <th style={{ ...th, width: 110 }}>ステータス</th>
-                <th style={{ ...th, width: 200 }}>期間</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.map((s) => {
-                const c = STATUS_COLOR[s.status];
-                return (
-                  <tr key={s.id}>
-                    <td style={td}>
-                      <div style={{ fontWeight: 600 }}>{s.title}</div>
-                      {s.description && <div style={{ fontSize: 12, color: "#5f6b7a", marginTop: 2 }}>{s.description}</div>}
-                    </td>
-                    <td style={td}>
+        {/* @container: the description column is dropped when the card is narrow. */}
+        <Card className="@container mt-6 overflow-hidden">
+          <CardHeader title="タスク" meta={`${tasks.length} 件`} />
+          {tasks.length === 0 ? (
+            <div className="px-5 py-4 text-[13px] text-fg-muted">タスクはまだありません。</div>
+          ) : (
+            <table className="w-full table-fixed border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
+                  <th className="w-24 px-3 py-2 font-medium">ID</th>
+                  <th className="px-3 py-2 font-medium @2xl:w-[38%]">名前</th>
+                  <th className="hidden px-3 py-2 font-medium @2xl:table-cell">説明</th>
+                  <th className="w-24 px-3 py-2 font-medium">ステータス</th>
+                  <th className="w-44 px-3 py-2 font-medium">期間</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((s) => (
+                  <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
+                    <td className="px-3 py-2">
                       <IdBadge id={s.id} />
                     </td>
-                    <td style={td}>
-                      <span style={{ ...badge, background: c.bg, color: c.fg, borderColor: c.border }}>{STATUS_LABEL[s.status]}</span>
+                    <td className="truncate px-3 py-2 font-medium text-fg" title={s.title}>
+                      {s.title}
                     </td>
-                    <td style={{ ...td, color: "#5f6b7a" }}>
-                      {s.start_date || s.due_date ? `${s.start_date ?? "—"} 〜 ${s.due_date ?? "—"}` : "—"}
+                    <td className={cn("hidden truncate px-3 py-2 @2xl:table-cell", s.description ? "text-fg-muted" : "text-fg-muted/60")}>
+                      {s.description ?? "（説明なし）"}
                     </td>
+                    <td className="px-3 py-2">
+                      <Badge tone={s.status}>{STATUS_LABEL[s.status]}</Badge>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{period(s)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      </div>
 
       {pendingState !== null && (
         <ConfirmDialog
@@ -229,6 +235,21 @@ export function StoryDetailPage({
           onCancel={() => setEditingInfo(false)}
         />
       )}
+    </div>
+  );
+}
+
+function period(t: Task): string {
+  return t.start_date || t.due_date ? `${t.start_date ?? "—"} 〜 ${t.due_date ?? "—"}` : "—";
+}
+
+// Card title row: title, a muted note next to it and buttons on the right.
+function CardHeader({ title, meta, children }: { title: string; meta: string; children?: ReactNode }) {
+  return (
+    <div className="flex min-h-12 items-center gap-3 border-b border-border px-5 py-2">
+      <h2 className="m-0 text-sm font-medium text-fg">{title}</h2>
+      <span className="text-xs text-fg-muted">{meta}</span>
+      {children && <div className="ml-auto flex gap-1.5">{children}</div>}
     </div>
   );
 }
@@ -262,148 +283,38 @@ function StoryInfoForm({
   };
 
   return (
-    <div style={overlay} onMouseDown={onCancel}>
-      <div style={dialog} onMouseDown={(e) => e.stopPropagation()}>
-        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>ストーリーを変更</h3>
-
-        <label style={fieldLabel}>名前</label>
-        <input
-          autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) submit();
-            if (e.key === "Escape") onCancel();
-          }}
-          style={textInput}
-        />
-
-        <label style={{ ...fieldLabel, marginTop: 14 }}>説明（任意）</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onCancel();
-          }}
-          rows={3}
-          placeholder="一覧に出す 1〜2 行の説明"
-          style={{ ...textInput, resize: "vertical", fontFamily: "inherit" }}
-        />
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-          <button onClick={onCancel} disabled={saving} style={btn}>
+    <Dialog
+      title="ストーリーを変更"
+      onClose={onCancel}
+      className="w-[420px]"
+      footer={
+        <>
+          <Button onClick={onCancel} disabled={saving}>
             キャンセル
-          </button>
-          <button onClick={submit} disabled={!trimmed || saving} style={primaryBtn}>
+          </Button>
+          <Button variant="primary" onClick={submit} disabled={!trimmed || saving}>
             {saving ? "保存中…" : "保存"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <label className="mb-1.5 block text-xs text-fg-muted">名前</label>
+      <Input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) submit();
+        }}
+      />
+
+      <label className="mb-1.5 mt-3.5 block text-xs text-fg-muted">説明（任意）</label>
+      <Textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3}
+        placeholder="一覧に出す 1〜2 行の説明"
+      />
+    </Dialog>
   );
 }
-
-const overlay: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(31,41,51,0.4)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 100,
-};
-
-const dialog: CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  padding: 24,
-  width: 420,
-  maxWidth: "90vw",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-};
-
-const fieldLabel: CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#5f6b7a",
-  marginBottom: 6,
-};
-
-const textInput: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  fontSize: 13,
-  padding: "8px 10px",
-  borderRadius: 6,
-  border: "1px solid #cbd2d9",
-};
-
-const card: CSSProperties = {
-  marginTop: 20,
-  background: "#fff",
-  border: "1px solid #e5e8eb",
-  borderRadius: 10,
-  padding: 16,
-};
-
-const cardHeader: CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 };
-
-const h3: CSSProperties = { margin: 0, fontSize: 15 };
-
-const btn: CSSProperties = {
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "5px 12px",
-  fontSize: 12,
-  cursor: "pointer",
-};
-
-const primaryBtn: CSSProperties = { ...btn, background: "#0972d3", color: "#fff", borderColor: "#0972d3" };
-
-const textarea: CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  fontSize: 13,
-  lineHeight: 1.6,
-  padding: "10px 12px",
-  borderRadius: 6,
-  border: "1px solid #cbd2d9",
-  resize: "vertical",
-};
-
-const contextView: CSSProperties = {
-  margin: 0,
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-word",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-  fontSize: 13,
-  lineHeight: 1.6,
-  color: "#1f2933",
-  background: "#f7f8f9",
-  borderRadius: 6,
-  padding: "10px 12px",
-};
-
-const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
-const th: CSSProperties = {
-  textAlign: "left",
-  padding: "6px 8px",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#5f6b7a",
-  borderBottom: "1px solid #e5e8eb",
-};
-const td: CSSProperties = { padding: "8px", borderBottom: "1px solid #eef0f2", verticalAlign: "top" };
-
-const badge: CSSProperties = {
-  display: "inline-block",
-  fontSize: 12,
-  padding: "2px 8px",
-  borderRadius: 10,
-  border: "1px solid",
-  whiteSpace: "nowrap",
-};
