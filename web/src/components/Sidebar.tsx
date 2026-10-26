@@ -1,15 +1,17 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
-import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
+import { useState, type ReactNode } from "react";
+import { cn } from "../lib/cn";
+import { useResizableWidth } from "../lib/useResizableWidth";
 import { BacklogIcon, GanttIcon, KanbanIcon, ProjectIcon } from "./Icons";
+import { Button } from "./ui/Button";
 
 export type MenuKey = "projects" | "backlog" | "gantt" | "kanban";
 
 // icon: shown next to the label, and alone while the sidebar is collapsed.
 const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
-  { key: "projects", label: "プロジェクト", icon: <ProjectIcon /> },
-  { key: "backlog", label: "バックログ", icon: <BacklogIcon /> },
-  { key: "gantt", label: "ガントチャート", icon: <GanttIcon /> },
-  { key: "kanban", label: "カンバン", icon: <KanbanIcon /> },
+  { key: "projects", label: "Projects", icon: <ProjectIcon /> },
+  { key: "backlog", label: "Backlog", icon: <BacklogIcon /> },
+  { key: "gantt", label: "Gantt", icon: <GanttIcon /> },
+  { key: "kanban", label: "Kanban", icon: <KanbanIcon /> },
 ];
 
 const COLLAPSED_W = 52;
@@ -42,27 +44,29 @@ export function Sidebar({
     });
   };
 
+  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+
   return (
     <aside
-      style={{
-        position: "relative",
-        width: collapsed ? COLLAPSED_W : width,
-        flexShrink: 0,
-        background: "#1f2933",
-        color: "#e5e8eb",
-        display: "flex",
-        flexDirection: "column",
-      }}
+      className="relative flex shrink-0 flex-col border-r border-border bg-bg"
+      style={{ width: collapsed ? COLLAPSED_W : width }}
     >
-      <nav style={{ flex: 1, padding: 8, overflowY: "auto", overflowX: "hidden" }}>
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto p-2">
         {MENU.map((m) => {
           const isActive = m.key === active;
           return (
             <button
               key={m.key}
+              type="button"
               onClick={() => onNavigate(m.key)}
               title={m.label}
-              style={menuBtn(isActive, collapsed)}
+              className={cn(
+                "m-0 flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-md border-0 font-sans text-sm transition-colors",
+                collapsed ? "justify-center px-0" : "justify-start px-2.5 text-left",
+                isActive
+                  ? "bg-[#ededed] font-medium text-fg"
+                  : "bg-transparent text-fg-muted hover:bg-surface-muted hover:text-fg",
+              )}
             >
               {m.icon}
               {!collapsed && m.label}
@@ -71,65 +75,19 @@ export function Sidebar({
         })}
       </nav>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          borderTop: "1px solid #2f3b46",
-          padding: collapsed ? "10px 0" : "10px 8px",
-          justifyContent: collapsed ? "center" : "flex-end",
-        }}
-      >
-        <button
-          onClick={toggle}
-          title={collapsed ? "サイドナビを開く" : "サイドナビを閉じる"}
-          aria-label={collapsed ? "サイドナビを開く" : "サイドナビを閉じる"}
-          style={toggleBtn}
-        >
+      <div className={cn("flex items-center border-t border-border py-2", collapsed ? "justify-center" : "justify-end px-2")}>
+        <Button variant="ghost" size="sm" onClick={toggle} title={toggleLabel} aria-label={toggleLabel} className="w-7 px-0 text-fg-muted">
           {collapsed ? "»" : "«"}
-        </button>
+        </Button>
       </div>
 
       {!collapsed && (
-        <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+        <div
+          onMouseDown={startResize}
+          title="Drag to resize"
+          className="absolute inset-y-0 -right-[3px] z-5 w-[7px] cursor-col-resize select-none"
+        />
       )}
     </aside>
   );
 }
-
-function menuBtn(isActive: boolean, collapsed: boolean): CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: collapsed ? "center" : "flex-start",
-    gap: 10,
-    width: "100%",
-    textAlign: collapsed ? "center" : "left",
-    background: isActive ? "#0972d3" : "transparent",
-    color: isActive ? "#fff" : "#cbd2d9",
-    border: "none",
-    borderRadius: 6,
-    padding: collapsed ? "9px 0" : "9px 10px",
-    marginBottom: 2,
-    cursor: "pointer",
-    fontSize: collapsed ? 15 : 13,
-    fontWeight: isActive ? 600 : 400,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-  };
-}
-
-const toggleBtn: CSSProperties = {
-  flexShrink: 0,
-  width: 24,
-  height: 24,
-  lineHeight: "22px",
-  padding: 0,
-  border: "1px solid #3d4b57",
-  borderRadius: 6,
-  background: "transparent",
-  color: "#cbd2d9",
-  cursor: "pointer",
-  fontSize: 13,
-};
