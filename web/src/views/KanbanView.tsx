@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { listProjectStories } from "../lib/api";
 import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
-import { STATUS_CLASS } from "../lib/style";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -311,23 +310,13 @@ export function KanbanView({
                           <ResizeHandle onMouseDown={startResize} />
                         </div>
                         {BOARD_STATUSES.map((s) => (
-                          <div key={s} className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
-                            <span
-                              className={cn(
-                                "inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold tracking-wide",
-                                STATUS_CLASS[s].bg,
-                                STATUS_CLASS[s].border,
-                                STATUS_CLASS[s].text,
-                              )}
-                            >
-                              <span className={cn("h-1.5 w-1.5 rounded-full ring-[3px]", STATUS_HEAD[s].dot)} />
-                              {STATUS_LABEL[s]}
-                            </span>
-                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-border bg-surface-muted px-1.5 text-[11px] font-medium tabular-nums text-fg-muted">
-                              {projectLanes.reduce((n, lane) => n + cardsIn(lane.tasks, s).length, 0)}
-                            </span>
-                            {/* 列の色帯。見出しの下端に status 色の線を引く */}
-                            <span className={cn("absolute inset-x-1.5 -bottom-px h-0.5 rounded-full", STATUS_HEAD[s].bar)} />
+                          <div
+                            key={s}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 px-3 py-2 text-xs font-medium text-fg-muted"
+                          >
+                            <span className={cn("inline-block h-2 w-2 rounded-full", STATUS_DOT[s])} />
+                            <span className="text-fg">{STATUS_LABEL[s]}</span>
+                            <span>{projectLanes.reduce((n, lane) => n + cardsIn(lane.tasks, s).length, 0)}</span>
                           </div>
                         ))}
                       </div>
@@ -518,14 +507,10 @@ function ResizeHandle({ onMouseDown }: { onMouseDown: (e: MouseEvent) => void })
   );
 }
 
-// 列の見出しの丸（淡い光輪付き）と下端の色帯。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
-// Tailwind が拾えるよう、クラス名は省略せずに書く。
-const STATUS_HEAD: Record<Status, { dot: string; bar: string }> = {
-  todo: { dot: "bg-status-todo-border ring-status-todo-border/25", bar: "bg-status-todo-border" },
-  in_progress: {
-    dot: "bg-status-in_progress-border ring-status-in_progress-border/25",
-    bar: "bg-status-in_progress-border",
-  },
-  done: { dot: "bg-status-done-border ring-status-done-border/25", bar: "bg-status-done-border" },
-  closed: { dot: "bg-status-closed-border ring-status-closed-border/25", bar: "bg-status-closed-border" },
+// 列の見出しの丸。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
+const STATUS_DOT: Record<Status, string> = {
+  todo: "bg-status-todo-border",
+  in_progress: "bg-status-in_progress-border",
+  done: "bg-status-done-border",
+  closed: "bg-status-closed-border",
 };
