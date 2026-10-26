@@ -1,12 +1,20 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Project, ProjectInput } from "../lib/types";
+import { cn } from "../lib/cn";
 import { ProjectForm } from "../components/ProjectForm";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
-import { EditIcon, withIcon } from "../components/Icons";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "../components/ui/DropdownMenu";
+import { BacklogIcon, DeleteIcon, EditIcon, GanttIcon, KanbanIcon, MoreIcon } from "../components/Icons";
+
+type Confirming = "archive" | "delete" | null;
 
 // Project detail: view / edit the project itself. Everything except 変更 lives in
-// the "…" menu next to it (jump to a view, export, archive, delete).
+// the ⋮ menu next to it (jump to a view, export, archive, delete).
 export function ProjectDetailPage({
   project,
   onUpdate,
@@ -27,83 +35,65 @@ export function ProjectDetailPage({
   onShowKanban: (projectId: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-
-  const archive = () => {
-    const message = project.is_active
-      ? `プロジェクト「${project.name}」をアーカイブします。\nガントチャート・カンバン・バックログの選択肢から外れます。よろしいですか？`
-      : `プロジェクト「${project.name}」をアクティブに戻します。よろしいですか？`;
-    if (window.confirm(message)) onSetActive(project.id, !project.is_active);
-  };
-
-  const remove = () => {
-    if (
-      window.confirm(
-        `プロジェクト「${project.name}」を削除します。\n配下のエピック・ストーリー・タスク・依存関係もすべて削除されます。よろしいですか？`
-      )
-    ) {
-      onDelete(project.id);
-    }
-  };
+  const [confirming, setConfirming] = useState<Confirming>(null);
 
   return (
-    <div style={{ height: "100%", overflow: "auto", padding: 24, boxSizing: "border-box" }}>
-      <Link to="/projects" style={{ fontSize: 12, color: "#0972d3", textDecoration: "none" }}>
-        ← プロジェクト
-      </Link>
+    <div className="h-full overflow-auto">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
+        <Link to="/projects" className="text-xs text-fg-muted no-underline hover:text-fg">
+          ← プロジェクト
+        </Link>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 6px" }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>{project.name}</h2>
-        <span style={project.is_active ? activeBadge : inactiveBadge}>
-          {project.is_active ? "Active" : "InActive（アーカイブ）"}
-        </span>
-        <IdBadge id={project.id} />
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <h1 className="m-0 text-2xl font-medium text-fg">{project.name}</h1>
+          <Badge tone={project.is_active ? "brand" : "neutral"}>
+            {project.is_active ? "Active" : "InActive"}
+          </Badge>
+          <IdBadge id={project.id} />
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => setEditing(true)} style={{ ...btn, ...withIcon }}>
-            <EditIcon size={13} />
-            変更
-          </button>
-          <ActionMenu
-            items={[
-              { label: "バックログ", onSelect: () => onShowBacklog(project.id) },
-              { label: "ガントチャート", onSelect: () => onShowGantt(project.id) },
-              { label: "カンバン", onSelect: () => onShowKanban(project.id) },
-              { label: "JSONエクスポート", onSelect: () => onExport(project), separated: true },
-              { label: project.is_active ? "アーカイブする" : "アクティブに戻す", onSelect: archive },
-              { label: "削除", onSelect: remove, danger: true },
-            ]}
-          />
+          <div className="ml-auto flex items-center gap-2">
+            <Button icon={<EditIcon size={14} />} onClick={() => setEditing(true)}>
+              変更
+            </Button>
+            <DropdownMenu trigger={<MoreIcon size={14} />} label="そのほかの操作" align="end">
+              <DropdownMenuItem onSelect={() => onShowBacklog(project.id)} icon={<BacklogIcon size={14} />}>
+                バックログ
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onShowGantt(project.id)} icon={<GanttIcon size={14} />}>
+                ガントチャート
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onShowKanban(project.id)} icon={<KanbanIcon size={14} />}>
+                カンバン
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => onExport(project)}>JSONエクスポート</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setConfirming("archive")}>
+                {project.is_active ? "アーカイブする" : "アクティブに戻す"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setConfirming("delete")} danger icon={<DeleteIcon size={14} />}>
+                削除
+              </DropdownMenuItem>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
-      <div style={{ fontSize: 13, color: project.description ? "#3b4149" : "#94a0ad" }}>
-        {project.description ?? "（説明なし）"}
-      </div>
+        <p className={cn("m-0 mt-2 text-sm", project.description ? "text-fg" : "text-fg-muted")}>
+          {project.description ?? "説明なし"}
+        </p>
 
-      <section style={card}>
-        <div style={cardHeader}>
-          <h3 style={h3}>基本情報</h3>
-        </div>
-        <Field label="URL">
-          {project.url ? (
-            <a href={project.url} target="_blank" rel="noreferrer" style={link}>
-              {project.url}
-            </a>
-          ) : (
-            DASH
-          )}
-        </Field>
-        <Field label="リポジトリ">
-          {project.repository_url ? (
-            <a href={project.repository_url} target="_blank" rel="noreferrer" style={link}>
-              {project.repository_url}
-            </a>
-          ) : (
-            DASH
-          )}
-        </Field>
-        <Field label="作成日時">{fmt(project.created_at)}</Field>
-        <Field label="更新日時">{fmt(project.updated_at)}</Field>
-      </section>
+        <Card className="mt-6 max-w-[720px]">
+          <div className="border-b border-border px-5 py-3 text-sm font-medium text-fg">基本情報</div>
+          <dl className="m-0 px-5 py-2">
+            <Field label="URL">
+              {project.url ? <ExternalLink href={project.url} /> : DASH}
+            </Field>
+            <Field label="リポジトリ">
+              {project.repository_url ? <ExternalLink href={project.repository_url} /> : DASH}
+            </Field>
+            <Field label="作成日時">{fmt(project.created_at)}</Field>
+            <Field label="更新日時">{fmt(project.updated_at)}</Field>
+          </dl>
+        </Card>
+      </div>
 
       {editing && (
         <ProjectForm
@@ -115,141 +105,58 @@ export function ProjectDetailPage({
           onCancel={() => setEditing(false)}
         />
       )}
-    </div>
-  );
-}
 
-type ActionItem = { label: string; onSelect: () => void; danger?: boolean; separated?: boolean };
+      {confirming === "archive" && (
+        <ConfirmDialog
+          message={
+            project.is_active
+              ? `プロジェクト「${project.name}」をアーカイブします。\nガントチャート・カンバン・バックログの選択肢から外れます。よろしいですか？`
+              : `プロジェクト「${project.name}」をアクティブに戻します。よろしいですか？`
+          }
+          confirmLabel={project.is_active ? "アーカイブする" : "アクティブに戻す"}
+          onConfirm={() => {
+            setConfirming(null);
+            onSetActive(project.id, !project.is_active);
+          }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
 
-// "…" button: the project's actions, collapsed into one pulldown.
-function ActionMenu({ items }: { items: ActionItem[] }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="そのほかの操作"
-        aria-label="そのほかの操作"
-        style={{ ...btn, padding: "5px 10px", lineHeight: "14px", fontSize: 14 }}
-      >
-        …
-      </button>
-      {open && (
-        <>
-          {/* click-away closes the menu */}
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
-          <div style={menu}>
-            {items.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => {
-                  setOpen(false);
-                  item.onSelect();
-                }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "6px 12px",
-                  border: "none",
-                  borderTop: item.separated ? "1px solid #e5e8eb" : "none",
-                  marginTop: item.separated ? 4 : 0,
-                  paddingTop: item.separated ? 10 : 6,
-                  borderRadius: 4,
-                  background: "transparent",
-                  color: item.danger ? "#a3210b" : "#1f2933",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </>
+      {confirming === "delete" && (
+        <ConfirmDialog
+          message={`プロジェクト「${project.name}」を削除します。\n配下のエピック・ストーリー・タスク・依存関係もすべて削除されます。よろしいですか？`}
+          confirmLabel="削除する"
+          danger
+          onConfirm={() => {
+            setConfirming(null);
+            onDelete(project.id);
+          }}
+          onCancel={() => setConfirming(null)}
+        />
       )}
     </div>
   );
 }
 
-const DASH = <span style={{ color: "#94a0ad" }}>—</span>;
+const DASH = <span className="text-fg-muted">—</span>;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div style={{ display: "flex", gap: 12, padding: "5px 0", fontSize: 13 }}>
-      <div style={{ width: 96, flexShrink: 0, color: "#94a0ad", fontSize: 12, fontWeight: 600 }}>{label}</div>
-      <div style={{ minWidth: 0, wordBreak: "break-all" }}>{children}</div>
+    <div className="flex gap-4 border-b border-border py-2.5 text-[13px] last:border-b-0">
+      <dt className="w-24 shrink-0 text-xs font-medium leading-5 text-fg-muted">{label}</dt>
+      <dd className="m-0 min-w-0 break-all leading-5 text-fg">{children}</dd>
     </div>
+  );
+}
+
+function ExternalLink({ href }: { href: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="text-brand no-underline hover:underline">
+      {href}
+    </a>
   );
 }
 
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" });
 }
-
-const menu: CSSProperties = {
-  position: "absolute",
-  right: 0,
-  top: "calc(100% + 4px)",
-  zIndex: 20,
-  minWidth: 160,
-  background: "#fff",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
-  padding: 4,
-};
-
-const card: CSSProperties = {
-  marginTop: 20,
-  background: "#fff",
-  border: "1px solid #e5e8eb",
-  borderRadius: 10,
-  padding: 16,
-  maxWidth: 720,
-};
-
-const cardHeader: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  marginBottom: 12,
-};
-
-const h3: CSSProperties = { margin: 0, fontSize: 14 };
-
-const link: CSSProperties = { color: "#0972d3", textDecoration: "none" };
-
-const btn: CSSProperties = {
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "5px 10px",
-  fontSize: 12,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
-const badgeBase: CSSProperties = {
-  fontSize: 11,
-  borderRadius: 999,
-  padding: "2px 10px",
-  border: "1px solid",
-  whiteSpace: "nowrap",
-};
-
-const activeBadge: CSSProperties = {
-  ...badgeBase,
-  background: "#e8f3ff",
-  color: "#0972d3",
-  borderColor: "#b5d6f7",
-};
-
-const inactiveBadge: CSSProperties = {
-  ...badgeBase,
-  background: "#f2f3f4",
-  color: "#5f6b7a",
-  borderColor: "#d5dbdb",
-};
