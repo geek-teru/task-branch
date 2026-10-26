@@ -1,12 +1,12 @@
-import type { CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cn } from "../lib/cn";
 
 // 説明文をマークダウンとして描画する。生の HTML は描画しない（react-markdown の既定）。
 // 単独の改行も改行として見せる（pre-wrap で書かれてきた説明が崩れないように）。
 export function Markdown({ children }: { children: string }) {
   return (
-    <div style={{ color: "#3b4149", lineHeight: 1.6, overflowWrap: "anywhere" }}>
+    <div className="leading-relaxed text-fg [overflow-wrap:anywhere]">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {children}
       </ReactMarkdown>
@@ -14,35 +14,37 @@ export function Markdown({ children }: { children: string }) {
   );
 }
 
-const block: CSSProperties = { margin: "0 0 8px" };
-const heading: CSSProperties = { margin: "12px 0 6px", fontWeight: 600, color: "#1f2933", lineHeight: 1.4 };
-const cell: CSSProperties = { border: "1px solid #e5e8eb", padding: "3px 6px", textAlign: "left", verticalAlign: "top" };
+// Preflight is off, so margins are set explicitly on every block.
+const block = "m-0 mb-2";
+const heading = "m-0 mb-1.5 mt-4 font-medium leading-snug text-fg first:mt-0";
+const cell = "border border-border px-2 py-1 text-left align-top";
 
 const components: Components = {
-  p: ({ node: _node, ...props }) => <p style={{ ...block, whiteSpace: "pre-line" }} {...props} />,
-  h1: ({ node: _node, ...props }) => <h1 style={{ ...heading, fontSize: 15 }} {...props} />,
-  h2: ({ node: _node, ...props }) => <h2 style={{ ...heading, fontSize: 14 }} {...props} />,
-  h3: ({ node: _node, ...props }) => <h3 style={{ ...heading, fontSize: 13 }} {...props} />,
-  h4: ({ node: _node, ...props }) => <h4 style={{ ...heading, fontSize: 13 }} {...props} />,
-  ul: ({ node: _node, ...props }) => <ul style={{ ...block, paddingLeft: 20 }} {...props} />,
-  ol: ({ node: _node, ...props }) => <ol style={{ ...block, paddingLeft: 20 }} {...props} />,
+  p: ({ node: _node, ...props }) => <p className={cn(block, "whitespace-pre-line")} {...props} />,
+  h1: ({ node: _node, ...props }) => <h1 className={cn(heading, "text-base")} {...props} />,
+  h2: ({ node: _node, ...props }) => <h2 className={cn(heading, "text-[15px]")} {...props} />,
+  h3: ({ node: _node, ...props }) => <h3 className={cn(heading, "text-sm")} {...props} />,
+  h4: ({ node: _node, ...props }) => <h4 className={cn(heading, "text-[13px]")} {...props} />,
+  ul: ({ node: _node, ...props }) => <ul className={cn(block, "pl-5")} {...props} />,
+  ol: ({ node: _node, ...props }) => <ol className={cn(block, "pl-5")} {...props} />,
   // チェックリストの項目は、チェックボックスがあるので黒丸を出さない。
   li: ({ node: _node, className, ...props }) => (
-    <li
-      className={className}
-      style={{ margin: "2px 0", listStyle: className?.includes("task-list-item") ? "none" : undefined }}
-      {...props}
-    />
+    <li className={cn(className, "my-0.5", className?.includes("task-list-item") && "list-none")} {...props} />
   ),
   a: ({ node: _node, ...props }) => (
-    <a style={{ color: "#0972d3" }} target="_blank" rel="noopener noreferrer" {...props} />
+    <a className="text-brand no-underline hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
   ),
   blockquote: ({ node: _node, ...props }) => (
-    <blockquote style={{ ...block, padding: "0 10px", borderLeft: "3px solid #cbd2d9", color: "#5f6b7a" }} {...props} />
+    <blockquote className={cn(block, "border-0 border-l-[3px] border-solid border-border-strong px-2.5 text-fg-muted")} {...props} />
   ),
+  // The code inside a block drops the inline-code background.
   pre: ({ node: _node, ...props }) => (
     <pre
-      style={{ ...block, padding: 8, background: "#f4f5f6", borderRadius: 4, overflowX: "auto", fontSize: 12 }}
+      className={cn(
+        block,
+        "overflow-x-auto rounded-md border border-border bg-surface-muted p-2.5 font-mono text-xs leading-relaxed",
+        "[&>code]:bg-transparent [&>code]:p-0",
+      )}
       {...props}
     />
   ),
@@ -50,14 +52,14 @@ const components: Components = {
     className ? (
       <code className={className} {...props} />
     ) : (
-      <code style={{ background: "#f4f5f6", borderRadius: 3, padding: "1px 4px", fontSize: 12 }} {...props} />
+      <code className="rounded bg-surface-muted px-1 py-px font-mono text-xs" {...props} />
     ),
   table: ({ node: _node, ...props }) => (
-    <div style={{ ...block, overflowX: "auto" }}>
-      <table style={{ borderCollapse: "collapse", fontSize: 12 }} {...props} />
+    <div className={cn(block, "overflow-x-auto")}>
+      <table className="border-collapse text-xs" {...props} />
     </div>
   ),
-  th: ({ node: _node, style, ...props }) => <th style={{ ...cell, ...style, background: "#f7f9fa", fontWeight: 600 }} {...props} />,
-  td: ({ node: _node, style, ...props }) => <td style={{ ...cell, ...style }} {...props} />,
-  hr: ({ node: _node, ...props }) => <hr style={{ border: "none", borderTop: "1px solid #e5e8eb", margin: "10px 0" }} {...props} />,
+  th: ({ node: _node, ...props }) => <th className={cn(cell, "bg-surface-muted font-medium")} {...props} />,
+  td: ({ node: _node, ...props }) => <td className={cell} {...props} />,
+  hr: ({ node: _node, ...props }) => <hr className="my-2.5 border-0 border-t border-solid border-border" {...props} />,
 };
