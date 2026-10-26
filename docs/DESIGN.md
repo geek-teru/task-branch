@@ -726,7 +726,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -774,6 +774,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `create_project`      | `name`, `description` / `url` / `repository_url`（いずれも任意） | 作ったプロジェクト（`id` / `name` / `description` / `url` / `repository_url`）。持ち主は人のユーザーになる（下記「プロジェクトの作成のツール」） |
 | `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
 | `list_stories`        | `project_id`             | `{ project, stories }`。ストーリーの一覧（進捗・タスク数込み）。`context` と配下のタスクは含まない（下記「ストーリーの一覧のツール」） |
+| `get_story`           | `story_id`               | `{ story, project, tasks }`。ストーリー1件（`context`・進捗込み）と配下のタスク。コメントは含まない（下記「ストーリーの中身のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status` / `active`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `activated_at` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
 | `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
@@ -796,7 +797,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 **プロジェクトの全体のツール**
 
-`export_project` は、計画の現状把握とタスクの一覧のために、プロジェクトを1回で返す。
+`export_project` は、プロジェクト全体の書き出し用に、プロジェクトを1回で返す（画面のエクスポートと同じ形）。全ストーリーの `context` と全タスクの説明を含んで大きいので、計画の現状把握は `list_stories` と `get_story` で行う（ツールの説明にもそう書く）。
 
 - RPC `export_project(project)`（画面のエクスポートと同じ）を呼び、返り値の JSON に手を加えずに返す。
 - `project`: `id` / `name` / `description` / `created_at`。`stories[]`: `id` / `title` / `description` / `context` / `activated_at` / `status` / `sort_order` / `start_date` / `due_date` / `progress` / `metadata` / `tasks[]`。`tasks[]`: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_id` / `sort_order` / `start_date` / `due_date` / `metadata`。
@@ -811,6 +812,15 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - `context` と配下のタスクの中身は返さない。
 - `projects` を id で引き、見つからない（他人のものを含む）ときは `isError`（「プロジェクトが見つかりません」。`export_project` と同じ文言）。
 - ストーリーは `tasks` を `project_id` と `level = 'story'` で、タスク数は `level = 'task'` の `parent_id` / `status` を取って関数の中で数える。どちらも 1000 行ずつ `range` で分けて全部取る（`find_items` と同じ）。
+
+**ストーリーの中身のツール**
+
+`get_story` は、`list_stories` で見つけたストーリー1件の中身（`context` と配下のタスク）を読むのに使う。DB の変更は持たず、RLS の下で読むだけ。
+
+- `story`: `id` / `title` / `description` / `context` / `status` / `active`（`activated_at` が null でないか）/ `activated_at` / `start_date` / `due_date` / `progress`（RPC `get_progress(project)` のそのストーリーの値。0〜1）。`project`: `id` / `name`。
+- `tasks[]`（`sort_order` 順）: `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`。`parent_id` と `level = 'task'` で、1000 行ずつ `range` で分けて全部取る。
+- コメントは含まない（タスクごとに `get_task_context` で取る）。
+- 見つからない（他人のものを含む）ストーリーは `isError`（「ストーリーが見つかりません」）、タスクの id は `isError`（「タスクの id です。ストーリーの id を指定してください」）。どちらも `update_story` と同じ文言。
 
 **検索のツール**
 
