@@ -25,26 +25,19 @@ function Icon({ size = 16, children }: { size?: number; children: ReactNode }) {
 
 type IconProps = { size?: number };
 
-// Service icon: a trunk with branches forking left and right, and smaller branches off those, on a rounded tile.
-// Same drawing as public/favicon.svg.
+// Service icon: a trunk with one branch forking off, on a rounded tile. Same drawing as public/favicon.svg.
 export function ServiceIcon({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }}>
       <rect width="24" height="24" rx="6" fill="#0972d3" />
-      <g fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round">
-        <path d="M12 20.5V4.5" />
-        <path d="M12 16.5c0-2.5-6.5-2.5-6.5-5V9" />
-        <path d="M12 12.5c0-2.5 6.5-2.5 6.5-5V5.5" />
-        <path d="M5.5 13c0-1.5-2-1-2-3" />
-        <path d="M18.5 10c0 2 2 2 2 4" />
+      <g fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
+        <path d="M8 6.5v11" />
+        <path d="M16 9c0 4-8 3-8 6" />
       </g>
       <g fill="#fff">
-        <circle cx="12" cy="4.5" r="1.6" />
-        <circle cx="12" cy="20" r="1.6" />
-        <circle cx="5.5" cy="8.5" r="1.6" />
-        <circle cx="18.5" cy="5" r="1.6" />
-        <circle cx="3.5" cy="9.5" r="1.3" />
-        <circle cx="20.5" cy="14.5" r="1.3" />
+        <circle cx="8" cy="6.5" r="1.9" />
+        <circle cx="8" cy="17.5" r="1.9" />
+        <circle cx="16" cy="7.5" r="1.9" />
       </g>
     </svg>
   );
