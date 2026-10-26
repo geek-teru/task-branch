@@ -673,7 +673,6 @@ export default function App() {
                       projects={pickerProjects(searchParams.get("project"))}
                       lanes={lanes}
                       projectFilter={searchParams.get("project")}
-                      onChangeProjectFilter={(id) => setSearchParams(id ? { project: id } : {})}
                       onChangeStatus={handleKanbanStatus}
                       onMoveTask={handleKanbanMove}
                       onAddStory={handleKanbanAddStory}
