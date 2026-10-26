@@ -51,7 +51,7 @@ export default function App() {
   const isKanban = pathname === "/kanban";
   const storyMatch = useMatch("/stories/:storyId");
   const isBacklog = pathname === "/backlog" || storyMatch !== null;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, or the first active project for /gantt.
   const defaultProjectId = (projects.find((p) => p.is_active) ?? projects[0])?.id;
   const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? defaultProjectId : undefined;
@@ -639,10 +639,7 @@ export default function App() {
                     <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
                   ) : (
                     <BacklogView
-                      projects={pickerProjects(backlogProjectId)}
-                      projectId={backlogProjectId!}
                       stories={backlog && backlog.projectId === backlogProjectId ? backlog.stories : null}
-                      onSelectProject={(id) => setSearchParams({ project: id })}
                       onAddBacklog={handleAddBacklog}
                       onSetActive={handleSetStoryActive}
                     />
