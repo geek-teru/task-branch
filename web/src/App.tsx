@@ -30,6 +30,7 @@ import {
 import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
+import { Button } from "./components/ui/Button";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
@@ -499,6 +500,23 @@ export default function App() {
   const meta = session.user.user_metadata ?? {};
   const userName: string = meta.full_name ?? meta.name ?? session.user.email ?? "";
 
+  // The header's project switcher keeps the page and swaps the project; pages without one
+  // (project list, story detail) go to that project's backlog.
+  const kanbanProjectId = isKanban ? searchParams.get("project") : null;
+  const headerProjectId = isGantt
+    ? ganttProjectId
+    : pathname === "/backlog"
+      ? backlogProjectId
+      : isKanban
+        ? kanbanProjectId
+        : projectMatch?.params.projectId;
+  const handleHeaderSelectProject = (id: string) => {
+    if (isGantt) navigate(`/projects/${id}/gantt`);
+    else if (isKanban) navigate(`/kanban?project=${id}`);
+    else if (projectMatch) navigate(`/projects/${id}`);
+    else navigate(`/backlog?project=${id}`);
+  };
+
   const detailProject = projects.find((p) => p.id === projectMatch?.params.projectId);
   const ganttProject = projects.find((p) => p.id === ganttProjectId);
   const ganttPage = (
@@ -537,18 +555,30 @@ export default function App() {
   );
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <GlobalHeader userName={userName} userEmail={session.user.email ?? null} onLogout={handleLogout} />
-      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+    <div className="flex h-screen flex-col">
+      <GlobalHeader
+        projects={projects}
+        currentProjectId={headerProjectId ?? null}
+        allProjectsLabel={isKanban ? "すべてのプロジェクト" : undefined}
+        onSelectProject={handleHeaderSelectProject}
+        onSelectAllProjects={() => navigate(isKanban ? "/kanban" : "/projects")}
+        userName={userName}
+        userEmail={session.user.email ?? null}
+        onLogout={handleLogout}
+      />
+      <div className="flex min-h-0 flex-1">
         <Sidebar
           active={isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
           onNavigate={onNavigate}
         />
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div className="flex min-w-0 flex-1 flex-col">
           {error && (
-            <div style={{ background: "#fdeceb", color: "#a3210b", padding: "6px 12px", fontSize: 13 }}>
-              {error} <button onClick={() => setError(null)}>×</button>
+            <div className="flex items-center gap-2 border-b border-danger/30 bg-danger/10 px-3 py-1.5 text-[13px] text-danger">
+              <span className="min-w-0 flex-1">{error}</span>
+              <Button variant="ghost" size="sm" aria-label="閉じる" onClick={() => setError(null)}>
+                ×
+              </Button>
             </div>
           )}
 
@@ -664,5 +694,5 @@ export default function App() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  return <div style={{ height: "100vh", display: "flex" }}>{children}</div>;
+  return <div className="flex h-screen">{children}</div>;
 }
