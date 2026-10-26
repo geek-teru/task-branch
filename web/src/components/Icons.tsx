@@ -112,3 +112,43 @@ export function AddIcon(p: IconProps) {
     </Icon>
   );
 }
+
+// Search: a magnifier.
+export function SearchIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
+    </Icon>
+  );
+}
+
+// More actions: three vertical dots (⋮).
+export function MoreIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M8 3h.01M8 8h.01M8 13h.01" strokeWidth="2.2" />
+    </Icon>
+  );
+}
+
+// Grid view: four tiles.
+export function GridIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="0.8" />
+      <rect x="9" y="2.5" width="4.5" height="4.5" rx="0.8" />
+      <rect x="2.5" y="9" width="4.5" height="4.5" rx="0.8" />
+      <rect x="9" y="9" width="4.5" height="4.5" rx="0.8" />
+    </Icon>
+  );
+}
+
+// List view: horizontal rows.
+export function ListIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+    </Icon>
+  );
+}

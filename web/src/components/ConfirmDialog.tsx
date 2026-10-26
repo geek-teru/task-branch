@@ -5,11 +5,14 @@ import { Dialog } from "./ui/Dialog";
 export function ConfirmDialog({
   message,
   confirmLabel = "変更する",
+  danger,
   onConfirm,
   onCancel,
 }: {
   message: string;
   confirmLabel?: string;
+  // Destructive action (e.g. delete): the confirm button turns red.
+  danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -20,7 +23,7 @@ export function ConfirmDialog({
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>
-          <Button variant="primary" autoFocus onClick={onConfirm}>
+          <Button variant={danger ? "danger" : "primary"} autoFocus onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>
