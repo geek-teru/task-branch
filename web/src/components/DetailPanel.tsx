@@ -79,9 +79,9 @@ export function DetailPanel<T extends DetailNode>({
       />
       <div className="shrink-0 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="flex-1 text-xs text-fg-muted">{node ? LEVEL_LABEL[node.level] : "詳細"}</span>
+          <span className="text-xs text-fg-muted">{node ? LEVEL_LABEL[node.level] : "詳細"}</span>
           {node && <IdBadge id={node.id} />}
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button size="sm" variant="ghost" onClick={onClose} className="ml-auto">
             閉じる
           </Button>
         </div>
