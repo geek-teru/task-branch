@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { addTaskComment, deleteTaskComment, listTaskComments, updateTaskComment } from "../lib/api";
 import type { TaskComment } from "../lib/types";
 import { useSession } from "../lib/useSession";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { DeleteIcon, EditIcon, withIcon } from "./Icons";
+import { DeleteIcon, EditIcon } from "./Icons";
+import { Badge } from "./ui/Badge";
+import { Button } from "./ui/Button";
+import { Textarea } from "./ui/Textarea";
 
 const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
 
@@ -110,77 +113,78 @@ export function TaskComments({ taskId }: { taskId: string }) {
     c.author_type === "ai" ? "AI" : myId && c.author_id === myId ? "自分" : "人";
 
   return (
-    <div style={{ marginTop: 4, paddingTop: 12, borderTop: "1px solid #e5e8eb" }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a0ad", marginBottom: 6 }}>
-        コメント（{comments.length}）
-      </div>
+    <div className="mt-1 border-t border-border pt-3">
+      <div className="mb-1 text-xs text-fg-muted">コメント（{comments.length}）</div>
 
-      {comments.map((c) => (
-        <div key={c.id} style={{ marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "baseline", fontSize: 11, color: "#5f6b7a", marginBottom: 2 }}>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 600, color: "#3b4149" }}>{authorLabel(c)}</span>
-              {"　"}
-              {fmtDateTime(c.created_at)}
-              {c.updated_at !== c.created_at && <span style={{ color: "#94a0ad" }}>（編集済み）</span>}
-            </span>
-            {canModify(c) && editingId !== c.id && (
-              <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button onClick={() => startEdit(c)} style={{ ...textBtn, ...withIcon, gap: 2 }}>
-                  <EditIcon size={11} />
-                  編集
-                </button>
-                <button onClick={() => setDeletingId(c.id)} style={{ ...textBtn, ...withIcon, gap: 2 }}>
-                  <DeleteIcon size={11} />
-                  削除
-                </button>
+      <div className="divide-y divide-border">
+        {comments.map((c) => (
+          <div key={c.id} className="py-2.5">
+            <div className="mb-1 flex items-center gap-2 text-[11px] text-fg-muted">
+              <Badge tone={c.author_type === "ai" ? "brand" : "neutral"}>{authorLabel(c)}</Badge>
+              <span className="min-w-0 flex-1">
+                {fmtDateTime(c.created_at)}
+                {c.updated_at !== c.created_at && "（編集済み）"}
               </span>
+              {canModify(c) && editingId !== c.id && (
+                <span className="flex shrink-0 gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<EditIcon size={11} />}
+                    onClick={() => startEdit(c)}
+                    className="h-5 px-1 text-[11px] text-fg-muted"
+                  >
+                    編集
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<DeleteIcon size={11} />}
+                    onClick={() => setDeletingId(c.id)}
+                    className="h-5 px-1 text-[11px] text-fg-muted"
+                  >
+                    削除
+                  </Button>
+                </span>
+              )}
+            </div>
+            {editingId === c.id ? (
+              <>
+                <Textarea
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      save();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEdit();
+                    }
+                  }}
+                  autoFocus
+                  rows={3}
+                  disabled={saving}
+                />
+                <div className="mt-1.5 flex justify-end gap-1.5">
+                  <Button size="sm" onClick={cancelEdit} disabled={saving}>
+                    キャンセル
+                  </Button>
+                  <Button size="sm" variant="primary" onClick={save} disabled={!canSave}>
+                    {saving ? "保存中…" : "保存"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="whitespace-pre-wrap break-words text-[13px] text-fg">{c.body}</div>
             )}
           </div>
-          {editingId === c.id ? (
-            <>
-              <textarea
-                value={editDraft}
-                onChange={(e) => setEditDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    save();
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    cancelEdit();
-                  }
-                }}
-                autoFocus
-                rows={3}
-                disabled={saving}
-                style={textarea}
-              />
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 6 }}>
-                <button onClick={cancelEdit} disabled={saving} style={cancelBtn}>
-                  キャンセル
-                </button>
-                <button
-                  onClick={save}
-                  disabled={!canSave}
-                  style={{
-                    ...postBtn,
-                    ...(canSave ? {} : { opacity: 0.5, cursor: "default" }),
-                  }}
-                >
-                  {saving ? "保存中…" : "保存"}
-                </button>
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 13, color: "#1f2933", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{c.body}</div>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
 
-      {error && <div style={{ fontSize: 12, color: "#a3210b", marginBottom: 8 }}>{error}</div>}
+      {error && <div className="mb-2 text-xs text-danger">{error}</div>}
 
-      <textarea
+      <Textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
@@ -192,25 +196,19 @@ export function TaskComments({ taskId }: { taskId: string }) {
         placeholder="コメントを書く（Ctrl+Enter で投稿）"
         rows={3}
         disabled={posting}
-        style={textarea}
+        className="mt-2"
       />
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-        <button
-          onClick={post}
-          disabled={!canPost}
-          style={{
-            ...postBtn,
-            ...(canPost ? {} : { opacity: 0.5, cursor: "default" }),
-          }}
-        >
+      <div className="mt-1.5 flex justify-end">
+        <Button size="sm" variant="primary" onClick={post} disabled={!canPost}>
           {posting ? "投稿中…" : "投稿"}
-        </button>
+        </Button>
       </div>
 
       {deletingId && (
         <ConfirmDialog
           message="このコメントを削除しますか？"
           confirmLabel="削除する"
+          danger
           onConfirm={() => remove(deletingId)}
           onCancel={() => setDeletingId(null)}
         />
@@ -218,45 +216,3 @@ export function TaskComments({ taskId }: { taskId: string }) {
     </div>
   );
 }
-
-const textarea: CSSProperties = {
-  display: "block",
-  width: "100%",
-  boxSizing: "border-box",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "6px 8px",
-  fontSize: 13,
-  fontFamily: "inherit",
-  color: "#1f2933",
-  resize: "vertical",
-};
-
-const postBtn: CSSProperties = {
-  background: "#0972d3",
-  color: "#fff",
-  border: "1px solid #0972d3",
-  borderRadius: 6,
-  padding: "6px 14px",
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const cancelBtn: CSSProperties = {
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "6px 14px",
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const textBtn: CSSProperties = {
-  background: "none",
-  border: "none",
-  padding: 0,
-  fontSize: 11,
-  color: "#5f6b7a",
-  cursor: "pointer",
-};
