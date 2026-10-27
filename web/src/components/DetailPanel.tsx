@@ -105,18 +105,18 @@ export function DetailPanel<T extends DetailNode>({
           </Button>
         </div>
         <div className="mt-1 break-words text-sm font-medium text-fg">{title}</div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
         {node && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Field label="ステータス">
             {onChangeStatus ? (
               <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
             ) : (
               <Badge tone={node.status}>{STATUS_LABEL[node.status]}</Badge>
             )}
-          </div>
+          </Field>
         )}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
         <Field label="詳細">{node?.description ? <Markdown>{node.description}</Markdown> : DASH}</Field>
         {place && (
           <Field label="ストーリー">
