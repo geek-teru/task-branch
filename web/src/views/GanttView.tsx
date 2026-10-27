@@ -315,6 +315,11 @@ export function GanttView({
   const bodyH = visibleRows.length * ROW_H;
   const totalW = LABEL_W + timelineW;
   const selectedRow = selectedKey ? rows.find((r) => r.key === selectedKey) ?? null : null;
+  // 期間のないタスクは、親のストーリーの期間を細く薄いバーで描く。
+  const storyPeriod = new Map<string, { start: Date; end: Date }>();
+  for (const r of rows) {
+    if (r.kind === "story" && r.node && r.start && r.end) storyPeriod.set(r.node.id, { start: r.start, end: r.end });
+  }
   // 新しいストーリーの期間の初期値に使う、プロジェクト内のストーリーの最終期限。
   const storyEnds = rows.filter((r) => r.kind === "story" && r.end).map((r) => r.end!.getTime());
   const lastStoryEnd = storyEnds.length ? new Date(Math.max(...storyEnds)) : null;
@@ -462,10 +467,10 @@ export function GanttView({
                   r.kind === "project"
                     ? "text-sm font-medium"
                     : r.kind === "group"
-                      ? "text-[13px] font-medium"
+                      ? "text-xs font-medium"
                       : r.kind === "story"
-                        ? "text-[13px]"
-                        : "text-xs",
+                        ? "text-xs"
+                        : "text-[11px]",
                   draggableStory && "cursor-grab",
                   dragStory && r.node?.id === dragStory.id && "opacity-50",
                 )}
@@ -530,11 +535,10 @@ export function GanttView({
                       setGroupForm({ id: r.groupId, name: r.label });
                     }}
                     title="グループ名を変更"
-                    icon={<EditIcon size={11} />}
-                    className={cn(rowBtn, rowBtnMuted, "gap-0.5")}
-                  >
-                    変更
-                  </Button>
+                    aria-label="グループ名を変更"
+                    icon={<EditIcon size={12} />}
+                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                  />
                 )}
                 {r.kind === "group" && r.groupId && onDeleteGroup && (
                   <Button
@@ -549,11 +553,10 @@ export function GanttView({
                       });
                     }}
                     title="グループを削除"
-                    icon={<DeleteIcon size={11} />}
-                    className={cn(rowBtn, "gap-0.5 text-danger!")}
-                  >
-                    削除
-                  </Button>
+                    aria-label="グループを削除"
+                    icon={<DeleteIcon size={12} />}
+                    className={cn(rowBtn, "w-5 px-0 text-danger!")}
+                  />
                 )}
                 {r.kind === "story" && r.node && onAddTask && (
                   <Button
@@ -571,12 +574,16 @@ export function GanttView({
                 <ResizeHandle onMouseDown={startResize} />
               </div>
               <div className="relative border-b border-border/60" style={{ width: timelineW }}>
-                {r.kind === "task" && !(r.start && r.end) && (
-                  <span className="absolute left-2 top-0 flex items-center text-[11px] text-fg-muted" style={{ height: ROW_H }}>
-                    期間未設定
-                  </span>
-                )}
                 {r.kind === "group" && r.start && r.end && <GroupBar row={r} timelineStart={timelineStart} />}
+                {r.kind === "task" && !(r.start && r.end) && r.node?.parent_id && storyPeriod.has(r.node.parent_id) && (
+                  <InheritedBar
+                    row={r}
+                    period={storyPeriod.get(r.node.parent_id)!}
+                    timelineStart={timelineStart}
+                    selected={r.key === selectedKey}
+                    onSelect={() => setSelectedKey(r.key)}
+                  />
+                )}
                 {r.kind !== "group" && r.start && r.end && (
                   <Bar
                     row={r}
@@ -746,6 +753,37 @@ function DateLabel({ left, children }: { left: number; children: string }) {
     >
       {children}
     </span>
+  );
+}
+
+// 期間のないタスク。親のストーリーの期間に、ストーリーのバーより細く薄い status 色で描く。
+// タスク自身の期間ではないので、ドラッグでは動かせない（押すと詳細パネルを開く）。
+function InheritedBar({
+  row,
+  period,
+  timelineStart,
+  selected,
+  onSelect,
+}: {
+  row: Row;
+  period: { start: Date; end: Date };
+  timelineStart: Date;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const left = diffDays(timelineStart, period.start) * PX_PER_DAY;
+  const width = Math.max((diffDays(period.start, period.end) + 1) * PX_PER_DAY, 4);
+  return (
+    <div
+      onClick={onSelect}
+      title={`${row.label}\n期間未設定（ストーリーの期間を表示）`}
+      className={cn(
+        "absolute h-1.5 cursor-pointer rounded opacity-40",
+        row.status ? BAR_BG[row.status] : "bg-status-closed-border",
+        selected && "opacity-70 ring-2 ring-brand ring-offset-1",
+      )}
+      style={{ left, width, top: (ROW_H - 6) / 2 }}
+    />
   );
 }
 
