@@ -1,12 +1,15 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
-import { STATUS_COLOR } from "../lib/style";
-import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
+import { useResizableWidth } from "../lib/useResizableWidth";
 import { IdBadge } from "./IdBadge";
 import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
-import { DeleteIcon, EditIcon, withIcon } from "./Icons";
+import { DeleteIcon, EditIcon } from "./Icons";
+import { Badge } from "./ui/Badge";
+import { Button } from "./ui/Button";
+import { DropdownMenu, DropdownMenuItem } from "./ui/DropdownMenu";
+import { Select } from "./ui/Select";
 
 // A story or task shown in the panel; progress is present for graph nodes only.
 export type DetailNode = Task & { progress?: number | null };
@@ -63,64 +66,63 @@ export function DetailPanel<T extends DetailNode>({
   const canEdit = node != null;
   const canStart = canEdit && node != null && node.status === "todo";
   const canComplete = canEdit && node != null && node.status === "in_progress";
-  const DASH = <span style={{ color: "#94a0ad" }}>-</span>;
+  const DASH = <span className="text-fg-muted">-</span>;
   // 左端のハンドルで幅を変える。右へドラッグすると狭くなる。
   const { width, startResize } = useResizableWidth("detailPanel.width", 320, 280, 800, { invert: true });
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width,
-        flexShrink: 0,
-        borderLeft: "1px solid #cbd2d9",
-        background: "#fff",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, left: 0 }} />
+    <div style={{ width }} className="relative flex shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 14px",
-          borderBottom: "1px solid #e5e8eb",
-          background: "#f7f9fa",
-        }}
-      >
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#5f6b7a" }}>
-          {node ? LEVEL_LABEL[node.level] : "詳細"}
-        </span>
-        <button
-          onClick={onClose}
-          style={{
-            border: "1px solid #cbd2d9",
-            background: "#fff",
-            borderRadius: 6,
-            padding: "2px 10px",
-            fontSize: 12,
-            cursor: "pointer",
-            color: "#3b4149",
-          }}
-        >
-          閉じる
-        </button>
+        onMouseDown={startResize}
+        title="ドラッグで幅を変更"
+        className="absolute inset-y-0 left-0 z-[5] w-[7px] cursor-col-resize select-none"
+      />
+      <div className="shrink-0 border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-fg-muted">{node ? LEVEL_LABEL[node.level] : "詳細"}</span>
+          {node && <IdBadge id={node.id} />}
+          <span className="ml-auto flex items-center gap-0.5">
+            {node && onEdit && (
+              <Button size="sm" variant="ghost" onClick={() => onEdit(node)} title="変更" aria-label="変更" className="w-7 px-0">
+                <EditIcon size={14} />
+              </Button>
+            )}
+            {node && onDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onDelete(node)}
+                title="削除"
+                aria-label="削除"
+                className="w-7 px-0 text-danger"
+              >
+                <DeleteIcon size={14} />
+              </Button>
+            )}
+          </span>
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            閉じる
+          </Button>
+        </div>
+        <div className="mt-1 break-words text-sm font-medium text-fg">{title}</div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#1f2933", marginBottom: 14 }}>
-          {title}
-        </div>
-
-        {node && <Field label="ID"><IdBadge id={node.id} /></Field>}
-        <Field label="レベル">{node ? LEVEL_LABEL[node.level] : DASH}</Field>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+        {node && (
+          <Field label="ステータス">
+            {onChangeStatus ? (
+              <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
+            ) : (
+              <Badge tone={node.status}>{STATUS_LABEL[node.status]}</Badge>
+            )}
+          </Field>
+        )}
+        <Field label="詳細">{node?.description ? <Markdown>{node.description}</Markdown> : DASH}</Field>
         {place && (
           <Field label="ストーリー">
             {storyOptions?.length && onPickStory ? (
-              <PlacePicker
+              <StoryPicker
+                key={node?.id}
                 text={place.story}
                 options={storyOptions}
                 currentStoryId={currentStoryId ?? null}
@@ -131,30 +133,10 @@ export function DetailPanel<T extends DetailNode>({
             )}
           </Field>
         )}
-        <Field label="ステータス">
-          {node?.status ? (
-            onChangeStatus ? (
-              <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
-            ) : (
-              <StatusBadge status={node.status} />
-            )
-          ) : (
-            DASH
-          )}
-        </Field>
         <Field label="開始日">{node?.start_date ? fmt(parseDate(node.start_date)) : DASH}</Field>
         <Field label="期限">{node?.due_date ? fmt(parseDate(node.due_date)) : DASH}</Field>
         <Field label="期間">{durationDays != null ? `${durationDays}日` : DASH}</Field>
-        <Field label="進捗">
-          {node?.progress != null ? `${Math.round(node.progress * 100)}%` : DASH}
-        </Field>
-        <Field label="詳細">
-          {node?.description ? (
-            <Markdown>{node.description}</Markdown>
-          ) : (
-            DASH
-          )}
-        </Field>
+        <Field label="進捗">{node?.progress != null ? `${Math.round(node.progress * 100)}%` : DASH}</Field>
         <Field label="作成日時">{node?.created_at ? fmtDateTime(node.created_at) : DASH}</Field>
         <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
@@ -162,45 +144,21 @@ export function DetailPanel<T extends DetailNode>({
         {node?.level === "task" && <TaskComments taskId={node.id} />}
       </div>
 
-      {canEdit && node && (
-        <div style={{ flexShrink: 0, borderTop: "1px solid #e5e8eb", background: "#fff", padding: 12 }}>
-          {((canStart && onStart) || (canComplete && onComplete)) && (
-            <div style={{ display: "flex", gap: 8 }}>
-              {canStart && onStart && (
-                <button
-                  onClick={() => onStart(node)}
-                  title={`この${LEVEL_LABEL[node.level]}を進行中にします`}
-                  style={{ ...panelBtn, flex: 1, background: "#0972d3", color: "#fff", borderColor: "#0972d3" }}
-                >
-                  進行中にする
-                </button>
-              )}
-              {canComplete && onComplete && (
-                <button
-                  onClick={() => onComplete(node)}
-                  style={{ ...panelBtn, flex: 1, background: "#1a7f37", color: "#fff", borderColor: "#1a7f37" }}
-                >
-                  完了にする
-                </button>
-              )}
-            </div>
+      {node && ((canStart && onStart) || (canComplete && onComplete)) && (
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-surface p-3">
+          {canStart && onStart && (
+            <Button
+              variant="primary"
+              onClick={() => onStart(node)}
+              title={`この${LEVEL_LABEL[node.level]}を進行中にします`}
+            >
+              進行中にする
+            </Button>
           )}
-
-          {(onEdit || onDelete) && (
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {onEdit && (
-                <button onClick={() => onEdit(node)} style={{ ...panelBtn, ...withIcon }}>
-                  <EditIcon size={14} />
-                  変更
-                </button>
-              )}
-              {onDelete && (
-                <button onClick={() => onDelete(node)} style={{ ...panelBtn, ...withIcon, marginLeft: "auto", color: "#a3210b", borderColor: "#f0c2ba" }}>
-                  <DeleteIcon size={14} />
-                  削除
-                </button>
-              )}
-            </div>
+          {canComplete && onComplete && (
+            <Button variant="primary" onClick={() => onComplete(node)}>
+              完了にする
+            </Button>
           )}
         </div>
       )}
@@ -208,27 +166,18 @@ export function DetailPanel<T extends DetailNode>({
   );
 }
 
-const panelBtn: CSSProperties = {
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "6px 14px",
-  fontSize: 13,
-  cursor: "pointer",
-};
-
+// Label above, value below.
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a0ad", marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 13, color: "#1f2933" }}>{children}</div>
+    <div className="mb-3">
+      <div className="mb-1 text-xs text-fg-muted">{label}</div>
+      <div className="text-[13px] text-fg">{children}</div>
     </div>
   );
 }
 
-// ストーリー名をクリックすると開く、移動先ストーリーのメニュー。
-function PlacePicker({
+// ストーリー名と編集ボタン。押すとプルダウンに切り替わり、選ぶか Escape / フォーカスが外れると戻る。
+function StoryPicker({
   text,
   options,
   currentStoryId,
@@ -239,160 +188,69 @@ function PlacePicker({
   currentStoryId: string | null;
   onPick: (storyId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="min-w-0 break-words">{text ?? "-"}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setEditing(true)}
+          title="ストーリーを変更"
+          aria-label="ストーリーを変更"
+          className="h-6 w-6 px-0 text-fg-muted"
+        >
+          <EditIcon size={13} />
+        </Button>
+      </div>
+    );
+  }
   return (
-    <span style={{ position: "relative", display: "block" }}>
-      <button onClick={() => setOpen((v) => !v)} title="クリックでストーリーを変更" style={placeBtn}>
-        <span style={{ flex: 1, textAlign: "left" }}>{text ?? "-"}</span>
-        <span style={{ fontSize: 10, color: "#5f6b7a" }}>▾</span>
-      </button>
-      {open && (
-        <>
-          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
-          <span style={placeMenu}>
-            {options.map((story) => (
-              <button
-                key={story.id}
-                onClick={() => {
-                  setOpen(false);
-                  if (story.id !== currentStoryId) onPick(story.id);
-                }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "5px 10px",
-                  border: "none",
-                  borderRadius: 4,
-                  background: story.id === currentStoryId ? "#eef1f3" : "transparent",
-                  color: "#1f2933",
-                  fontSize: 12,
-                  fontWeight: story.id === currentStoryId ? 600 : 400,
-                  cursor: "pointer",
-                }}
-              >
-                {story.label}
-              </button>
-            ))}
-          </span>
-        </>
-      )}
-    </span>
+    <Select
+      autoFocus
+      value={currentStoryId ?? ""}
+      onChange={(e) => {
+        setEditing(false);
+        if (e.target.value !== currentStoryId) onPick(e.target.value);
+      }}
+      onBlur={() => setEditing(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setEditing(false);
+      }}
+      title="ストーリーを変更"
+    >
+      {currentStoryId == null && <option value="">{text ?? "-"}</option>}
+      {options.map((story) => (
+        <option key={story.id} value={story.id}>
+          {story.label}
+        </option>
+      ))}
+    </Select>
   );
 }
-
-const placeBtn: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-  width: "100%",
-  background: "none",
-  border: "none",
-  padding: 0,
-  fontSize: 13,
-  color: "#1f2933",
-  cursor: "pointer",
-  textAlign: "left",
-};
-
-const placeMenu: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  top: "calc(100% + 4px)",
-  zIndex: 20,
-  width: 268,
-  maxHeight: 260,
-  overflowY: "auto",
-  background: "#fff",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
-  padding: 4,
-};
 
 // Badge that opens a small menu to pick any status.
 function StatusPicker({ status, onPick }: { status: Status; onPick: (status: Status) => void }) {
-  const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: "relative", display: "inline-block" }}>
-      <button onClick={() => setOpen((v) => !v)} title="クリックでステータスを変更" style={pickerBtn}>
-        <StatusBadge status={status} />
-        <span style={{ fontSize: 10, color: "#5f6b7a" }}>▾</span>
-      </button>
-      {open && (
+    <DropdownMenu
+      variant="ghost"
+      size="sm"
+      label="ステータスを変更"
+      menuClassName="min-w-[120px]"
+      className="-mx-2.5"
+      trigger={
         <>
-          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
-          <span style={pickerMenu}>
-            {STATUS_ORDER.map((s) => (
-              <button
-                key={s}
-                onClick={() => {
-                  setOpen(false);
-                  if (s !== status) onPick(s);
-                }}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "5px 10px",
-                  border: "none",
-                  borderRadius: 4,
-                  background: s === status ? "#eef1f3" : "transparent",
-                  color: "#1f2933",
-                  fontSize: 12,
-                  fontWeight: s === status ? 600 : 400,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {STATUS_LABEL[s]}
-              </button>
-            ))}
-          </span>
+          <Badge tone={status}>{STATUS_LABEL[status]}</Badge>
+          <span className="text-[10px] text-fg-muted">▾</span>
         </>
-      )}
-    </span>
-  );
-}
-
-const pickerBtn: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  background: "none",
-  border: "none",
-  padding: 0,
-  cursor: "pointer",
-};
-
-const pickerMenu: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  top: "calc(100% + 4px)",
-  zIndex: 20,
-  minWidth: 96,
-  background: "#fff",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  boxShadow: "0 4px 12px rgba(31,41,51,0.18)",
-  padding: 4,
-};
-
-function StatusBadge({ status }: { status: Status }) {
-  const c = STATUS_COLOR[status];
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 12,
-        padding: "2px 8px",
-        borderRadius: 10,
-        background: c?.bg ?? "#f4f5f6",
-        color: c?.fg ?? "#5f6b7a",
-        border: `1px solid ${c?.border ?? "#cbd2d9"}`,
-      }}
+      }
     >
-      {STATUS_LABEL[status]}
-    </span>
+      {STATUS_ORDER.map((s) => (
+        <DropdownMenuItem key={s} onSelect={() => s !== status && onPick(s)}>
+          <Badge tone={s}>{STATUS_LABEL[s]}</Badge>
+        </DropdownMenuItem>
+      ))}
+    </DropdownMenu>
   );
 }

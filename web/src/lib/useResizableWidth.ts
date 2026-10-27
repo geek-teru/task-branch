@@ -48,14 +48,3 @@ export function useResizableWidth(
 
   return { width, startResize };
 }
-
-// Shared look of the vertical drag handle sitting on a column border.
-export const resizeHandleStyle = {
-  position: "absolute" as const,
-  top: 0,
-  bottom: 0,
-  width: 7,
-  cursor: "col-resize",
-  zIndex: 5,
-  userSelect: "none" as const,
-};

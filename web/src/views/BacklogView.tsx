@@ -156,7 +156,7 @@ export function BacklogView({
   );
 }
 
-// Transparent drag handle on a column edge (same hit area as resizeHandleStyle).
+// Transparent 7px drag handle on a column edge.
 function ResizeHandle({ onMouseDown, side }: { onMouseDown: (e: MouseEvent) => void; side: "left" | "right" }) {
   return (
     <div
