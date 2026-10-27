@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
@@ -121,20 +121,13 @@ export function DetailPanel<T extends DetailNode>({
         {place && (
           <Field label="ストーリー">
             {storyOptions?.length && onPickStory ? (
-              <Select
-                value={currentStoryId ?? ""}
-                onChange={(e) => {
-                  if (e.target.value !== currentStoryId) onPickStory(e.target.value);
-                }}
-                title="ストーリーを変更"
-              >
-                {currentStoryId == null && <option value="">{place.story ?? "-"}</option>}
-                {storyOptions.map((story) => (
-                  <option key={story.id} value={story.id}>
-                    {story.label}
-                  </option>
-                ))}
-              </Select>
+              <StoryPicker
+                key={node?.id}
+                text={place.story}
+                options={storyOptions}
+                currentStoryId={currentStoryId ?? null}
+                onPick={onPickStory}
+              />
             ) : (
               place.story ?? DASH
             )}
@@ -180,6 +173,60 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <div className="mb-1 text-xs text-fg-muted">{label}</div>
       <div className="text-[13px] text-fg">{children}</div>
     </div>
+  );
+}
+
+// ストーリー名と編集ボタン。押すとプルダウンに切り替わり、選ぶか Escape / フォーカスが外れると戻る。
+function StoryPicker({
+  text,
+  options,
+  currentStoryId,
+  onPick,
+}: {
+  text: string | null;
+  options: StoryOption[];
+  currentStoryId: string | null;
+  onPick: (storyId: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="min-w-0 break-words">{text ?? "-"}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setEditing(true)}
+          title="ストーリーを変更"
+          aria-label="ストーリーを変更"
+          className="h-6 w-6 px-0 text-fg-muted"
+        >
+          <EditIcon size={13} />
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Select
+      autoFocus
+      value={currentStoryId ?? ""}
+      onChange={(e) => {
+        setEditing(false);
+        if (e.target.value !== currentStoryId) onPick(e.target.value);
+      }}
+      onBlur={() => setEditing(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setEditing(false);
+      }}
+      title="ストーリーを変更"
+    >
+      {currentStoryId == null && <option value="">{text ?? "-"}</option>}
+      {options.map((story) => (
+        <option key={story.id} value={story.id}>
+          {story.label}
+        </option>
+      ))}
+    </Select>
   );
 }
 
