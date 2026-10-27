@@ -98,6 +98,7 @@ export function DetailPanel<T extends DetailNode>({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+        <Field label="詳細">{node?.description ? <Markdown>{node.description}</Markdown> : DASH}</Field>
         {place && (
           <Field label="ストーリー">
             {storyOptions?.length && onPickStory ? (
@@ -124,7 +125,6 @@ export function DetailPanel<T extends DetailNode>({
         <Field label="期限">{node?.due_date ? fmt(parseDate(node.due_date)) : DASH}</Field>
         <Field label="期間">{durationDays != null ? `${durationDays}日` : DASH}</Field>
         <Field label="進捗">{node?.progress != null ? `${Math.round(node.progress * 100)}%` : DASH}</Field>
-        <Field label="詳細">{node?.description ? <Markdown>{node.description}</Markdown> : DASH}</Field>
         <Field label="作成日時">{node?.created_at ? fmtDateTime(node.created_at) : DASH}</Field>
         <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
