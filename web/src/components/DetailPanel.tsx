@@ -81,7 +81,26 @@ export function DetailPanel<T extends DetailNode>({
         <div className="flex items-center gap-2">
           <span className="text-xs text-fg-muted">{node ? LEVEL_LABEL[node.level] : "詳細"}</span>
           {node && <IdBadge id={node.id} />}
-          <Button size="sm" variant="ghost" onClick={onClose} className="ml-auto">
+          <span className="ml-auto flex items-center gap-0.5">
+            {node && onEdit && (
+              <Button size="sm" variant="ghost" onClick={() => onEdit(node)} title="変更" aria-label="変更" className="w-7 px-0">
+                <EditIcon size={14} />
+              </Button>
+            )}
+            {node && onDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onDelete(node)}
+                title="削除"
+                aria-label="削除"
+                className="w-7 px-0 text-danger"
+              >
+                <DeleteIcon size={14} />
+              </Button>
+            )}
+          </span>
+          <Button size="sm" variant="ghost" onClick={onClose}>
             閉じる
           </Button>
         </div>
@@ -132,7 +151,7 @@ export function DetailPanel<T extends DetailNode>({
         {node?.level === "task" && <TaskComments taskId={node.id} />}
       </div>
 
-      {canEdit && node && (
+      {node && ((canStart && onStart) || (canComplete && onComplete)) && (
         <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-surface p-3">
           {canStart && onStart && (
             <Button
@@ -147,20 +166,6 @@ export function DetailPanel<T extends DetailNode>({
             <Button variant="primary" onClick={() => onComplete(node)}>
               完了にする
             </Button>
-          )}
-          {(onEdit || onDelete) && (
-            <div className="flex gap-2">
-              {onEdit && (
-                <Button icon={<EditIcon size={14} />} onClick={() => onEdit(node)}>
-                  変更
-                </Button>
-              )}
-              {onDelete && (
-                <Button icon={<DeleteIcon size={14} />} onClick={() => onDelete(node)} className="ml-auto text-danger">
-                  削除
-                </Button>
-              )}
-            </div>
           )}
         </div>
       )}
