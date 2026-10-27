@@ -1,20 +1,34 @@
 // Gantt view: a project's stories and their tasks on a shared timeline.
 // Built from start_date/due_date on the story and task nodes.
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
-import { STATUS_COLOR } from "../lib/style";
+import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { GroupForm } from "../components/GroupForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
-import { useResizableWidth, resizeHandleStyle } from "../lib/useResizableWidth";
-import { AddIcon, DeleteIcon, EditIcon, withIcon } from "../components/Icons";
+import { useResizableWidth } from "../lib/useResizableWidth";
+import { AddIcon, DeleteIcon, EditIcon } from "../components/Icons";
+import { Button } from "../components/ui/Button";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
 const HEADER_H = 34;
 const MS_DAY = 86_400_000;
+
+// バーの塗り。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
+const BAR_BG: Record<Status, string> = {
+  todo: "bg-status-todo-border",
+  in_progress: "bg-status-in_progress-border",
+  done: "bg-status-done-border",
+  closed: "bg-status-closed-border",
+};
+
+// 行の中の小さなボタン。Button の sm（h-7）は行の高さ 26px に入らないので詰める。
+// 文字色は呼び出し側で付ける。削除の赤は ghost の text-fg に CSS の順で負けるので important にする。
+const rowBtn = "h-5 rounded px-1.5 text-[11px] font-normal";
+const rowBtnMuted = "text-fg-muted hover:text-fg";
 
 function parseDate(s: string): Date {
   return new Date(`${s}T00:00:00`);
@@ -165,10 +179,8 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
 }
 
 export function GanttView({
-  projects,
   project,
   graph,
-  onSelectProject,
   onAddStory,
   onAddTask,
   onUpdateTask,
@@ -184,10 +196,8 @@ export function GanttView({
   onDeleteGroup,
   onMoveStoryToGroup,
 }: {
-  projects: Project[];
   project: Project;
   graph: ProjectGraph;
-  onSelectProject: (projectId: string) => void;
   onAddStory?: (values: StoryInput) => void;
   onAddTask?: (story: GraphNode, values: StoryInput) => void;
   onUpdateTask?: (id: string, values: StoryInput) => void;
@@ -257,53 +267,31 @@ export function GanttView({
       });
     }
 
+    // 下段の目盛りは週の頭（月曜）。1日 8px では毎日の数字が入らない。
+    // 土日はタイムラインの背景を1日ずつ塗る。
+    const weeks: { x: number; label: string }[] = [];
+    const weekends: number[] = [];
+    for (let d = timelineStart; d < timelineEnd; d = addDays(d, 1)) {
+      const x = diffDays(timelineStart, d) * PX_PER_DAY;
+      if (d.getDay() === 1) weeks.push({ x, label: String(d.getDate()) });
+      if (d.getDay() === 0 || d.getDay() === 6) weekends.push(x);
+    }
+
     const today = new Date();
     const todayX =
       today >= timelineStart && today < timelineEnd ? diffDays(timelineStart, today) * PX_PER_DAY : null;
 
-    return { rows, timelineStart, timelineW, months, todayX };
+    return { rows, timelineStart, timelineW, months, weeks, weekends, todayX };
   }, [filtered]);
 
-  const toolbar = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 12px",
-        borderBottom: "1px solid #e5e8eb",
-        background: "#fff",
-        flexShrink: 0,
-      }}
-    >
-      <label style={{ fontSize: 12, color: "#5f6b7a" }}>プロジェクト</label>
-      <select
-        value={project.id}
-        onChange={(e) => {
-          onSelectProject(e.target.value);
-          setSelectedKey(null);
-        }}
-        style={{ fontSize: 13, padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd2d9" }}
-      >
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  // プロジェクトはヘッダーの切替で選ぶ。プロジェクトが変わったら詳細パネルを閉じる。
+  useEffect(() => setSelectedKey(null), [project.id]);
 
   if (!model) {
-    return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        {toolbar}
-        <div style={{ padding: 24, color: "#5f6b7a" }}>期間（開始日・期限）が設定されたタスクがありません。</div>
-      </div>
-    );
+    return <div className="p-6 text-[13px] text-fg-muted">期間（開始日・期限）が設定されたタスクがありません。</div>;
   }
 
-  const { rows, timelineStart, timelineW, months, todayX } = model;
+  const { rows, timelineStart, timelineW, months, weeks, weekends, todayX } = model;
 
   // 配下のタスクの数。0 件のストーリーには開閉のトグルを出さない。
   const childCount = new Map<string, number>();
@@ -327,6 +315,11 @@ export function GanttView({
   const bodyH = visibleRows.length * ROW_H;
   const totalW = LABEL_W + timelineW;
   const selectedRow = selectedKey ? rows.find((r) => r.key === selectedKey) ?? null : null;
+  // 期間のないタスクは、親のストーリーの期間を細く薄いバーで描く。
+  const storyPeriod = new Map<string, { start: Date; end: Date }>();
+  for (const r of rows) {
+    if (r.kind === "story" && r.node && r.start && r.end) storyPeriod.set(r.node.id, { start: r.start, end: r.end });
+  }
   // 新しいストーリーの期間の初期値に使う、プロジェクト内のストーリーの最終期限。
   const storyEnds = rows.filter((r) => r.kind === "story" && r.end).map((r) => r.end!.getTime());
   const lastStoryEnd = storyEnds.length ? new Date(Math.max(...storyEnds)) : null;
@@ -349,70 +342,55 @@ export function GanttView({
   };
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {toolbar}
-      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-      <div style={{ flex: 1, minWidth: 0, overflow: "auto", background: "#fff" }}>
-        <div style={{ width: totalW, position: "relative" }}>
+    <div className="flex h-full">
+      <div className="min-w-0 flex-1 overflow-auto bg-surface">
+        <div className="relative" style={{ width: totalW }}>
         {/* header */}
-        <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 3, height: HEADER_H }}>
+        <div className="sticky top-0 z-[3] flex" style={{ height: HEADER_H }}>
           <div
-            style={{
-              width: LABEL_W,
-              flexShrink: 0,
-              position: "sticky",
-              left: 0,
-              zIndex: 4,
-              background: "#f7f9fa",
-              borderBottom: "1px solid #cbd2d9",
-              borderRight: "1px solid #cbd2d9",
-              display: "flex",
-              alignItems: "center",
-              padding: "0 12px",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#3b4149",
-            }}
+            className="sticky left-0 z-[4] flex shrink-0 items-center border-b border-r border-border bg-surface px-3 text-xs text-fg-muted"
+            style={{ width: LABEL_W }}
           >
             プロジェクト / ストーリー
-            <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+            <ResizeHandle onMouseDown={startResize} />
           </div>
-          <div style={{ position: "relative", width: timelineW, background: "#f7f9fa", borderBottom: "1px solid #cbd2d9" }}>
+          <div className="relative border-b border-border bg-surface text-xs text-fg-muted" style={{ width: timelineW }}>
             {months.map((mo) => (
               <div
                 key={mo.x}
-                style={{
-                  position: "absolute",
-                  left: mo.x,
-                  width: mo.w,
-                  height: HEADER_H,
-                  borderLeft: "1px solid #e5e8eb",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  color: "#5f6b7a",
-                  boxSizing: "border-box",
-                }}
+                className="absolute top-0 flex h-[18px] items-center border-l border-border/60 pl-1.5"
+                style={{ left: mo.x, width: mo.w }}
               >
                 {mo.label}
+              </div>
+            ))}
+            {weeks.map((w) => (
+              <div
+                key={w.x}
+                className="absolute bottom-0 flex h-4 items-center border-l border-border/40 pl-0.5 text-[10px] leading-none"
+                style={{ left: w.x }}
+              >
+                {w.label}
               </div>
             ))}
           </div>
         </div>
 
         {/* body */}
-        <div style={{ position: "relative", height: bodyH }}>
-          {/* gridlines + today marker */}
-          <div style={{ position: "absolute", left: LABEL_W, top: 0, width: timelineW, height: bodyH, zIndex: 0 }}>
+        <div className="relative" style={{ height: bodyH }}>
+          {/* weekends + gridlines + today marker */}
+          <div className="absolute top-0 z-0" style={{ left: LABEL_W, width: timelineW, height: bodyH }}>
+            {weekends.map((x) => (
+              <div key={`we:${x}`} className="absolute top-0 h-full bg-surface-muted" style={{ left: x, width: PX_PER_DAY }} />
+            ))}
+            {weeks.map((w) => (
+              <div key={`w:${w.x}`} className="absolute top-0 h-full w-px bg-border/40" style={{ left: w.x }} />
+            ))}
             {months.map((mo) => (
-              <div
-                key={mo.x}
-                style={{ position: "absolute", left: mo.x, top: 0, width: 1, height: bodyH, background: "#eef1f3" }}
-              />
+              <div key={`m:${mo.x}`} className="absolute top-0 h-full w-px bg-border/70" style={{ left: mo.x }} />
             ))}
             {todayX != null && (
-              <div style={{ position: "absolute", left: todayX, top: 0, width: 2, height: bodyH, background: "#d13212", opacity: 0.7 }} />
+              <div className="absolute top-0 h-full w-0.5 bg-brand" style={{ left: todayX }} title="今日" />
             )}
           </div>
 
@@ -460,7 +438,8 @@ export function GanttView({
                 setDragStory(null);
                 setDropKey(null);
               }}
-              style={{ display: "flex", height: ROW_H, position: "relative" }}
+              className="relative flex"
+              style={{ height: ROW_H }}
             >
               <div
                 draggable={draggableStory}
@@ -476,35 +455,26 @@ export function GanttView({
                   setDragStory(null);
                   setDropKey(null);
                 }}
-                style={{
-                  cursor: draggableStory ? "grab" : undefined,
-                  opacity: dragStory && r.node?.id === dragStory.id ? 0.5 : 1,
-                  outline: isOver ? "2px solid #0972d3" : "none",
-                  outlineOffset: -2,
-                  width: LABEL_W,
-                  flexShrink: 0,
-                  position: "sticky",
-                  left: 0,
-                  zIndex: 2,
-                  background: isOver
-                    ? "#eaf2fc"
+                className={cn(
+                  "sticky left-0 z-[2] flex shrink-0 items-center gap-1 border-b border-r border-b-border/60 border-r-border pr-2 text-fg",
+                  isOver
+                    ? "bg-[color-mix(in_srgb,var(--color-brand)_10%,var(--color-surface))] ring-2 ring-inset ring-brand"
                     : canDrop
-                      ? "#f7fafe"
+                      ? "bg-[color-mix(in_srgb,var(--color-brand)_5%,var(--color-surface))]"
                       : r.kind === "project"
-                        ? "#eef1f3"
-                        : r.kind === "group"
-                          ? "#f7f9fa"
-                          : "#fff",
-                  borderRight: "1px solid #cbd2d9",
-                  borderBottom: "1px solid #f0f2f4",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: `0 8px 0 ${indent}px`,
-                  fontSize: r.kind === "project" ? 12 : 11,
-                  fontWeight: r.kind === "project" ? 700 : r.kind === "group" ? 600 : 400,
-                  color: r.kind === "project" ? "#1f2933" : "#3b4149",
-                  gap: 4,
-                }}
+                        ? "bg-surface-muted"
+                        : "bg-surface",
+                  r.kind === "project"
+                    ? "text-sm font-medium"
+                    : r.kind === "group"
+                      ? "text-xs font-medium"
+                      : r.kind === "story"
+                        ? "text-xs"
+                        : "text-[11px]",
+                  draggableStory && "cursor-grab",
+                  dragStory && r.node?.id === dragStory.id && "opacity-50",
+                )}
+                style={{ width: LABEL_W, paddingLeft: indent }}
                 title={r.label}
               >
                 <span
@@ -514,7 +484,7 @@ export function GanttView({
                     toggle.onToggle();
                   }}
                   title={toggle ? `クリックで${toggle.noun}を${toggle.collapsed ? "表示" : "隠す"}` : undefined}
-                  style={{ flexShrink: 0, width: 12, color: "#5f6b7a", cursor: toggle ? "pointer" : "default" }}
+                  className={cn("w-3 shrink-0 text-fg-muted", toggle ? "cursor-pointer" : "cursor-default")}
                 >
                   {toggle ? (toggle.collapsed ? "▸" : "▾") : ""}
                 </span>
@@ -522,60 +492,57 @@ export function GanttView({
                   onClick={() => {
                     if (r.node) setSelectedKey(r.key);
                   }}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    cursor: r.node ? "pointer" : "default",
-                  }}
+                  className={cn(
+                    "min-w-0 flex-1 truncate",
+                    r.node ? "cursor-pointer hover:underline" : "cursor-default",
+                  )}
                 >
                   {r.label}
-                  {toggle?.collapsed && (
-                    <span style={{ color: "#94a0ad", marginLeft: 4, fontWeight: 400 }}>({toggle.count})</span>
-                  )}
+                  {toggle?.collapsed && <span className="ml-1 font-normal text-fg-muted">({toggle.count})</span>}
                 </span>
                 {r.kind === "project" && onAddStory && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
                       setForm({ mode: "create", prevEnd: lastStoryEnd });
                     }}
                     title="ストーリーを追加"
-                    style={{ ...addBtn, ...withIcon }}
-                  >
-                    <AddIcon size={12} />
-                  </button>
+                    aria-label="ストーリーを追加"
+                    icon={<AddIcon size={12} />}
+                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                  />
                 )}
                 {r.kind === "project" && onAddGroup && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
                       setGroupForm({ id: null, name: "" });
                     }}
                     title="グループを追加"
-                    style={{ ...textBtn, ...withIcon, gap: 2 }}
+                    icon={<AddIcon size={11} />}
+                    className={cn(rowBtn, rowBtnMuted, "gap-0.5")}
                   >
-                    <AddIcon size={10} />
                     グループを追加
-                  </button>
+                  </Button>
                 )}
                 {r.kind === "group" && r.groupId && onRenameGroup && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
                       setGroupForm({ id: r.groupId, name: r.label });
                     }}
                     title="グループ名を変更"
-                    style={{ ...textBtn, ...withIcon, gap: 2 }}
-                  >
-                    <EditIcon size={10} />
-                    変更
-                  </button>
+                    aria-label="グループ名を変更"
+                    icon={<EditIcon size={12} />}
+                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                  />
                 )}
                 {r.kind === "group" && r.groupId && onDeleteGroup && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
                       const id = r.groupId!;
@@ -586,44 +553,37 @@ export function GanttView({
                       });
                     }}
                     title="グループを削除"
-                    style={{ ...textBtn, ...withIcon, gap: 2, color: "#d13212" }}
-                  >
-                    <DeleteIcon size={10} />
-                    削除
-                  </button>
+                    aria-label="グループを削除"
+                    icon={<DeleteIcon size={12} />}
+                    className={cn(rowBtn, "w-5 px-0 text-danger!")}
+                  />
                 )}
                 {r.kind === "story" && r.node && onAddTask && (
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
                       setForm({ mode: "create-task", story: r.node! });
                     }}
                     title="タスクを追加"
-                    style={{ ...addBtn, ...withIcon }}
-                  >
-                    <AddIcon size={12} />
-                  </button>
+                    aria-label="タスクを追加"
+                    icon={<AddIcon size={12} />}
+                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                  />
                 )}
-                <div onMouseDown={startResize} title="ドラッグで幅を変更" style={{ ...resizeHandleStyle, right: -3 }} />
+                <ResizeHandle onMouseDown={startResize} />
               </div>
-              <div style={{ position: "relative", width: timelineW, borderBottom: "1px solid #f0f2f4" }}>
-                {r.kind === "task" && !(r.start && r.end) && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: 8,
-                      top: 0,
-                      height: ROW_H,
-                      display: "flex",
-                      alignItems: "center",
-                      fontSize: 10,
-                      color: "#94a0ad",
-                    }}
-                  >
-                    期間未設定
-                  </span>
-                )}
+              <div className="relative border-b border-border/60" style={{ width: timelineW }}>
                 {r.kind === "group" && r.start && r.end && <GroupBar row={r} timelineStart={timelineStart} />}
+                {r.kind === "task" && !(r.start && r.end) && r.node?.parent_id && storyPeriod.has(r.node.parent_id) && (
+                  <InheritedBar
+                    row={r}
+                    period={storyPeriod.get(r.node.parent_id)!}
+                    timelineStart={timelineStart}
+                    selected={r.key === selectedKey}
+                    onSelect={() => setSelectedKey(r.key)}
+                  />
+                )}
                 {r.kind !== "group" && r.start && r.end && (
                   <Bar
                     row={r}
@@ -680,7 +640,7 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
           })}
         </div>
         {/* extra room so the last row's status menu (opens below the bar) stays on-screen */}
-        <div style={{ height: 160 }} />
+        <div className="h-40" />
         </div>
       </div>
       {selectedRow && (
@@ -716,7 +676,6 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
           }
         />
       )}
-      </div>
 
       {form && (
         <TaskForm
@@ -774,36 +733,59 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
   );
 }
 
-// プロジェクトの「ストーリーを追加」／ストーリーの「タスクを追加」で共通。
-const addBtn: CSSProperties = {
-  flexShrink: 0,
-  width: 18,
-  height: 18,
-  lineHeight: "16px",
-  padding: 0,
-  border: "1px solid #cbd2d9",
-  borderRadius: 4,
-  background: "#fff",
-  color: "#0972d3",
-  cursor: "pointer",
-  fontSize: 13,
-};
+// 行見出しの幅を変えるつまみ。行見出しとタイムラインの境目の右端に置く。
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: ReactMouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      title="ドラッグで幅を変更"
+      className="absolute inset-y-0 -right-[3px] z-[5] w-[7px] cursor-col-resize select-none"
+    />
+  );
+}
 
-// プロジェクトの「グループを追加」／グループの「変更」「削除」。
-const textBtn: CSSProperties = {
-  flexShrink: 0,
-  height: 18,
-  lineHeight: "16px",
-  padding: "0 6px",
-  border: "1px solid #cbd2d9",
-  borderRadius: 4,
-  background: "#fff",
-  color: "#0972d3",
-  cursor: "pointer",
-  fontSize: 10,
-  fontWeight: 400,
-  whiteSpace: "nowrap",
-};
+// バーの右に出す期間（M/D - M/D）。
+function DateLabel({ left, children }: { left: number; children: string }) {
+  return (
+    <span
+      className="pointer-events-none absolute top-0 flex items-center whitespace-nowrap text-[11px] text-fg-muted"
+      style={{ left, height: ROW_H }}
+    >
+      {children}
+    </span>
+  );
+}
+
+// 期間のないタスク。親のストーリーの期間に、ストーリーのバーより細く薄い status 色で描く。
+// タスク自身の期間ではないので、ドラッグでは動かせない（押すと詳細パネルを開く）。
+function InheritedBar({
+  row,
+  period,
+  timelineStart,
+  selected,
+  onSelect,
+}: {
+  row: Row;
+  period: { start: Date; end: Date };
+  timelineStart: Date;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const left = diffDays(timelineStart, period.start) * PX_PER_DAY;
+  const width = Math.max((diffDays(period.start, period.end) + 1) * PX_PER_DAY, 4);
+  return (
+    <div
+      onClick={onSelect}
+      title={`${row.label}\n期間未設定（ストーリーの期間を表示）`}
+      className={cn(
+        "absolute h-1.5 cursor-pointer rounded opacity-40",
+        row.status ? BAR_BG[row.status] : "bg-status-closed-border",
+        selected && "opacity-70 ring-2 ring-brand ring-offset-1",
+      )}
+      style={{ left, width, top: (ROW_H - 6) / 2 }}
+    />
+  );
+}
 
 // グループの期間（中のストーリーの最小開始日〜最大期限）。ストーリーより細いグレーのバーで、動かせない。
 function GroupBar({ row, timelineStart }: { row: Row; timelineStart: Date }) {
@@ -817,32 +799,10 @@ function GroupBar({ row, timelineStart }: { row: Row; timelineStart: Date }) {
     <>
       <div
         title={`${row.label}\n${fmt(start)} 〜 ${fmt(end)}`}
-        style={{
-          position: "absolute",
-          left,
-          width,
-          top: (ROW_H - 8) / 2,
-          height: 8,
-          borderRadius: 4,
-          background: "#b8c1cc",
-        }}
+        className="absolute h-2 rounded bg-border-strong"
+        style={{ left, width, top: (ROW_H - 8) / 2 }}
       />
-      <span
-        style={{
-          position: "absolute",
-          left: left + width + 6,
-          top: 0,
-          height: ROW_H,
-          display: "flex",
-          alignItems: "center",
-          fontSize: 10,
-          color: "#5f6b7a",
-          whiteSpace: "nowrap",
-          pointerEvents: "none",
-        }}
-      >
-        {short(start)} - {short(end)}
-      </span>
+      <DateLabel left={left + width + 6}>{`${short(start)} - ${short(end)}`}</DateLabel>
     </>
   );
 }
@@ -865,7 +825,6 @@ function Bar({
 }) {
   const start = row.start as Date;
   const end = row.end as Date;
-  const c = row.status ? STATUS_COLOR[row.status] : null;
 
   // Live drag offset (in whole days) while an edge or the whole bar is being dragged; null otherwise.
   const [drag, setDrag] = useState<{ edge: "start" | "end" | "move"; days: number } | null>(null);
@@ -949,18 +908,13 @@ function Bar({
           onSelect();
         }}
         title={`${row.label}\n${fmt(pStart)} 〜 ${fmt(pEnd)}`}
-        style={{
-          position: "absolute",
-          left,
-          width,
-          top: 4,
-          height: ROW_H - 10,
-          borderRadius: 4,
-          background: c?.border ?? "#94a0ad",
-          cursor: drag?.edge === "move" ? "grabbing" : onMove ? "grab" : "pointer",
-          outline: selected || drag ? "2px solid #1f2933" : "none",
-          outlineOffset: 1,
-        }}
+        className={cn(
+          "absolute rounded",
+          row.status ? BAR_BG[row.status] : "bg-status-closed-border",
+          drag?.edge === "move" ? "cursor-grabbing" : onMove ? "cursor-grab" : "cursor-pointer",
+          (selected || drag) && "ring-2 ring-brand ring-offset-1",
+        )}
+        style={{ left, width, top: 4, height: ROW_H - 10 }}
       />
       {showHandles && (
         <>
@@ -968,48 +922,19 @@ function Bar({
             onMouseDown={(e) => beginResize("start", e)}
             onClick={(e) => e.stopPropagation()}
             title="ドラッグで開始日を変更"
-            style={{
-              position: "absolute",
-              left: left - HANDLE_W / 2,
-              width: HANDLE_W,
-              top: 4,
-              height: ROW_H - 10,
-              cursor: "ew-resize",
-              zIndex: 10,
-            }}
+            className="absolute z-10 cursor-ew-resize"
+            style={{ left: left - HANDLE_W / 2, width: HANDLE_W, top: 4, height: ROW_H - 10 }}
           />
           <div
             onMouseDown={(e) => beginResize("end", e)}
             onClick={(e) => e.stopPropagation()}
             title="ドラッグで期限を変更"
-            style={{
-              position: "absolute",
-              left: left + width - HANDLE_W / 2,
-              width: HANDLE_W,
-              top: 4,
-              height: ROW_H - 10,
-              cursor: "ew-resize",
-              zIndex: 10,
-            }}
+            className="absolute z-10 cursor-ew-resize"
+            style={{ left: left + width - HANDLE_W / 2, width: HANDLE_W, top: 4, height: ROW_H - 10 }}
           />
         </>
       )}
-      <span
-        style={{
-          position: "absolute",
-          left: left + width + 6,
-          top: 0,
-          height: ROW_H,
-          display: "flex",
-          alignItems: "center",
-          fontSize: 10,
-          color: "#5f6b7a",
-          whiteSpace: "nowrap",
-          pointerEvents: "none",
-        }}
-      >
-        {short(pStart)} - {short(pEnd)}
-      </span>
+      <DateLabel left={left + width + 6}>{`${short(pStart)} - ${short(pEnd)}`}</DateLabel>
     </>
   );
 }
