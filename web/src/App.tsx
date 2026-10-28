@@ -461,9 +461,9 @@ export default function App() {
   if (!isConfigured) {
     return (
       <Shell>
-        <div style={{ padding: 24 }}>
-          <h2>設定が必要です</h2>
-          <p>
+        <div className="p-6">
+          <h2 className="mb-3 text-2xl font-medium text-fg">設定が必要です</h2>
+          <p className="text-sm text-fg">
             <code>web/.env.example</code> を <code>web/.env</code> にコピーし、Supabase の URL と anon key を設定してください。
             ローカルは <code>supabase start</code> が値を表示します。
           </p>

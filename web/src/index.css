@@ -1,7 +1,6 @@
-/* Preflight is left out until the screens move from inline styles to className:
-   its resets (heading sizes, margins, button styles) would change the current screens. */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
 
 /* static: emit every token, since inline styles read them through var(). */
@@ -38,13 +37,13 @@
 }
 
 @layer base {
-  * { box-sizing: border-box; }
-  html, body, #root { height: 100%; margin: 0; }
+  html, body, #root { height: 100%; }
   body {
     font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
     color: var(--color-fg);
     background: var(--color-bg);
   }
-  button { font-family: inherit; }
   code { background: var(--color-surface-muted); padding: 1px 4px; border-radius: 4px; font-size: 0.9em; font-family: var(--font-mono); }
 }
