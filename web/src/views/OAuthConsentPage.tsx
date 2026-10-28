@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { OAuthAuthorizationDetails, Session } from "@supabase/supabase-js";
+import { AuthCard } from "../components/AuthCard";
+import { GoogleIcon } from "../components/Icons";
+import { Button } from "../components/ui/Button";
 import { approveAuthorization, denyAuthorization, getAuthorizationDetails } from "../lib/oauth";
 import { signInWithGoogle } from "../lib/useSession";
+
+const lead = "m-0 mb-6 text-center text-[13px] text-fg-muted";
 
 // Consent screen for MCP clients. Supabase Auth sends the user here with ?authorization_id=...
 export function OAuthConsentPage({ session }: { session: Session | null }) {
@@ -54,100 +59,63 @@ export function OAuthConsentPage({ session }: { session: Session | null }) {
 
   let body;
   if (!authorizationId) {
-    body = <p style={lead}>認可のリクエストがありません。</p>;
+    body = <p className={lead}>認可のリクエストがありません。</p>;
   } else if (!session) {
     body = (
       <>
-        <p style={lead}>MCP クライアントを接続するにはログインしてください。</p>
-        <button onClick={handleLogin} disabled={pending} style={{ ...primaryBtn, width: "100%", opacity: pending ? 0.6 : 1 }}>
+        <p className={lead}>MCP クライアントを接続するにはログインしてください。</p>
+        <Button onClick={handleLogin} disabled={pending} icon={<GoogleIcon />} className="h-10 w-full">
           {pending ? "Google へ移動中…" : "Google でログイン"}
-        </button>
+        </Button>
       </>
     );
   } else if (error) {
     // Expired or invalid requests can't be retried from here; the client has to start over.
     body = null;
   } else if (!details) {
-    body = <p style={lead}>読み込み中…</p>;
+    body = <p className={lead}>読み込み中…</p>;
   } else {
     const clientName = details.client.name || details.client.id;
+    const scopes = details.scope ? details.scope.split(" ").filter(Boolean) : [];
     body = (
       <>
-        <p style={{ ...lead, color: "#1f2933", fontSize: 14 }}>
-          <b>{clientName}</b> があなたの task-branch のデータを読み書きすることを許可しますか？
+        <p className="m-0 mb-4 text-center text-sm text-fg">
+          <span className="font-medium">{clientName}</span> があなたの task-branch のデータを読み書きすることを許可しますか？
         </p>
-        <dl style={info}>
-          <dt style={infoLabel}>ログイン中</dt>
-          <dd style={infoValue}>{session.user.email}</dd>
-          <dt style={infoLabel}>戻り先</dt>
-          <dd style={infoValue}>{details.redirect_uri}</dd>
-          <dt style={infoLabel}>スコープ</dt>
-          <dd style={infoValue}>{details.scope || "-"}</dd>
+        <dl className="m-0 mb-6 divide-y divide-border rounded-md border border-border text-[13px]">
+          <InfoRow label="クライアント">{clientName}</InfoRow>
+          <InfoRow label="ログイン中">{session.user.email}</InfoRow>
+          <InfoRow label="戻り先">{details.redirect_uri}</InfoRow>
+          <InfoRow label="スコープ">
+            {scopes.length === 0
+              ? "-"
+              : scopes.map((s) => (
+                  <div key={s} className="font-mono text-xs">
+                    {s}
+                  </div>
+                ))}
+          </InfoRow>
         </dl>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => decide(denyAuthorization)} disabled={pending} style={{ ...secondaryBtn, opacity: pending ? 0.6 : 1 }}>
+        <div className="flex gap-2">
+          <Button onClick={() => decide(denyAuthorization)} disabled={pending} className="h-9 flex-1">
             拒否
-          </button>
-          <button onClick={() => decide(approveAuthorization)} disabled={pending} style={{ ...primaryBtn, opacity: pending ? 0.6 : 1 }}>
+          </Button>
+          <Button variant="primary" onClick={() => decide(approveAuthorization)} disabled={pending} className="h-9 flex-1">
             許可
-          </button>
+          </Button>
         </div>
       </>
     );
   }
 
-  return (
-    <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={card}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, textAlign: "center" }}>task-branch</h1>
-        {body}
-        {error && <div style={{ marginTop: 12, color: "#a3210b", fontSize: 13 }}>{error}</div>}
-      </div>
-    </main>
-  );
+  return <AuthCard error={error}>{body}</AuthCard>;
 }
 
-const card: CSSProperties = {
-  width: 360,
-  maxWidth: "calc(100% - 32px)",
-  background: "#fff",
-  border: "1px solid #e1e4e8",
-  borderRadius: 8,
-  padding: "32px 28px",
-};
-
-const lead: CSSProperties = { margin: "8px 0 24px", color: "#5f6b7a", fontSize: 13, textAlign: "center" };
-
-const info: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "auto 1fr",
-  gap: "6px 12px",
-  margin: "0 0 24px",
-  fontSize: 13,
-};
-
-const infoLabel: CSSProperties = { color: "#5f6b7a", fontSize: 12 };
-
-const infoValue: CSSProperties = { margin: 0, color: "#1f2933", wordBreak: "break-all" };
-
-const primaryBtn: CSSProperties = {
-  flex: 1,
-  background: "#0972d3",
-  color: "#fff",
-  border: "none",
-  borderRadius: 6,
-  padding: "10px 14px",
-  fontSize: 14,
-  cursor: "pointer",
-};
-
-const secondaryBtn: CSSProperties = {
-  flex: 1,
-  background: "#fff",
-  color: "#3b4149",
-  border: "1px solid #cbd2d9",
-  borderRadius: 6,
-  padding: "10px 14px",
-  fontSize: 14,
-  cursor: "pointer",
-};
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[88px_1fr] gap-3 px-3 py-2">
+      <dt className="text-xs text-fg-muted">{label}</dt>
+      <dd className="m-0 break-all text-fg">{children}</dd>
+    </div>
+  );
+}

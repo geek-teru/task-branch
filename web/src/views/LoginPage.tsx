@@ -1,4 +1,7 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
+import { AuthCard } from "../components/AuthCard";
+import { GoogleIcon } from "../components/Icons";
+import { Button } from "../components/ui/Button";
 import { signInWithGoogle } from "../lib/useSession";
 
 export function LoginPage() {
@@ -17,36 +20,11 @@ export function LoginPage() {
   };
 
   return (
-    <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={card}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>task-branch</h1>
-        <p style={{ margin: "8px 0 24px", color: "#5f6b7a", fontSize: 13 }}>Google アカウントでログインしてください。</p>
-        <button onClick={handleLogin} disabled={pending} style={{ ...primaryBtn, opacity: pending ? 0.6 : 1 }}>
-          {pending ? "Google へ移動中…" : "Google でログイン"}
-        </button>
-        {error && <div style={{ marginTop: 12, color: "#a3210b", fontSize: 13 }}>{error}</div>}
-      </div>
-    </main>
+    <AuthCard error={error}>
+      <p className="m-0 mb-6 text-center text-[13px] text-fg-muted">Google アカウントでログインしてください。</p>
+      <Button onClick={handleLogin} disabled={pending} icon={<GoogleIcon />} className="h-10 w-full">
+        {pending ? "Google へ移動中…" : "Google でログイン"}
+      </Button>
+    </AuthCard>
   );
 }
-
-const card: CSSProperties = {
-  width: 360,
-  maxWidth: "calc(100% - 32px)",
-  background: "#fff",
-  border: "1px solid #e1e4e8",
-  borderRadius: 8,
-  padding: "32px 28px",
-  textAlign: "center",
-};
-
-const primaryBtn: CSSProperties = {
-  width: "100%",
-  background: "#0972d3",
-  color: "#fff",
-  border: "none",
-  borderRadius: 6,
-  padding: "10px 14px",
-  fontSize: 14,
-  cursor: "pointer",
-};
