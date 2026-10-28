@@ -14,7 +14,7 @@ export function Markdown({ children }: { children: string }) {
   );
 }
 
-// Preflight is off, so margins are set explicitly on every block.
+// Preflight resets margins and list markers, so every block sets its own.
 const block = "m-0 mb-2";
 const heading = "m-0 mb-1.5 mt-4 font-medium leading-snug text-fg first:mt-0";
 const cell = "border border-border px-2 py-1 text-left align-top";
@@ -25,8 +25,8 @@ const components: Components = {
   h2: ({ node: _node, ...props }) => <h2 className={cn(heading, "text-[15px]")} {...props} />,
   h3: ({ node: _node, ...props }) => <h3 className={cn(heading, "text-sm")} {...props} />,
   h4: ({ node: _node, ...props }) => <h4 className={cn(heading, "text-[13px]")} {...props} />,
-  ul: ({ node: _node, ...props }) => <ul className={cn(block, "pl-5")} {...props} />,
-  ol: ({ node: _node, ...props }) => <ol className={cn(block, "pl-5")} {...props} />,
+  ul: ({ node: _node, ...props }) => <ul className={cn(block, "list-disc pl-5")} {...props} />,
+  ol: ({ node: _node, ...props }) => <ol className={cn(block, "list-decimal pl-5")} {...props} />,
   // チェックリストの項目は、チェックボックスがあるので黒丸を出さない。
   li: ({ node: _node, className, ...props }) => (
     <li className={cn(className, "my-0.5", className?.includes("task-list-item") && "list-none")} {...props} />
