@@ -159,9 +159,13 @@ export async function getStory(storyId: string): Promise<Task | null> {
   return data;
 }
 
-// Rename a story / edit its one-line description. The context document has its own function.
-export async function updateStoryInfo(storyId: string, title: string, description: string | null): Promise<void> {
-  const { error } = await supabase.from("tasks").update({ title, description }).eq("id", storyId);
+// Rename a story / edit its one-line description and period. The context document has its own function.
+// Only the story's own dates change; its tasks are not shifted (same as the MCP update_story).
+export async function updateStoryInfo(
+  storyId: string,
+  info: { title: string; description: string | null; start_date: string | null; due_date: string | null },
+): Promise<void> {
+  const { error } = await supabase.from("tasks").update(info).eq("id", storyId);
   if (error) throw error;
 }
 

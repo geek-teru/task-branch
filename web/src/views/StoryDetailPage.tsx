@@ -96,10 +96,10 @@ export function StoryDetailPage({
     }
   };
 
-  // 名前と説明の変更。コンテキストの編集とは別。
-  const submitInfo = async (title: string, description: string | null) => {
+  // 名前・説明・期間の変更。コンテキストの編集とは別。
+  const submitInfo = async (info: StoryInfo) => {
     try {
-      await updateStoryInfo(story.id, title, description);
+      await updateStoryInfo(story.id, info);
       setEditingInfo(false);
       await load();
     } catch (err: any) {
@@ -229,8 +229,7 @@ export function StoryDetailPage({
 
       {editingInfo && (
         <StoryInfoForm
-          initialTitle={story.title}
-          initialDescription={story.description}
+          initial={story}
           onSubmit={submitInfo}
           onCancel={() => setEditingInfo(false)}
         />
@@ -254,29 +253,35 @@ function CardHeader({ title, meta, children }: { title: string; meta: string; ch
   );
 }
 
-// 名前（必須）と説明。コンテキストは詳細画面のエディタで編集する。
+type StoryInfo = { title: string; description: string | null; start_date: string | null; due_date: string | null };
+
+// 名前（必須）・説明・期間。コンテキストは詳細画面のエディタで編集する。
+// 期間を変えても配下のタスクはずらさない。
 function StoryInfoForm({
-  initialTitle,
-  initialDescription,
+  initial,
   onSubmit,
   onCancel,
 }: {
-  initialTitle: string;
-  initialDescription: string | null;
-  onSubmit: (title: string, description: string | null) => Promise<void>;
+  initial: Task;
+  onSubmit: (info: StoryInfo) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(initialTitle);
-  const [description, setDescription] = useState(initialDescription ?? "");
+  const [title, setTitle] = useState(initial.title);
+  const [description, setDescription] = useState(initial.description ?? "");
+  const [start, setStart] = useState(initial.start_date ?? "");
+  const [due, setDue] = useState(initial.due_date ?? "");
   const [saving, setSaving] = useState(false);
   const trimmed = title.trim();
+  // YYYY-MM-DD compares correctly as a string.
+  const periodInvalid = start !== "" && due !== "" && start > due;
+  const canSubmit = trimmed !== "" && !periodInvalid && !saving;
 
   const submit = async () => {
-    if (!trimmed || saving) return;
+    if (!canSubmit) return;
     setSaving(true);
     try {
       const d = description.trim();
-      await onSubmit(trimmed, d ? d : null);
+      await onSubmit({ title: trimmed, description: d ? d : null, start_date: start || null, due_date: due || null });
     } finally {
       setSaving(false);
     }
@@ -292,7 +297,7 @@ function StoryInfoForm({
           <Button onClick={onCancel} disabled={saving}>
             キャンセル
           </Button>
-          <Button variant="primary" onClick={submit} disabled={!trimmed || saving}>
+          <Button variant="primary" onClick={submit} disabled={!canSubmit}>
             {saving ? "保存中…" : "保存"}
           </Button>
         </>
@@ -315,6 +320,22 @@ function StoryInfoForm({
         rows={3}
         placeholder="一覧に出す 1〜2 行の説明"
       />
+
+      <div className="mt-3.5 flex gap-3">
+        <div className="flex-1">
+          <label className="mb-1.5 block text-xs text-fg-muted">開始日</label>
+          <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+        </div>
+        <div className="flex-1">
+          <label className="mb-1.5 block text-xs text-fg-muted">期限</label>
+          <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </div>
+      </div>
+      {periodInvalid ? (
+        <div className="mt-1.5 text-[11px] text-danger">開始日が期限より後になっています。</div>
+      ) : (
+        <div className="mt-1.5 text-[11px] text-fg-muted">配下のタスクの期間は変わりません。</div>
+      )}
     </Dialog>
   );
 }
