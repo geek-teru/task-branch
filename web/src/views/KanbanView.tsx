@@ -181,8 +181,11 @@ export function KanbanView({
     return (
       <div key={story.id} className="flex border-b border-border last:border-b-0">
         <div className="relative box-border flex-none px-3 py-2.5" style={{ width: LABEL_W }}>
-          <div className="flex items-start gap-1.5">
-            <div className="flex-1 text-sm font-medium text-fg">{story.title}</div>
+          {/* カードと同じく ID を名前の上に置く。名前はガントのストーリー行と同じ大きさ。 */}
+          <div className="flex items-center gap-1.5 text-[11px] text-fg-muted">
+            <div className="flex-1">
+              <IdBadge id={story.id} />
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -194,9 +197,9 @@ export function KanbanView({
               <AddIcon size={12} />
             </Button>
           </div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-fg-muted">
-            <IdBadge id={story.id} />
-            <span>{tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}</span>
+          <div className="mt-0.5 text-xs text-fg">{story.title}</div>
+          <div className="mt-1 text-[11px] text-fg-muted">
+            {tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}
           </div>
           {/* same handle as the header, so the column can be dragged from any lane */}
           <ResizeHandle onMouseDown={startResize} />
