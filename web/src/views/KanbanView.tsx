@@ -473,7 +473,8 @@ function TaskCard({
       onClick={onSelect}
       title={task.description ?? task.title}
       className={cn(
-        "px-2.5 py-2 text-fg",
+        // 列幅に合わせて伸ばさず、細い縦長にしてタスク名を短く折り返す
+        "box-border min-h-20 w-32 px-2.5 py-2 text-fg",
         selected && "border-brand ring-2 ring-brand/30 hover:border-brand",
         dragging ? "opacity-40" : closed && "opacity-60",
       )}
@@ -482,7 +483,7 @@ function TaskCard({
         <IdBadge id={task.id} />
       </div>
       {/* ガントのタスク行と同じ大きさ。 */}
-      <div className="mt-0.5 text-[11px]">{task.title}</div>
+      <div className="mt-0.5 break-words text-[11px]">{task.title}</div>
       {/* 期限は ID より弱い補助として出す。 */}
       {task.due_date && <div className="mt-0.5 truncate text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
     </Card>
