@@ -121,8 +121,9 @@ export const STATUS_LABEL: Record<Status, string> = {
 // Every status, in workflow order (status pickers and forms).
 export const STATUS_ORDER: Status[] = ["todo", "in_progress", "done", "closed"];
 
-// Kanban columns. closed is not a column: those cards are hidden unless the toolbar toggle is on.
-export const BOARD_STATUSES: Status[] = ["todo", "in_progress", "done"];
+// Kanban columns. The closed column is always shown (as a drop target); its cards are hidden
+// unless the toolbar toggle is on.
+export const BOARD_STATUSES: Status[] = ["todo", "in_progress", "done", "closed"];
 
 // done and closed both count as finished (same rule as get_progress).
 export const isFinished = (status: Status) => status === "done" || status === "closed";
