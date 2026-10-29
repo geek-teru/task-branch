@@ -16,3 +16,7 @@ supabase/signing_keys.json
 
 # Vercel CLI のプロジェクト紐づけ（vercel link。Root Directory が web のためリポジトリ直下で行う）
 .vercel
+
+# tsc -b が vite.config.ts から出す生成物（Vite は .js を先に読むので残さない）
+web/vite.config.js
+web/vite.config.d.ts
