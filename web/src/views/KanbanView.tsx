@@ -181,8 +181,11 @@ export function KanbanView({
     return (
       <div key={story.id} className="flex border-b border-border last:border-b-0">
         <div className="relative box-border flex-none px-3 py-2.5" style={{ width: LABEL_W }}>
-          <div className="flex items-start gap-1.5">
-            <div className="flex-1 text-sm font-medium text-fg">{story.title}</div>
+          {/* カードと同じく ID を名前の上に置く。名前はガントのストーリー行と同じ大きさ。 */}
+          <div className="flex items-center gap-1.5 text-[11px] text-fg-muted">
+            <div className="flex-1">
+              <IdBadge id={story.id} />
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -194,9 +197,9 @@ export function KanbanView({
               <AddIcon size={12} />
             </Button>
           </div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-fg-muted">
-            <IdBadge id={story.id} />
-            <span>{tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}</span>
+          <div className="mt-0.5 text-xs text-fg">{story.title}</div>
+          <div className="mt-1 text-[11px] text-fg-muted">
+            {tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}
           </div>
           {/* same handle as the header, so the column can be dragged from any lane */}
           <ResizeHandle onMouseDown={startResize} />
@@ -242,7 +245,6 @@ export function KanbanView({
                   <TaskCard
                     key={t.id}
                     task={t}
-                    storyTitle={story.title}
                     dragging={drag?.task.id === t.id}
                     selected={selectedId === t.id}
                     onSelect={() => setSelectedId(t.id)}
@@ -289,7 +291,7 @@ export function KanbanView({
               return (
                 <section key={p.id} className="mb-7">
                   <div className="mb-2 flex items-center gap-2.5">
-                    <h3 className="m-0 text-[15px] font-semibold">{p.name}</h3>
+                    <h3 className="m-0 text-sm font-medium">{p.name}</h3>
                     <Button size="sm" icon={<AddIcon size={13} />} onClick={() => setStoryForm(p)}>
                       ストーリーを追加
                     </Button>
@@ -442,10 +444,9 @@ function moveMessage({ task, status, targetStory }: { task: Task; status: Status
   return `${head}${warn}\nよろしいですか？`;
 }
 
-// 上から ID / ストーリー / タイトル / 期限。上2行は弱い補助として出す。
+// 上から ID / タイトル / 期限。ストーリー名はレーンの見出しにあるので出さない。
 function TaskCard({
   task,
-  storyTitle,
   dragging,
   selected,
   onSelect,
@@ -453,7 +454,6 @@ function TaskCard({
   onDragEnd,
 }: {
   task: Task;
-  storyTitle: string;
   dragging: boolean;
   selected: boolean;
   onSelect: () => void;
@@ -473,7 +473,8 @@ function TaskCard({
       onClick={onSelect}
       title={task.description ?? task.title}
       className={cn(
-        "px-2 py-1.5 text-xs text-fg",
+        // 幅は列に合わせ、高さだけ最小を取って縦長に見せる
+        "relative box-border min-h-20 px-2.5 py-2 text-fg",
         selected && "border-brand ring-2 ring-brand/30 hover:border-brand",
         dragging ? "opacity-40" : closed && "opacity-60",
       )}
@@ -481,13 +482,28 @@ function TaskCard({
       <div className="flex items-center gap-1.5 text-[11px] leading-relaxed text-fg-muted">
         <IdBadge id={task.id} />
       </div>
-      {/* ストーリー名は「補助・ラベル」、期限はそれより弱く出す。長い名前は末尾を「…」で切る。 */}
-      <div className="truncate text-[11px] text-fg-muted" title={storyTitle}>
-        {storyTitle}
-      </div>
-      <div className="mt-0.5">{task.title}</div>
-      {task.due_date && <div className="truncate text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
+      {/* ガントのタスク行と同じ大きさ。2行まで出し、3行目からは「…」で省略する。 */}
+      {/* 右下のアイコンに重ならないよう、タスク名と期限はアイコンの幅だけ右を空ける。 */}
+      <div className="mt-0.5 line-clamp-2 break-words pr-6 text-[11px]">{task.title}</div>
+      {/* 期限は ID より弱い補助として出す。 */}
+      {task.due_date && <div className="mt-0.5 truncate pr-6 text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
+      <AssigneeAvatar />
     </Card>
+  );
+}
+
+// 担当者のアイコン（ヘッダーのユーザーアイコンと同じ形の小型版）。
+// 担当者のデータがまだ無いので、今は固定のサンプルを出す。
+const SAMPLE_ASSIGNEE = "Sample User";
+
+function AssigneeAvatar({ name = SAMPLE_ASSIGNEE }: { name?: string }) {
+  return (
+    <span
+      className="absolute right-2 bottom-2 flex size-5 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-medium text-fg"
+      title={name}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
   );
 }
 

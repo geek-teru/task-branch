@@ -74,13 +74,13 @@ export function BacklogIcon(p: IconProps) {
   );
 }
 
-// Kanban: three columns of different heights.
+// Kanban: three columns of the same height (todo / in progress / done).
 export function KanbanIcon(p: IconProps) {
   return (
     <Icon {...p}>
       <rect x="2" y="2.5" width="3.2" height="11" rx="0.8" />
-      <rect x="6.4" y="2.5" width="3.2" height="7.5" rx="0.8" />
-      <rect x="10.8" y="2.5" width="3.2" height="9.5" rx="0.8" />
+      <rect x="6.4" y="2.5" width="3.2" height="11" rx="0.8" />
+      <rect x="10.8" y="2.5" width="3.2" height="11" rx="0.8" />
     </Icon>
   );
 }
