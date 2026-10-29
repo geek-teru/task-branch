@@ -1,5 +1,6 @@
 -- Sample project 1: AWS移行 Phase1 アプリケーション移行  (source: sample/sample1 の mermaid gantt)
 -- task -> story（親なし）。section はコメントの区切りだけにする。マイルストーン / level3 タスクは意図的に省略。
+-- 一部のストーリーには、期間付きのタスク（ストーリーの期間内）を置く。
 -- status: 区切り「本番移行 ドメイン移管」の全ストーリーを 'in_progress'、それより前を 'done'、後ろを 'todo' とする。
 -- 単独で再実行可能: このプロジェクト名の既存行を先に削除してから再投入する。
 -- 実行例: docker exec -i supabase_db_task-branch psql -U postgres -d postgres < supabase/sample01.sql
@@ -11,6 +12,7 @@ delete from projects where name = 'AWS移行 Phase1 アプリケーション移�
 do $$
 declare
   p  uuid;
+  s  uuid;
   -- 所有者: 最古のユーザー（ダミーを除く）。いなければダミー（seed.sql）
   owner uuid := coalesce(
     (select id from auth.users where id <> '00000000-0000-0000-0000-000000000001' order by created_at limit 1),
@@ -79,6 +81,14 @@ begin
     (p, 'story', '本番 決済ゲートウェイ経路切替', 'in_progress', '2026-01-08', '2026-01-09', 31),
     (p, 'story', '本番 外部連携試験 外部API', 'in_progress', '2026-01-08', '2026-01-16', 32);
 
+  -- 期間付きタスク（ストーリーの期間内）。ストーリーの期間変更・ガントのバー移動の確認用
+  select id into s from tasks where project_id = p and level = 'story' and title = '本番 外部連携試験 外部API';
+  insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order) values
+    (p, s, 'task', '外部API 疎通確認', 'done', '2026-01-08', '2026-01-09', 1),
+    (p, s, 'task', '外部API 認証・署名の確認', 'done', '2026-01-09', '2026-01-12', 2),
+    (p, s, 'task', '外部API 正常系・異常系の試験', 'in_progress', '2026-01-12', '2026-01-15', 3),
+    (p, s, 'task', '外部API 試験結果の報告', 'todo', '2026-01-15', '2026-01-16', 4);
+
   -- 本番移行 Service C 切り替え
   insert into tasks(project_id, level, title, status, start_date, due_date, sort_order) values
     (p, 'story', '本番 Service C リリース', 'todo', '2026-01-19', '2026-01-20', 33),
@@ -105,6 +115,12 @@ begin
     (p, 'story', '本番 Service B パブリック カナリアリリース50%', 'todo', '2026-02-18', '2026-02-19', 48),
     (p, 'story', 'コードフリーズ', 'todo', '2026-02-05', '2026-02-08', 49),
     (p, 'story', '建国記念日', 'todo', '2026-02-10', '2026-02-11', 50);
+
+  select id into s from tasks where project_id = p and level = 'story' and title = '本番 Service B オンプレの変更取り込み';
+  insert into tasks(project_id, parent_id, level, title, status, start_date, due_date, sort_order) values
+    (p, s, 'task', 'オンプレの差分の洗い出し', 'todo', '2026-01-19', '2026-01-21', 1),
+    (p, s, 'task', '差分の取り込み', 'todo', '2026-01-22', '2026-01-28', 2),
+    (p, s, 'task', '取り込み後の動作確認', 'todo', '2026-01-29', '2026-01-30', 3);
 end $$;
 
 commit;
