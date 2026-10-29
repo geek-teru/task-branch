@@ -478,7 +478,8 @@ function TaskCard({
       <div className="flex items-center gap-1.5 text-[11px] leading-relaxed text-fg-muted">
         <IdBadge id={task.id} />
       </div>
-      <div className="mt-0.5 text-sm font-medium">{task.title}</div>
+      {/* ガントのタスク行と同じ大きさ。 */}
+      <div className="mt-0.5 text-[11px]">{task.title}</div>
       {/* 期限は ID より弱い補助として出す。 */}
       {task.due_date && <div className="mt-0.5 truncate text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
     </Card>
