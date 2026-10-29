@@ -474,7 +474,7 @@ function TaskCard({
       title={task.description ?? task.title}
       className={cn(
         // 幅は列に合わせ、高さだけ最小を取って縦長に見せる
-        "box-border min-h-20 px-2.5 py-2 text-fg",
+        "relative box-border min-h-20 px-2.5 py-2 text-fg",
         selected && "border-brand ring-2 ring-brand/30 hover:border-brand",
         dragging ? "opacity-40" : closed && "opacity-60",
       )}
@@ -483,10 +483,27 @@ function TaskCard({
         <IdBadge id={task.id} />
       </div>
       {/* ガントのタスク行と同じ大きさ。2行まで出し、3行目からは「…」で省略する。 */}
-      <div className="mt-0.5 line-clamp-2 break-words text-[11px]">{task.title}</div>
+      {/* 右下のアイコンに重ならないよう、タスク名と期限はアイコンの幅だけ右を空ける。 */}
+      <div className="mt-0.5 line-clamp-2 break-words pr-6 text-[11px]">{task.title}</div>
       {/* 期限は ID より弱い補助として出す。 */}
-      {task.due_date && <div className="mt-0.5 truncate text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
+      {task.due_date && <div className="mt-0.5 truncate pr-6 text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
+      <AssigneeAvatar />
     </Card>
+  );
+}
+
+// 担当者のアイコン（ヘッダーのユーザーアイコンと同じ形の小型版）。
+// 担当者のデータがまだ無いので、今は固定のサンプルを出す。
+const SAMPLE_ASSIGNEE = "Sample User";
+
+function AssigneeAvatar({ name = SAMPLE_ASSIGNEE }: { name?: string }) {
+  return (
+    <span
+      className="absolute right-2 bottom-2 flex size-5 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-medium text-fg"
+      title={name}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
   );
 }
 
