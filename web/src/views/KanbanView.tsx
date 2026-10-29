@@ -11,7 +11,6 @@ import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
@@ -172,11 +171,9 @@ export function KanbanView({
     setOver(null);
   };
 
-  // クローズは列を持たない。トグルが入っているときだけ完了列の下に薄く出す。
+  // クローズ列は常に出すが、カードはトグルが入っているときだけ出す。
   const cardsIn = (tasks: Task[], s: Status) =>
-    tasks
-      .filter((t) => t.status === s || (s === "done" && showClosed && t.status === "closed"))
-      .sort((a, b) => Number(a.status === "closed") - Number(b.status === "closed"));
+    s === "closed" && !showClosed ? [] : tasks.filter((t) => t.status === s);
 
   const renderLane = ({ story, tasks }: KanbanLane) => {
     // クローズも完了として数える。トグルで隠していても数は変えない。
@@ -300,7 +297,7 @@ export function KanbanView({
                   {projectLanes.length === 0 ? (
                     <div className="text-[13px] text-fg-muted">進行中のストーリーがありません。</div>
                   ) : (
-                    <div className="rounded-md border border-border bg-surface" style={{ minWidth: LABEL_W + 3 * 220 }}>
+                    <div className="rounded-md border border-border bg-surface" style={{ minWidth: LABEL_W + BOARD_STATUSES.length * 220 }}>
                       <div className="flex border-b border-border">
                         <div
                           className="relative flex flex-none items-center px-3 py-2 text-xs font-medium text-fg-muted"
@@ -316,7 +313,10 @@ export function KanbanView({
                           >
                             <span className={cn("inline-block h-2 w-2 rounded-full", STATUS_DOT[s])} />
                             <span className="text-fg">{STATUS_LABEL[s]}</span>
-                            <span>{projectLanes.reduce((n, lane) => n + cardsIn(lane.tasks, s).length, 0)}</span>
+                            {/* カードを隠していてもその status の件数を出す */}
+                            <span>
+                              {projectLanes.reduce((n, lane) => n + lane.tasks.filter((t) => t.status === s).length, 0)}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -480,11 +480,6 @@ function TaskCard({
     >
       <div className="flex items-center gap-1.5 text-[11px] leading-relaxed text-fg-muted">
         <IdBadge id={task.id} />
-        {closed && (
-          <Badge tone="closed" className="ml-auto h-4 px-1.5 text-[10px]">
-            {STATUS_LABEL.closed}
-          </Badge>
-        )}
       </div>
       {/* ストーリー名は「補助・ラベル」、期限はそれより弱く出す。長い名前は末尾を「…」で切る。 */}
       <div className="truncate text-[11px] text-fg-muted" title={storyTitle}>
