@@ -264,7 +264,7 @@ export function KanbanView({
     <div className="flex h-full text-sm text-fg">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-fg-muted">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
             <input
               type="checkbox"
               checked={showClosed}
