@@ -45,8 +45,8 @@ export function EpicStateBadge({ active, onPick }: { active: boolean; onPick?: (
                   if (value !== active) onPick(value);
                 }}
                 className={cn(
-                  "m-0 block w-full cursor-pointer whitespace-nowrap rounded border-0 px-2.5 py-1 text-left text-xs text-fg hover:bg-surface-muted",
-                  value === active ? "bg-surface-muted font-medium" : "bg-transparent",
+                  "m-0 block w-full cursor-pointer whitespace-nowrap rounded border-0 px-2.5 py-1 text-left text-[13px] text-fg hover:bg-surface-muted",
+                  value === active ? "bg-surface-muted" : "bg-transparent",
                 )}
               >
                 {value ? "Active" : "InActive"}
