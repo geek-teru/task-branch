@@ -27,7 +27,7 @@ const BAR_BG: Record<Status, string> = {
 
 // 行の中の小さなボタン。Button の sm（h-7）は行の高さ 26px に入らないので詰める。
 // 文字色は呼び出し側で付ける。削除の赤は ghost の text-fg に CSS の順で負けるので important にする。
-const rowBtn = "h-5 rounded px-1.5 text-[11px] font-normal";
+const rowBtn = "h-5 rounded px-1.5 text-[11px]";
 const rowBtnMuted = "text-fg-muted hover:text-fg";
 
 function parseDate(s: string): Date {
@@ -348,7 +348,7 @@ export function GanttView({
         {/* header */}
         <div className="sticky top-0 z-[3] flex" style={{ height: HEADER_H }}>
           <div
-            className="sticky left-0 z-[4] flex shrink-0 items-center border-b border-r border-border bg-surface px-3 text-xs text-fg-muted"
+            className="sticky left-0 z-[4] flex shrink-0 items-center border-b border-r border-border bg-surface px-3 text-xs font-medium text-fg-muted"
             style={{ width: LABEL_W }}
           >
             プロジェクト / ストーリー
@@ -358,7 +358,7 @@ export function GanttView({
             {months.map((mo) => (
               <div
                 key={mo.x}
-                className="absolute top-0 flex h-[18px] items-center border-l border-border/60 pl-1.5"
+                className="absolute top-0 flex h-[18px] items-center border-l border-border/60 pl-1.5 font-medium"
                 style={{ left: mo.x, width: mo.w }}
               >
                 {mo.label}

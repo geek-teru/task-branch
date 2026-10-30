@@ -93,7 +93,7 @@ export function ProjectForm({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-fg-muted">{label}</span>
+      <span className="text-xs text-fg-muted">{label}</span>
       {children}
     </label>
   );
