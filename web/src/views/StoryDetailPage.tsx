@@ -154,7 +154,7 @@ export function StoryDetailPage({
               </Button>
             )}
           </CardHeader>
-          <div className="px-5 py-4 text-[13px]">
+          <div className="px-5 py-4 text-sm">
             {editing ? (
               <Textarea
                 autoFocus
