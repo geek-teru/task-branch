@@ -123,7 +123,7 @@ export function StoryDetailPage({
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
           <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
-          <span className="text-xs text-fg-muted">{period(story)}</span>
+          <span className="text-[11px] text-fg-muted">{period(story)}</span>
           <IdBadge id={story.id} />
         </div>
         <p className={cn("m-0 mt-3 text-sm", story.description ? "text-fg" : "text-fg-muted")}>
@@ -247,7 +247,7 @@ function CardHeader({ title, meta, children }: { title: string; meta: string; ch
   return (
     <div className="flex min-h-12 items-center gap-3 border-b border-border px-5 py-2">
       <h2 className="m-0 text-sm font-medium text-fg">{title}</h2>
-      <span className="text-xs text-fg-muted">{meta}</span>
+      <span className="text-[11px] text-fg-muted">{meta}</span>
       {children && <div className="ml-auto flex gap-1.5">{children}</div>}
     </div>
   );
