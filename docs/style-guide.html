@@ -102,6 +102,14 @@
   .nav .item.active { background: #0972d3; color: #fff; font-weight: 600; }
 
   .bar { height: 16px; border-radius: 3px; }
+
+  /* 文字の大きさ・太さの表（セル結合あり） */
+  .type-table td, .type-table th { border: 1px solid #e5e8eb; }
+  .type-table td.cat { font-weight: 600; background: #f7f9fa; }
+  .type-table td.sub-cat { background: #fbfbfc; }
+  .type-table .sub { font-size: 11px; font-weight: 400; color: #5f6b7a; }
+  .type-table .ex { color: #94a0ad; }
+  .type-table .ng { color: #a3210b; }
 </style>
 </head>
 <body>
@@ -194,21 +202,130 @@
 </div>
 
 <h2 id="type">3. タイポグラフィ</h2>
-<pre><code>font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
-  "Noto Sans JP", Meiryo, sans-serif;</code></pre>
-<p class="note">ID などの固定幅は <code>ui-monospace, SFMono-Regular, Menlo, Consolas, monospace</code>。</p>
-<table>
-  <thead><tr><th>サイズ</th><th>太さ</th><th>使うところ</th></tr></thead>
+<pre><code>font-family: Inter, "Noto Sans JP", sans-serif;  /* web/src/index.css の --font-sans */</code></pre>
+<p class="note">ID などの固定幅は <code>ui-monospace, SFMono-Regular, Menlo, monospace</code>（<code>--font-mono</code>）。</p>
+
+<h3>文字の大きさ・太さの決まり</h3>
+<ul>
+  <li>太さは 400（通常）と 500（<code>font-medium</code>）の2つだけ。600 以上（<code>font-semibold</code> / <code>font-bold</code>）は使わない。</li>
+  <li>本文の既定は 14px（<code>text-sm</code>）。補助の文字は 13px 以下で <code>text-fg-muted</code>。</li>
+  <li>同じ小分類の要素は同じ大きさ・太さにそろえる。下の表にない要素を足すときは、まず既存の小分類に当てはめる。</li>
+</ul>
+
+<h3>要素ごとの大きさ・太さ</h3>
+<p class="note">「6fa86f5e: 画面の文字サイズ・太さの統一」で整理した一覧。<span class="ng">※</span> はルールからずれていて未修正のもの、<span class="ex">（例外）</span> は決定済みの例外。</p>
+<table class="type-table">
+  <colgroup><col style="width:14%"><col style="width:18%"><col><col style="width:13%"><col style="width:11%"></colgroup>
+  <thead><tr><th>大分類</th><th>小分類</th><th>画面 - 要素</th><th>サイズ</th><th>太さ</th></tr></thead>
   <tbody>
-    <tr><td class="mono">20px</td><td>600</td><td>詳細画面の見出し（プロジェクト名など）</td></tr>
-    <tr><td class="mono">18px</td><td>600</td><td>ページ見出し（一覧の「プロジェクト」など）</td></tr>
-    <tr><td class="mono">16px</td><td>600–700</td><td>モーダルの見出し、サイドナビのブランド</td></tr>
-    <tr><td class="mono">15px</td><td>600</td><td>カードのタイトル、パネルの対象名、プロジェクト見出し</td></tr>
-    <tr><td class="mono">14px</td><td>600</td><td>セクション見出し（カード内の h3）</td></tr>
-    <tr><td class="mono">13px</td><td>400</td><td><b>本文の基準</b>。表のセル、パネルの値、主ボタン</td></tr>
-    <tr><td class="mono">12px</td><td>400–600</td><td>補助テキスト、副ボタン、表の見出し、フォームのラベル</td></tr>
-    <tr><td class="mono">11px</td><td>400–600</td><td>メタ情報（作成日）、パネルの項目ラベル、ID、バッジ</td></tr>
-    <tr><td class="mono">10px</td><td>400</td><td>ごく小さい印（▾ など）</td></tr>
+    <tr><td class="cat" rowspan="9">グローバルヘッダー</td><td class="sub-cat" rowspan="1">区切り</td><td>グローバルヘッダー - 「/」</td><td class="mono" rowspan="1">18px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">ロゴ</td><td>グローバルヘッダー - 「task-branch」</td><td class="mono" rowspan="1">15px</td><td rowspan="1">500</td></tr>
+    <tr><td class="sub-cat" rowspan="2">ボタン・ユーザー名</td><td>グローバルヘッダー - プロジェクト切替ボタン</td><td class="mono" rowspan="2">13px</td><td rowspan="2">500</td></tr>
+    <tr><td>グローバルヘッダー - ユーザーメニューのユーザー名</td></tr>
+    <tr><td class="sub-cat" rowspan="3">メニュー項目</td><td>グローバルヘッダー - 切替メニューの項目</td><td class="mono" rowspan="3">13px</td><td rowspan="3">400</td></tr>
+    <tr><td>グローバルヘッダー - 「ログアウト」</td></tr>
+    <tr><td>グローバルヘッダー - 「プロジェクトがありません」</td></tr>
+    <tr><td class="sub-cat" rowspan="1">アイコン文字</td><td>グローバルヘッダー - アバターの頭文字</td><td class="mono" rowspan="1">12px</td><td rowspan="1">500</td></tr>
+    <tr><td class="sub-cat" rowspan="1">補助の文字</td><td>グローバルヘッダー - ユーザーメニューのメール</td><td class="mono" rowspan="1">12px</td><td rowspan="1">400</td></tr>
+    <tr><td class="cat" rowspan="2">サイドナビ</td><td class="sub-cat" rowspan="1">ナビ項目</td><td>サイドナビ - Projects / Backlog / Gantt / Board</td><td class="mono" rowspan="1">14px</td><td rowspan="1">選択中 500、他 400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">折りたたみボタン</td><td>サイドナビ - 「«」</td><td class="mono" rowspan="1">14px</td><td rowspan="1">400</td></tr>
+    <tr><td class="cat" rowspan="59">コンテンツ部分</td><td class="sub-cat" rowspan="4">ページ見出し</td><td>プロジェクト一覧 - 「プロジェクト」</td><td class="mono" rowspan="4">24px</td><td rowspan="4">500</td></tr>
+    <tr><td>プロジェクト詳細 - プロジェクト名</td></tr>
+    <tr><td>ストーリー詳細 - ストーリー名</td></tr>
+    <tr><td>設定エラー - 「設定が必要です」</td></tr>
+    <tr><td class="sub-cat" rowspan="5">セクション見出し</td><td>Markdown（コンテキスト・「詳細」） - h1 <span class="ex">（例外）</span></td><td class="mono" rowspan="1">15px</td><td rowspan="1">500</td></tr>
+    <tr><td>プロジェクト詳細 - 「基本情報」</td><td class="mono" rowspan="4">14px</td><td rowspan="4">500</td></tr>
+    <tr><td>ストーリー詳細 - コンテキスト / タスク など</td></tr>
+    <tr><td>カンバン - プロジェクト名</td></tr>
+    <tr><td>Markdown（コンテキスト・「詳細」） - h2</td></tr>
+    <tr><td class="sub-cat" rowspan="6">項目名（大）</td><td>プロジェクト一覧 - カード名</td><td class="mono" rowspan="6">13px</td><td rowspan="6">500</td></tr>
+    <tr><td>プロジェクト一覧 - 表の名前セル</td></tr>
+    <tr><td>バックログ - ストーリー名セル</td></tr>
+    <tr><td>ストーリー詳細 - タスク名セル</td></tr>
+    <tr><td>ガント - プロジェクト行</td></tr>
+    <tr><td>Markdown（コンテキスト・「詳細」） - h3</td></tr>
+    <tr><td class="sub-cat" rowspan="5">項目名（中）</td><td>ガント - グループ行</td><td class="mono" rowspan="2">12px</td><td rowspan="2">500</td></tr>
+    <tr><td>Markdown（コンテキスト・「詳細」） - h4</td></tr>
+    <tr><td>カンバン - レーンのストーリー名</td><td class="mono" rowspan="3">12px</td><td rowspan="3">400</td></tr>
+    <tr><td>カンバン - カードのタスク名</td></tr>
+    <tr><td>ガント - ストーリー行</td></tr>
+    <tr><td class="sub-cat" rowspan="1">項目名（小）</td><td>ガント - タスク行</td><td class="mono" rowspan="1">11px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">プロパティ名</td><td>プロジェクト詳細 - 基本情報のプロパティ名</td><td class="mono" rowspan="1">12px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">プロパティ値</td><td>プロジェクト詳細 - 基本情報のプロパティ値</td><td class="mono" rowspan="1">13px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="6">表のヘッダー</td><td>プロジェクト一覧 - 名前 / 説明 / 状態 / 作成日</td><td class="mono" rowspan="6">12px</td><td rowspan="6">500</td></tr>
+    <tr><td>バックログ - ID / 名前 / 説明 / ステータス / 状態</td></tr>
+    <tr><td>ストーリー詳細 - ID / 名前 / 説明 / ステータス / 期間</td></tr>
+    <tr><td>カンバン - 列の見出し（ストーリー / 未着手 / 進行中 / 完了 / クローズ）</td></tr>
+    <tr><td>ガント - 左上の見出し・月の見出し</td></tr>
+    <tr><td>Markdown（コンテキスト・「詳細」） - 表の見出しセル</td></tr>
+    <tr><td class="sub-cat" rowspan="4">表の本文</td><td>プロジェクト一覧 - その他のセル</td><td class="mono" rowspan="4">13px</td><td rowspan="4">400</td></tr>
+    <tr><td>バックログ - その他のセル</td></tr>
+    <tr><td>ストーリー詳細 - タスク表のその他のセル</td></tr>
+    <tr><td>Markdown（コンテキスト・「詳細」） - 表のセル</td></tr>
+    <tr><td class="sub-cat" rowspan="5">本文</td><td>共通 - 本文の既定（body）</td><td class="mono" rowspan="5">14px</td><td rowspan="5">400</td></tr>
+    <tr><td>プロジェクト詳細 - 説明</td></tr>
+    <tr><td>ストーリー詳細 - 説明</td></tr>
+    <tr><td>ストーリー詳細 - コンテキスト本文</td></tr>
+    <tr><td>設定エラー - 説明文</td></tr>
+    <tr><td class="sub-cat" rowspan="15">補助の文字</td><td>ストーリー詳細 - 「コンテキストがまだありません。…」 <span class="ng">※</span></td><td class="mono" rowspan="2">14px</td><td rowspan="2">400</td></tr>
+    <tr><td>カンバン - 「プロジェクトが見つかりません。」「プロジェクトがありません。」 <span class="ng">※</span></td></tr>
+    <tr><td>プロジェクト一覧 - 空の表示（「条件に合うプロジェクトがありません。」など）</td><td class="mono" rowspan="6">13px</td><td rowspan="6">400</td></tr>
+    <tr><td>プロジェクト一覧 - カードの説明</td></tr>
+    <tr><td>バックログ - 読み込み中・空の表示</td></tr>
+    <tr><td>ストーリー詳細 - 「タスクはまだありません。」</td></tr>
+    <tr><td>カンバン - 「進行中のストーリーがありません。」</td></tr>
+    <tr><td>ガント - 空の表示</td></tr>
+    <tr><td>プロジェクト一覧 - カードの URL</td><td class="mono" rowspan="1">12px</td><td rowspan="1">400</td></tr>
+    <tr><td>ストーリー詳細 - 期間</td><td class="mono" rowspan="5">11px</td><td rowspan="5">400</td></tr>
+    <tr><td>ストーリー詳細 - コンテキストの版・更新日時、タスクの件数</td></tr>
+    <tr><td>カンバン - レーンの ID 行・件数・「タスクなし」</td></tr>
+    <tr><td>カンバン - カードの ID 行・期限</td></tr>
+    <tr><td>ガント - バーのラベル</td></tr>
+    <tr><td>ガント - 折りたたみ時の件数</td><td class="mono" rowspan="1">行と同じ</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">エラー</td><td>共通 - エラーの帯</td><td class="mono" rowspan="1">13px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="2">リンク</td><td>プロジェクト詳細 - 「← プロジェクト」</td><td class="mono" rowspan="2">12px</td><td rowspan="2">400</td></tr>
+    <tr><td>ストーリー詳細 - 「← バックログ」</td></tr>
+    <tr><td class="sub-cat" rowspan="1">アイコン文字</td><td>カンバン - 担当者アイコン</td><td class="mono" rowspan="1">10px</td><td rowspan="1">500</td></tr>
+    <tr><td class="sub-cat" rowspan="1">目盛り</td><td>ガント - 日付の目盛り</td><td class="mono" rowspan="1">10px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">コード</td><td>Markdown（コンテキスト・「詳細」） - インライン・ブロックのコード</td><td class="mono" rowspan="1">12px（等幅）</td><td rowspan="1">400</td></tr>
+    <tr><td class="cat" rowspan="9">フォーム</td><td class="sub-cat" rowspan="7">ラベル</td><td>プロジェクトフォーム - 入力欄のラベル</td><td class="mono" rowspan="7">12px</td><td rowspan="7">400</td></tr>
+    <tr><td>バックログ - 「状態」フィルター</td></tr>
+    <tr><td>バックログ - 追加フォームのラベル</td></tr>
+    <tr><td>ストーリー詳細 - 編集フォームのラベル</td></tr>
+    <tr><td>タスクフォーム - 入力欄のラベル</td></tr>
+    <tr><td>カンバン - 「クローズしたタスクも表示」</td></tr>
+    <tr><td>グループフォーム - 入力欄のラベル</td></tr>
+    <tr><td class="sub-cat" rowspan="2">注記</td><td>ストーリー詳細 - 期間の注記・エラー</td><td class="mono" rowspan="2">11px</td><td rowspan="2">400</td></tr>
+    <tr><td>タスクフォーム - todo の注記</td></tr>
+    <tr><td class="cat" rowspan="9">詳細パネル<br><span class="sub">ガント・ボードで名前をクリック</span></td><td class="sub-cat" rowspan="2">タイトル・セクション見出し</td><td>詳細パネル - タイトル</td><td class="mono" rowspan="2">14px</td><td rowspan="2">500</td></tr>
+    <tr><td>詳細パネル - 「コメント（N）」</td></tr>
+    <tr><td class="sub-cat" rowspan="2">プロパティ値・本文</td><td>詳細パネル - 各プロパティ値（「詳細」の Markdown 本文を含む）</td><td class="mono" rowspan="2">13px</td><td rowspan="2">400</td></tr>
+    <tr><td>詳細パネル - コメント本文</td></tr>
+    <tr><td class="sub-cat" rowspan="3">プロパティ名・補助の文字</td><td>詳細パネル - 種別（「ストーリー」「タスク」など）</td><td class="mono" rowspan="3">12px</td><td rowspan="3">400</td></tr>
+    <tr><td>詳細パネル - 各プロパティ名</td></tr>
+    <tr><td>詳細パネル - コメントのエラー <span class="ng">※</span></td></tr>
+    <tr><td class="sub-cat" rowspan="1">小さいボタン</td><td>詳細パネル - コメントの編集・削除</td><td class="mono" rowspan="1">11px</td><td rowspan="1">500</td></tr>
+    <tr><td class="sub-cat" rowspan="1">補助の文字（小）</td><td>詳細パネル - コメントの投稿者・日時</td><td class="mono" rowspan="1">11px</td><td rowspan="1">400</td></tr>
+    <tr><td class="cat" rowspan="10">認証画面</td><td class="sub-cat" rowspan="2">ページ見出し</td><td>ログイン - 「task-branch」</td><td class="mono" rowspan="2">24px</td><td rowspan="2">500</td></tr>
+    <tr><td>OAuth 同意 - 「task-branch」</td></tr>
+    <tr><td class="sub-cat" rowspan="1">項目名</td><td>OAuth 同意 - クライアント名</td><td class="mono" rowspan="1">14px</td><td rowspan="1">500</td></tr>
+    <tr><td class="sub-cat" rowspan="1">本文</td><td>OAuth 同意 - 許可の確認文</td><td class="mono" rowspan="1">14px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="4">案内文・プロパティ値・エラー</td><td>ログイン - 案内文「Google アカウントで…」</td><td class="mono" rowspan="4">13px</td><td rowspan="4">400</td></tr>
+    <tr><td>ログイン - エラー文</td></tr>
+    <tr><td>OAuth 同意 - リード文</td></tr>
+    <tr><td>OAuth 同意 - 各プロパティ値</td></tr>
+    <tr><td class="sub-cat" rowspan="1">プロパティ名</td><td>OAuth 同意 - 各プロパティ名</td><td class="mono" rowspan="1">12px</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="1">スコープ名</td><td>OAuth 同意 - スコープ名</td><td class="mono" rowspan="1">12px（等幅）</td><td rowspan="1">400</td></tr>
+    <tr><td class="cat" rowspan="10">共通部品<br><span class="sub">どの画面でも使う</span></td><td class="sub-cat" rowspan="2">ボタン</td><td>共通部品 - Button（sm / md）</td><td class="mono" rowspan="1">13px / 14px</td><td rowspan="1">500</td></tr>
+    <tr><td>ガント - 行のボタン</td><td class="mono" rowspan="1">11px</td><td rowspan="1">500</td></tr>
+    <tr><td class="sub-cat" rowspan="2">メニュー項目</td><td>共通部品 - DropdownMenu の項目</td><td class="mono" rowspan="2">13px</td><td rowspan="2">400</td></tr>
+    <tr><td>共通部品 - 状態の選択メニュー（Active / InActive）</td></tr>
+    <tr><td class="sub-cat" rowspan="2">入力欄</td><td>共通部品 - Input・Select</td><td class="mono" rowspan="1">13px</td><td rowspan="1">400</td></tr>
+    <tr><td>ストーリー詳細 - コンテキストの入力欄</td><td class="mono" rowspan="1">13px（等幅）</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="2">バッジ</td><td>共通部品 - Badge（ステータス・状態）</td><td class="mono" rowspan="1">11px</td><td rowspan="1">400</td></tr>
+    <tr><td>共通部品 - ID バッジ</td><td class="mono" rowspan="1">11px（等幅）</td><td rowspan="1">400</td></tr>
+    <tr><td class="sub-cat" rowspan="2">ダイアログ</td><td>共通部品 - Dialog のタイトル</td><td class="mono" rowspan="1">14px</td><td rowspan="1">500</td></tr>
+    <tr><td>共通部品 - Dialog の本文</td><td class="mono" rowspan="1">14px</td><td rowspan="1">400</td></tr>
   </tbody>
 </table>
 
