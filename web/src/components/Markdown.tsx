@@ -56,10 +56,10 @@ const components: Components = {
     ),
   table: ({ node: _node, ...props }) => (
     <div className={cn(block, "overflow-x-auto")}>
-      <table className="border-collapse text-xs" {...props} />
+      <table className="border-collapse text-[13px]" {...props} />
     </div>
   ),
-  th: ({ node: _node, ...props }) => <th className={cn(cell, "bg-surface-muted font-medium")} {...props} />,
+  th: ({ node: _node, ...props }) => <th className={cn(cell, "bg-surface-muted text-xs font-medium")} {...props} />,
   td: ({ node: _node, ...props }) => <td className={cell} {...props} />,
   hr: ({ node: _node, ...props }) => <hr className="my-2.5 border-0 border-t border-solid border-border" {...props} />,
 };
