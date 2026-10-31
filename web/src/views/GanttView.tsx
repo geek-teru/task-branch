@@ -465,7 +465,7 @@ export function GanttView({
                         ? "bg-surface-muted"
                         : "bg-surface",
                   r.kind === "project"
-                    ? "text-sm font-medium"
+                    ? "text-[13px] font-medium"
                     : r.kind === "group"
                       ? "text-xs font-medium"
                       : r.kind === "story"

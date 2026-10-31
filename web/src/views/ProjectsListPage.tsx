@@ -157,7 +157,7 @@ export function ProjectsListPage({
                     <ProjectIcon size={16} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-fg">{p.name}</div>
+                    <div className="truncate text-[13px] font-medium text-fg">{p.name}</div>
                     <div
                       className={cn(
                         "mt-1 line-clamp-2 text-[13px] leading-snug",
