@@ -12,6 +12,8 @@ import {
   AddIcon,
   BacklogIcon,
   GanttIcon,
+  GitHubIcon,
+  GlobeIcon,
   GridIcon,
   KanbanIcon,
   ListIcon,
@@ -171,9 +173,17 @@ export function ProjectsListPage({
                 </div>
 
                 {(p.url || p.repository_url) && (
-                  <div className="mt-3 flex flex-col gap-0.5 pl-11 text-xs">
-                    {p.url && <ExternalLink href={p.url} />}
-                    {p.repository_url && <ExternalLink href={p.repository_url} />}
+                  <div className="mt-3 flex items-center gap-1 pl-11">
+                    {p.url && (
+                      <ExternalLink href={p.url} label="Web サイト">
+                        <GlobeIcon size={16} />
+                      </ExternalLink>
+                    )}
+                    {p.repository_url && (
+                      <ExternalLink href={p.repository_url} label="リポジトリ">
+                        <GitHubIcon size={16} />
+                      </ExternalLink>
+                    )}
                   </div>
                 )}
 
@@ -299,18 +309,20 @@ function ViewToggle({
   );
 }
 
-// URL shown small on a card; opening it must not open the project.
-function ExternalLink({ href }: { href: string }) {
+// URL shown as an icon on a card (the URL itself is in the tooltip); opening it must not open the project.
+function ExternalLink({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
       title={href}
+      aria-label={`${label}: ${href}`}
       onClick={(e: MouseEvent) => e.stopPropagation()}
-      className="truncate text-fg-muted no-underline hover:text-fg hover:underline"
+      onKeyDown={(e) => e.stopPropagation()}
+      className="flex h-7 w-7 items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
     >
-      {href.replace(/^https?:\/\//, "")}
+      {children}
     </a>
   );
 }
