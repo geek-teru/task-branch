@@ -44,7 +44,7 @@ export function GlobalHeader({
       style={{ height: HEADER_H }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="flex shrink-0 items-center gap-2 text-[15px] font-semibold whitespace-nowrap">
+        <span className="flex shrink-0 items-center gap-2 text-[15px] font-medium whitespace-nowrap">
           <ServiceIcon />
           task-branch
         </span>
@@ -96,7 +96,7 @@ export function GlobalHeader({
         label="ユーザーメニュー"
         menuClassName="min-w-[220px]"
         trigger={
-          <span className="flex size-7 items-center justify-center rounded-full border border-border bg-surface-muted text-xs font-semibold text-fg">
+          <span className="flex size-7 items-center justify-center rounded-full border border-border bg-surface-muted text-xs font-medium text-fg">
             {initial(userName)}
           </span>
         }

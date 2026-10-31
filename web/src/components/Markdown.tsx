@@ -21,10 +21,10 @@ const cell = "border border-border px-2 py-1 text-left align-top";
 
 const components: Components = {
   p: ({ node: _node, ...props }) => <p className={cn(block, "whitespace-pre-line")} {...props} />,
-  h1: ({ node: _node, ...props }) => <h1 className={cn(heading, "text-base")} {...props} />,
-  h2: ({ node: _node, ...props }) => <h2 className={cn(heading, "text-[15px]")} {...props} />,
-  h3: ({ node: _node, ...props }) => <h3 className={cn(heading, "text-sm")} {...props} />,
-  h4: ({ node: _node, ...props }) => <h4 className={cn(heading, "text-[13px]")} {...props} />,
+  h1: ({ node: _node, ...props }) => <h1 className={cn(heading, "text-[15px]")} {...props} />,
+  h2: ({ node: _node, ...props }) => <h2 className={cn(heading, "text-sm")} {...props} />,
+  h3: ({ node: _node, ...props }) => <h3 className={cn(heading, "text-[13px]")} {...props} />,
+  h4: ({ node: _node, ...props }) => <h4 className={cn(heading, "text-xs")} {...props} />,
   ul: ({ node: _node, ...props }) => <ul className={cn(block, "list-disc pl-5")} {...props} />,
   ol: ({ node: _node, ...props }) => <ol className={cn(block, "list-decimal pl-5")} {...props} />,
   // チェックリストの項目は、チェックボックスがあるので黒丸を出さない。
@@ -56,10 +56,10 @@ const components: Components = {
     ),
   table: ({ node: _node, ...props }) => (
     <div className={cn(block, "overflow-x-auto")}>
-      <table className="border-collapse text-xs" {...props} />
+      <table className="border-collapse text-[13px]" {...props} />
     </div>
   ),
-  th: ({ node: _node, ...props }) => <th className={cn(cell, "bg-surface-muted font-medium")} {...props} />,
+  th: ({ node: _node, ...props }) => <th className={cn(cell, "bg-surface-muted text-xs font-medium")} {...props} />,
   td: ({ node: _node, ...props }) => <td className={cell} {...props} />,
   hr: ({ node: _node, ...props }) => <hr className="my-2.5 border-0 border-t border-solid border-border" {...props} />,
 };

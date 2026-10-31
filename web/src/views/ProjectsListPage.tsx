@@ -133,7 +133,7 @@ export function ProjectsListPage({
         </div>
 
         {visible.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border-strong px-6 py-12 text-center text-sm text-fg-muted">
+          <div className="rounded-md border border-dashed border-border-strong px-6 py-12 text-center text-[13px] text-fg-muted">
             {projects.length === 0
               ? "プロジェクトがありません。「新規プロジェクト」から作成してください。"
               : "条件に合うプロジェクトがありません。"}
@@ -157,7 +157,7 @@ export function ProjectsListPage({
                     <ProjectIcon size={16} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-fg">{p.name}</div>
+                    <div className="truncate text-[13px] font-medium text-fg">{p.name}</div>
                     <div
                       className={cn(
                         "mt-1 line-clamp-2 text-[13px] leading-snug",

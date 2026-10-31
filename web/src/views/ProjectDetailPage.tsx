@@ -143,7 +143,7 @@ const DASH = <span className="text-fg-muted">—</span>;
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-4 border-b border-border py-2.5 text-[13px] last:border-b-0">
-      <dt className="w-24 shrink-0 text-xs font-medium leading-5 text-fg-muted">{label}</dt>
+      <dt className="w-24 shrink-0 text-xs leading-5 text-fg-muted">{label}</dt>
       <dd className="m-0 min-w-0 break-all leading-5 text-fg">{children}</dd>
     </div>
   );

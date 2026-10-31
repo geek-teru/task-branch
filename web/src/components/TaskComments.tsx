@@ -114,7 +114,7 @@ export function TaskComments({ taskId }: { taskId: string }) {
 
   return (
     <div className="mt-1 border-t border-border pt-3">
-      <div className="mb-1 text-xs text-fg-muted">コメント（{comments.length}）</div>
+      <div className="mb-1 text-sm font-medium text-fg">コメント（{comments.length}）</div>
 
       <div className="divide-y divide-border">
         {comments.map((c) => (

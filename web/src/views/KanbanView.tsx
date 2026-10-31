@@ -264,7 +264,7 @@ export function KanbanView({
     <div className="flex h-full text-sm text-fg">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-fg-muted">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
             <input
               type="checkbox"
               checked={showClosed}
@@ -482,9 +482,9 @@ function TaskCard({
       <div className="flex items-center gap-1.5 text-[11px] leading-relaxed text-fg-muted">
         <IdBadge id={task.id} />
       </div>
-      {/* ガントのタスク行と同じ大きさ。2行まで出し、3行目からは「…」で省略する。 */}
+      {/* レーンのストーリー名と同じ大きさ。2行まで出し、3行目からは「…」で省略する。 */}
       {/* 右下のアイコンに重ならないよう、タスク名と期限はアイコンの幅だけ右を空ける。 */}
-      <div className="mt-0.5 line-clamp-2 break-words pr-6 text-[11px]">{task.title}</div>
+      <div className="mt-0.5 line-clamp-2 break-words pr-6 text-xs">{task.title}</div>
       {/* 期限は ID より弱い補助として出す。 */}
       {task.due_date && <div className="mt-0.5 truncate pr-6 text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
       <AssigneeAvatar />
