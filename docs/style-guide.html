@@ -422,6 +422,21 @@
 </table>
 <p class="note">バッジはどれも 11px / 400。色の意味は上の4種類だけに使い、ほかの情報（件数・期間など）はバッジにせず補助の文字（<code>text-fg-muted</code>）で出す。</p>
 
+<h3>検索・絞り込み・並び替え（ツールバー）</h3>
+<p>一覧の上に置く検索・絞り込み・並び替え・切替は、<code>components/ui/Toolbar.tsx</code> の <code>Toolbar</code> に並べる。部品の高さはどれも <code>h-8</code>。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>置き場所</td><td>画面いっぱいの画面（バックログ・カンバン）は上部の <code>Toolbar</code>（白地・<code>border-b</code>・<code>px-3 py-2</code>）。見出しのある本文の画面（プロジェクト一覧）は見出しの下に <code>Toolbar variant="inline"</code>（枠線なし）</td></tr>
+    <tr><td>並び</td><td>左から 検索 → 絞り込み Select → 並び替え Select → トグル。右端（<code>ToolbarEnd</code>、<code>ml-auto</code>）に 切替 → primary の追加ボタン</td></tr>
+    <tr><td>検索</td><td><code>SearchInput</code>（虫めがね付き・既定 <code>w-60</code>）。placeholder は「{object}を検索」。入力があると × と Esc で消せる</td></tr>
+    <tr><td>状態の絞り込み</td><td><code>StateFilterSelect</code>（<code>w-32</code>）。選択肢は すべて / Active / InActive の順。ラベルは画面に出さず <code>aria-label="状態"</code>。既定値は画面ごと（プロジェクト一覧は Active、バックログはすべて）</td></tr>
+    <tr><td>並び替え</td><td><code>Select</code>（<code>w-32</code>・<code>aria-label="並び"</code>）。選択肢は「〇〇順」（作成順 / 名前順）</td></tr>
+    <tr><td>オン / オフ</td><td><code>Switch</code>（ラベル付き、12px <code>text-fg-muted</code>）。ネイティブのチェックボックスは使わない</td></tr>
+    <tr><td>表示の切替</td><td><code>SegmentedControl</code>（グリッド / リストなど。アイコンだけのときも <code>label</code> を入れる）</td></tr>
+  </tbody>
+</table>
+
 <h3>バッジ・ピル・ID</h3>
 <div class="demo row">
   <span class="badge badge-todo">未着手</span>

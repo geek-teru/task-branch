@@ -6,8 +6,11 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "../components/ui/DropdownMenu";
-import { Input } from "../components/ui/Input";
+import { SearchInput } from "../components/ui/SearchInput";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Select } from "../components/ui/Select";
+import { Toolbar, ToolbarEnd } from "../components/ui/Toolbar";
+import { StateFilterSelect, type StateFilter } from "../components/StateFilterSelect";
 import {
   AddIcon,
   BacklogIcon,
@@ -19,10 +22,8 @@ import {
   ListIcon,
   MoreIcon,
   ProjectIcon,
-  SearchIcon,
 } from "../components/Icons";
 
-type StateFilter = "active" | "inactive" | "all";
 type SortOrder = "created" | "name";
 type ViewMode = "grid" | "list";
 
@@ -90,25 +91,14 @@ export function ProjectsListPage({
       <div className="mx-auto max-w-[1200px] px-6 py-8">
         <h1 className="m-0 mb-6 text-2xl font-medium text-fg">プロジェクト</h1>
 
-        <div className="mb-5 flex flex-wrap items-center gap-2">
-          <Input
-            icon={<SearchIcon size={14} />}
+        <Toolbar variant="inline" className="mb-5">
+          <SearchInput
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             placeholder="プロジェクトを検索"
-            aria-label="プロジェクトを名前で絞り込む"
-            className="w-60"
+            label="プロジェクトを名前で絞り込む"
           />
-          <Select
-            value={stateFilter}
-            onChange={(e) => setStateFilter(e.target.value as StateFilter)}
-            aria-label="状態"
-            className="w-36"
-          >
-            <option value="active">Active</option>
-            <option value="inactive">InActive</option>
-            <option value="all">すべて</option>
-          </Select>
+          <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
           <Select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as SortOrder)}
@@ -119,20 +109,21 @@ export function ProjectsListPage({
             <option value="name">名前順</option>
           </Select>
 
-          <div className="ml-auto flex items-center gap-2">
-            <div className="inline-flex rounded-md border border-border-strong bg-surface p-0.5">
-              <ViewToggle label="グリッド表示" active={view === "grid"} onClick={() => changeView("grid")}>
-                <GridIcon size={14} />
-              </ViewToggle>
-              <ViewToggle label="リスト表示" active={view === "list"} onClick={() => changeView("list")}>
-                <ListIcon size={14} />
-              </ViewToggle>
-            </div>
+          <ToolbarEnd>
+            <SegmentedControl
+              value={view}
+              onChange={changeView}
+              label="表示"
+              options={[
+                { value: "grid", label: "グリッド表示", icon: <GridIcon size={14} /> },
+                { value: "list", label: "リスト表示", icon: <ListIcon size={14} /> },
+              ]}
+            />
             <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setCreating(true)}>
               New Project
             </Button>
-          </div>
-        </div>
+          </ToolbarEnd>
+        </Toolbar>
 
         {visible.length === 0 ? (
           <div className="rounded-md border border-dashed border-border-strong px-6 py-12 text-center text-[13px] text-fg-muted">
@@ -278,34 +269,6 @@ function ProjectMenu({
         </DropdownMenuItem>
       </DropdownMenu>
     </div>
-  );
-}
-
-function ViewToggle({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "m-0 flex h-[26px] w-7 cursor-pointer items-center justify-center rounded border-0 transition-colors",
-        active ? "bg-surface-muted text-fg shadow-[inset_0_0_0_1px_var(--color-border)]" : "bg-transparent text-fg-muted hover:text-fg",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

@@ -11,6 +11,8 @@ import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { Switch } from "../components/ui/Switch";
+import { Toolbar } from "../components/ui/Toolbar";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
@@ -252,17 +254,9 @@ export function KanbanView({
   return (
     <div className="flex h-full text-sm text-fg">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
-            <input
-              type="checkbox"
-              checked={showClosed}
-              onChange={(e) => toggleShowClosed(e.target.checked)}
-              className="m-0 h-3.5 w-3.5 cursor-pointer accent-brand"
-            />
-            クローズしたタスクも表示
-          </label>
-        </div>
+        <Toolbar>
+          <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
+        </Toolbar>
 
         <div
           ref={boardRef}
