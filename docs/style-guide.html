@@ -70,7 +70,10 @@
   }
   pre code { background: none; padding: 0; font-size: 12px; }
   .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 16px; margin-bottom: 12px; }
-  .toc { columns: 2; font-size: 13px; }
+  .toc { margin: 0; padding-left: 0; list-style: none; font-size: 13px; }
+  .toc > li + li { margin-top: 6px; }
+  .toc ul { margin: 2px 0 0; padding-left: 20px; list-style: none; }
+  .toc li { font-size: 13px; }
   .toc a { color: var(--color-brand); text-decoration: none; }
   .toc a:hover { text-decoration: underline; }
   table { border-collapse: collapse; width: 100%; }
@@ -245,14 +248,49 @@
 </p>
 
 <div class="card">
-  <div class="toc">
-    <div><a href="#basis">1. 基本方針</a></div>
-    <div><a href="#color">2. 色</a></div>
-    <div><a href="#type">3. タイポグラフィ</a></div>
-    <div><a href="#space">4. 余白・角丸・影</a></div>
-    <div><a href="#parts">5. コンポーネント</a></div>
-    <div><a href="#rules">6. 書き方の決まり</a></div>
-  </div>
+  <ul class="toc">
+    <li><a href="#basis">1. 基本方針</a>
+    </li>
+    <li><a href="#color">2. 色</a>
+      <ul>
+        <li><a href="#color-1">2.1 文字・背景・枠線</a></li>
+        <li><a href="#color-2">2.2 ブランド・アクセント・危険</a></li>
+        <li><a href="#color-3">2.3 ステータス</a></li>
+      </ul>
+    </li>
+    <li><a href="#type">3. タイポグラフィ</a>
+      <ul>
+        <li><a href="#type-1">3.1 文字の大きさ・太さの決まり</a></li>
+        <li><a href="#type-2">3.2 要素ごとの大きさ・太さ</a></li>
+      </ul>
+    </li>
+    <li><a href="#space">4. 余白・角丸・影</a>
+      <ul>
+        <li><a href="#space-1">4.1 余白・高さ</a></li>
+        <li><a href="#space-2">4.2 角丸</a></li>
+        <li><a href="#space-3">4.3 影・重なり</a></li>
+      </ul>
+    </li>
+    <li><a href="#parts">5. コンポーネント</a>
+      <ul>
+        <li><a href="#parts-1">5.1 Button / IconButton</a></li>
+        <li><a href="#parts-2">5.2 Input / Select / Textarea</a></li>
+        <li><a href="#parts-3">5.3 アイコン・ボタン・バッジの使い分け</a></li>
+        <li><a href="#parts-4">5.4 検索・絞り込み・並び替え</a></li>
+        <li><a href="#parts-5">5.5 Badge / IdBadge</a></li>
+        <li><a href="#parts-6">5.6 Card</a></li>
+        <li><a href="#parts-7">5.7 表</a></li>
+        <li><a href="#parts-8">5.8 詳細パネル</a></li>
+        <li><a href="#parts-9">5.9 Dialog / ConfirmDialog</a></li>
+        <li><a href="#parts-10">5.10 ドロップダウン</a></li>
+        <li><a href="#parts-11">5.11 ツールチップ</a></li>
+        <li><a href="#parts-12">5.12 サイドナビ</a></li>
+        <li><a href="#parts-13">5.13 列幅のドラッグハンドル</a></li>
+      </ul>
+    </li>
+    <li><a href="#rules">6. 書き方の決まり</a>
+    </li>
+  </ul>
 </div>
 
 <h2 id="basis">1. 基本方針</h2>
@@ -268,7 +306,7 @@
 <h2 id="color">2. 色</h2>
 <p class="note">名前は <code>@theme</code> の <code>--color-*</code>。Tailwind では <code>bg-{名前}</code> <code>text-{名前}</code> <code>border-{名前}</code> で使い、<code>/30</code> のように付けると透明度を変えられる（例: <code>ring-brand/30</code>）。</p>
 
-<h3>文字・背景・枠線</h3>
+<h3 id="color-1">文字・背景・枠線</h3>
 <div class="swatches">
   <div class="swatch"><div class="chip" style="background:var(--color-fg)"></div><div class="meta"><b>fg — 文字</b><span class="mono">#171717</span></div></div>
   <div class="swatch"><div class="chip" style="background:var(--color-fg-muted)"></div><div class="meta"><b>fg-muted — 補助の文字・ラベル・アイコン</b><span class="mono">#707070</span></div></div>
@@ -280,7 +318,7 @@
   <div class="swatch"><div class="chip" style="background:#ededed"></div><div class="meta"><b>サイドナビの選択中（トークン外）</b><span class="mono">#ededed</span></div></div>
 </div>
 
-<h3>ブランド・アクセント・危険</h3>
+<h3 id="color-2">ブランド・アクセント・危険</h3>
 <div class="swatches">
   <div class="swatch"><div class="chip" style="background:var(--color-brand)"></div><div class="meta"><b>brand — primary ボタン・フォーカス・選択のチェック・今日の線</b><span class="mono">#1f7a4d（白文字で約 5.3:1）</span></div></div>
   <div class="swatch"><div class="chip" style="background:var(--color-brand-hover)"></div><div class="meta"><b>brand-hover — primary の hover</b><span class="mono">#18633e</span></div></div>
@@ -288,7 +326,7 @@
   <div class="swatch"><div class="chip" style="background:var(--color-danger)"></div><div class="meta"><b>danger — 削除・エラー（帯は地 10%・枠 30%）</b><span class="mono">#c4352b</span></div></div>
 </div>
 
-<h3>ステータス（DESIGN.md 5.2。<code>lib/style.ts</code> の <code>STATUS_CLASS</code> / <code>STATUS_COLOR</code>）</h3>
+<h3 id="color-3">ステータス（DESIGN.md 5.2。<code>lib/style.ts</code> の <code>STATUS_CLASS</code> / <code>STATUS_COLOR</code>）</h3>
 <table>
   <thead><tr><th>状態</th><th>見本</th><th>bg</th><th>border</th><th>fg</th></tr></thead>
   <tbody>
@@ -305,14 +343,14 @@
 <pre><code>font-family: Inter, "Noto Sans JP", sans-serif;  /* web/src/index.css の --font-sans */</code></pre>
 <p class="note">ID などの固定幅は <code>ui-monospace, SFMono-Regular, Menlo, monospace</code>（<code>--font-mono</code>）。</p>
 
-<h3>文字の大きさ・太さの決まり</h3>
+<h3 id="type-1">文字の大きさ・太さの決まり</h3>
 <ul>
   <li>太さは 400（通常）と 500（<code>font-medium</code>）の2つだけ。600 以上（<code>font-semibold</code> / <code>font-bold</code>）は使わない。</li>
   <li>本文の既定は 14px（<code>text-sm</code>）。補助の文字は 13px 以下で <code>text-fg-muted</code>。</li>
   <li>同じ小分類の要素は同じ大きさ・太さにそろえる。下の表にない要素を足すときは、まず既存の小分類に当てはめる。</li>
 </ul>
 
-<h3>要素ごとの大きさ・太さ</h3>
+<h3 id="type-2">要素ごとの大きさ・太さ</h3>
 <p class="note">「6fa86f5e: 画面の文字サイズ・太さの統一」で整理した一覧。<span class="ng">※</span> はルールからずれていて未修正のもの、<span class="ex">（例外）</span> は決定済みの例外。</p>
 <table class="type-table">
   <colgroup><col style="width:14%"><col style="width:18%"><col><col style="width:13%"><col style="width:11%"></colgroup>
@@ -432,7 +470,7 @@
 <h2 id="space">4. 余白・角丸・影</h2>
 <p class="note">Tailwind の既定のスケール（1 = 4px）を使う。下の値にない余白を足すときは、まず近い既存の値に寄せる。</p>
 
-<h3>余白・高さ</h3>
+<h3 id="space-1">余白・高さ</h3>
 <table>
   <thead><tr><th>クラス（値）</th><th>使うところ</th></tr></thead>
   <tbody>
@@ -449,7 +487,7 @@
   </tbody>
 </table>
 
-<h3>角丸</h3>
+<h3 id="space-2">角丸</h3>
 <div class="demo row">
   <div style="width:86px;height:44px;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:4px"></div>
   <div style="width:86px;height:44px;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:6px"></div>
@@ -461,7 +499,7 @@
   <code>rounded-full</code> アバター・Switch。これ以外の角丸は使わない。
 </p>
 
-<h3>影・重なり</h3>
+<h3 id="space-3">影・重なり</h3>
 <table>
   <thead><tr><th>クラス</th><th>値（Tailwind v4 の既定）</th><th>使うところ</th></tr></thead>
   <tbody>
@@ -476,7 +514,7 @@
 <h2 id="parts">5. コンポーネント</h2>
 <p>部品は <code>web/src/components/ui/</code> にある。画面はこれを使い、同じ見た目を <code>className</code> で書き直さない。見本は部品のクラスと同じ値で描いている（hover・フォーカスも動く）。</p>
 
-<h3>Button / IconButton（<code>ui/Button.tsx</code>）</h3>
+<h3 id="parts-1">Button / IconButton（<code>ui/Button.tsx</code>）</h3>
 <div class="demo">
   <div class="row">
     <button class="btn primary"><svg><use href="#i-add"/></svg>New Project</button>
@@ -514,7 +552,7 @@
 &lt;Button size="sm" onClick={onCancel}&gt;キャンセル&lt;/Button&gt;
 &lt;IconButton label="削除" danger onClick={onDelete}&gt;&lt;DeleteIcon /&gt;&lt;/IconButton&gt;</code></pre>
 
-<h3>Input / Select / Textarea（<code>ui/Input.tsx</code>・<code>ui/Select.tsx</code>・<code>ui/Textarea.tsx</code>）</h3>
+<h3 id="parts-2">Input / Select / Textarea（<code>ui/Input.tsx</code>・<code>ui/Select.tsx</code>・<code>ui/Textarea.tsx</code>）</h3>
 <div class="demo">
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
     <div><label class="field-label">プロジェクト名</label><input class="field" placeholder="task-branch" /></div>
@@ -539,7 +577,7 @@
 <pre><code>&lt;Input value={name} onChange={(e) =&gt; setName(e.target.value)} className="w-full" /&gt;
 &lt;Select value={status} onChange={setStatus} options={STATUS_OPTIONS} aria-label="ステータス" /&gt;</code></pre>
 
-<h3>アイコン・ボタン・バッジの使い分け</h3>
+<h3 id="parts-3">アイコン・ボタン・バッジの使い分け</h3>
 <p>同じ操作は、どの画面でも同じアイコン・同じ形のボタンで出す。アイコンは <code>web/src/components/Icons.tsx</code>、ボタンは <code>components/ui/Button.tsx</code> の <code>Button</code> / <code>IconButton</code>、バッジは <code>components/ui/Badge.tsx</code> と <code>components/IdBadge.tsx</code> を使う。</p>
 <table>
   <thead><tr><th>操作</th><th>アイコン</th><th>ボタンの形</th><th>例</th></tr></thead>
@@ -564,7 +602,7 @@
 </table>
 <p class="note">バッジはどれも 11px / 400。色の意味は上の4種類だけに使い、ほかの情報（件数・期間など）はバッジにせず補助の文字（<code>text-fg-muted</code>）で出す。</p>
 
-<h3>検索・絞り込み・並び替え（ツールバー）</h3>
+<h3 id="parts-4">検索・絞り込み・並び替え（ツールバー）</h3>
 <p>一覧の上に置く検索・絞り込み・並び替え・切替は、<code>components/ui/Toolbar.tsx</code> の <code>Toolbar</code> に並べる。部品の高さはどれも <code>h-8</code>。</p>
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
@@ -594,7 +632,7 @@
 </div>
 <p class="note">ツールバーの並びの見本（<code>Toolbar variant="inline"</code>）。<code>Switch</code> は 28×16 のトラック（オンで <code>brand</code>）＋ 12px <code>text-fg-muted</code> のラベル。<code>SegmentedControl</code> は枠 <code>border-strong</code> の中に 26px のボタンを並べ、選択中は地 <code>surface-muted</code>＋内側に 1px の枠。</p>
 
-<h3>Badge / IdBadge（<code>ui/Badge.tsx</code>・<code>components/IdBadge.tsx</code>）</h3>
+<h3 id="parts-5">Badge / IdBadge（<code>ui/Badge.tsx</code>・<code>components/IdBadge.tsx</code>）</h3>
 <div class="demo row">
   <span class="badge todo">未着手</span>
   <span class="badge in_progress">進行中</span>
@@ -615,7 +653,7 @@
 <pre><code>&lt;Badge tone={task.status}&gt;{STATUS_LABEL[task.status]}&lt;/Badge&gt;
 &lt;IdBadge id={task.id} /&gt;</code></pre>
 
-<h3>Card（<code>ui/Card.tsx</code>）</h3>
+<h3 id="parts-6">Card（<code>ui/Card.tsx</code>）</h3>
 <div class="demo">
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
     <div class="app-card interactive" style="padding:16px;min-height:148px" tabindex="0">
@@ -639,7 +677,7 @@
   クリックできるカードは <code>interactive</code> を付け、hover で枠が <code>border-strong</code> になる。選択中は枠 <code>brand</code>＋<code>ring-2 ring-brand/30</code>。
 </p>
 
-<h3>表</h3>
+<h3 id="parts-7">表</h3>
 <div class="demo" style="padding:12px">
   <div style="overflow:hidden;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)">
     <table style="table-layout:fixed">
@@ -657,7 +695,7 @@
   名前のセルは 13px / 500。値が無いときは <code>text-fg-muted/60</code> で「説明なし」「-」を出し、空欄にしない。
 </p>
 
-<h3>詳細パネル（<code>components/DetailPanel.tsx</code>）</h3>
+<h3 id="parts-8">詳細パネル（<code>components/DetailPanel.tsx</code>）</h3>
 <div class="demo">
   <div class="panel">
     <div class="head">
@@ -687,7 +725,7 @@
   プロパティ名は 12px <code>fg-muted</code>、値は 13px、項目の間は 12px。下部の確定の操作（着手・完了）は <code>p-3</code> の帯に横いっぱいで置く。
 </p>
 
-<h3>Dialog / ConfirmDialog（<code>ui/Dialog.tsx</code>・<code>components/ConfirmDialog.tsx</code>）</h3>
+<h3 id="parts-9">Dialog / ConfirmDialog（<code>ui/Dialog.tsx</code>・<code>components/ConfirmDialog.tsx</code>）</h3>
 <div class="backdrop">
   <div class="dialog" style="width:360px">
     <div class="d-title">プロジェクトを変更</div>
@@ -719,7 +757,7 @@
   &lt;Button variant="primary" onClick={onSave}&gt;保存&lt;/Button&gt;
 &lt;/&gt;}&gt;…&lt;/Dialog&gt;</code></pre>
 
-<h3>ドロップダウン</h3>
+<h3 id="parts-10">ドロップダウン</h3>
 <p>開いたリストはどれも同じ見た目にする。操作のメニューは <code>components/ui/DropdownMenu.tsx</code> の <code>DropdownMenu</code>、入力欄の選択は <code>components/ui/Select.tsx</code> の <code>Select</code> を使う。ネイティブの <code>&lt;select&gt;</code> と、部品を使わない手書きのメニューは使わない。</p>
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
@@ -760,7 +798,7 @@
   &lt;DropdownMenuItem danger icon={&lt;DeleteIcon /&gt;} onSelect={onDelete}&gt;削除&lt;/DropdownMenuItem&gt;
 &lt;/DropdownMenu&gt;</code></pre>
 
-<h3>ツールチップ</h3>
+<h3 id="parts-11">ツールチップ</h3>
 <p>マウスを合わせたとき・キーボードでフォーカスしたときに出る補足は、<code>components/ui/Tooltip.tsx</code> の <code>TooltipLayer</code>（<code>main.tsx</code> で1つだけ置く）が描く。要素には <code>title</code> ではなく <code>data-tooltip</code> を付ける。<code>title</code> はブラウザ標準の黒い枠になり、デザインに合わないので使わない。</p>
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
@@ -773,7 +811,7 @@
   </tbody>
 </table>
 
-<h3>サイドナビ（<code>components/Sidebar.tsx</code>）</h3>
+<h3 id="parts-12">サイドナビ（<code>components/Sidebar.tsx</code>）</h3>
 <div class="demo row" style="align-items:flex-start;gap:16px">
   <div class="nav">
     <div class="items">
@@ -800,7 +838,7 @@
   選択中は地 <code>#ededed</code>・文字 <code>fg</code>・500（青の塗りは使わない）。開閉と幅は localStorage に残す。
 </p>
 
-<h3>列幅のドラッグハンドル</h3>
+<h3 id="parts-13">列幅のドラッグハンドル</h3>
 <div class="demo" style="padding:0">
   <div style="display:flex;background:var(--color-surface);border-radius:6px;overflow:hidden">
     <div style="position:relative;width:220px;padding:8px 12px;font-size:12px;font-weight:500;color:var(--color-fg-muted);background:var(--color-surface-muted);border-right:1px solid var(--color-border)">
