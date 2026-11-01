@@ -30,7 +30,8 @@ import {
 import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
-import { Button } from "./components/ui/Button";
+import { CloseIcon } from "./components/Icons";
+import { IconButton } from "./components/ui/Button";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
@@ -574,9 +575,9 @@ export default function App() {
           {error && (
             <div className="flex items-center gap-2 border-b border-danger/30 bg-danger/10 px-3 py-1.5 text-[13px] text-danger">
               <span className="min-w-0 flex-1">{error}</span>
-              <Button variant="ghost" size="sm" aria-label="閉じる" onClick={() => setError(null)}>
-                ×
-              </Button>
+              <IconButton label="閉じる" danger onClick={() => setError(null)}>
+                <CloseIcon size={14} />
+              </IconButton>
             </div>
           )}
 

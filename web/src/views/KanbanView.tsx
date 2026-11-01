@@ -9,7 +9,7 @@ import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 
 
@@ -186,16 +186,9 @@ export function KanbanView({
             <div className="flex-1">
               <IdBadge id={story.id} />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setAdding(story)}
-              title="タスクを追加"
-              aria-label="タスクを追加"
-              className="h-6 w-6 px-0 text-fg-muted"
-            >
+            <IconButton label="タスクを追加" onClick={() => setAdding(story)} className="size-6!">
               <AddIcon size={12} />
-            </Button>
+            </IconButton>
           </div>
           <div className="mt-0.5 text-xs text-fg">{story.title}</div>
           <div className="mt-1 text-[11px] text-fg-muted">
@@ -292,8 +285,8 @@ export function KanbanView({
                 <section key={p.id} className="mb-7">
                   <div className="mb-2 flex items-center gap-2.5">
                     <h3 className="m-0 text-sm font-medium">{p.name}</h3>
-                    <Button size="sm" icon={<AddIcon size={13} />} onClick={() => setStoryForm(p)}>
-                      ストーリーを追加
+                    <Button size="sm" variant="primary" icon={<AddIcon size={13} />} onClick={() => setStoryForm(p)}>
+                      New Story
                     </Button>
                   </div>
                   {projectLanes.length === 0 ? (

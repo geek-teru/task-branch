@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+﻿import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Project, ProjectInput } from "../lib/types";
 import { cn } from "../lib/cn";
@@ -6,7 +6,7 @@ import { ProjectForm } from "../components/ProjectForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
 import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
+import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "../components/ui/DropdownMenu";
 import { BacklogIcon, DeleteIcon, EditIcon, GanttIcon, KanbanIcon, MoreIcon } from "../components/Icons";
@@ -52,9 +52,9 @@ export function ProjectDetailPage({
           <IdBadge id={project.id} />
 
           <div className="ml-auto flex items-center gap-2">
-            <Button icon={<EditIcon size={14} />} onClick={() => setEditing(true)}>
-              変更
-            </Button>
+            <IconButton label="変更" size="md" onClick={() => setEditing(true)}>
+              <EditIcon size={14} />
+            </IconButton>
             <DropdownMenu trigger={<MoreIcon size={14} />} label="そのほかの操作" align="end">
               <DropdownMenuItem onSelect={() => onShowBacklog(project.id)} icon={<BacklogIcon size={14} />}>
                 バックログ

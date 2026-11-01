@@ -17,7 +17,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Markdown } from "../components/Markdown";
 import { EditIcon } from "../components/Icons";
 import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Dialog } from "../components/ui/Dialog";
 import { Input } from "../components/ui/Input";
@@ -116,9 +116,9 @@ export function StoryDetailPage({
 
         <div className="mt-3 flex items-start gap-3">
           <h1 className="m-0 min-w-0 flex-1 text-2xl font-medium leading-tight text-fg">{story.title}</h1>
-          <Button icon={<EditIcon size={14} />} onClick={() => setEditingInfo(true)}>
-            変更
-          </Button>
+          <IconButton label="変更" size="md" onClick={() => setEditingInfo(true)}>
+            <EditIcon size={14} />
+          </IconButton>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
@@ -149,9 +149,9 @@ export function StoryDetailPage({
                 </Button>
               </>
             ) : (
-              <Button size="sm" icon={<EditIcon size={13} />} onClick={() => setDraft(story.context ?? "")}>
-                編集
-              </Button>
+              <IconButton label="コンテキストを変更" onClick={() => setDraft(story.context ?? "")}>
+                <EditIcon size={14} />
+              </IconButton>
             )}
           </CardHeader>
           <div className="px-5 py-4 text-sm">

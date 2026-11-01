@@ -3,9 +3,9 @@ import { addTaskComment, deleteTaskComment, listTaskComments, updateTaskComment 
 import type { TaskComment } from "../lib/types";
 import { useSession } from "../lib/useSession";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { DeleteIcon, EditIcon } from "./Icons";
+import { CommentIcon, DeleteIcon, EditIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
-import { Button } from "./ui/Button";
+import { Button, IconButton } from "./ui/Button";
 import { Textarea } from "./ui/Textarea";
 
 const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
@@ -114,7 +114,10 @@ export function TaskComments({ taskId }: { taskId: string }) {
 
   return (
     <div className="mt-1 border-t border-border pt-3">
-      <div className="mb-1 text-sm font-medium text-fg">コメント（{comments.length}）</div>
+      <div className="mb-1 flex items-center gap-1.5 text-sm font-medium text-fg">
+        <CommentIcon size={14} />
+        コメント（{comments.length}）
+      </div>
 
       <div className="divide-y divide-border">
         {comments.map((c) => (
@@ -126,25 +129,13 @@ export function TaskComments({ taskId }: { taskId: string }) {
                 {c.updated_at !== c.created_at && "（編集済み）"}
               </span>
               {canModify(c) && editingId !== c.id && (
-                <span className="flex shrink-0 gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<EditIcon size={11} />}
-                    onClick={() => startEdit(c)}
-                    className="h-5 px-1 text-[11px] text-fg-muted"
-                  >
-                    編集
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<DeleteIcon size={11} />}
-                    onClick={() => setDeletingId(c.id)}
-                    className="h-5 px-1 text-[11px] text-fg-muted"
-                  >
-                    削除
-                  </Button>
+                <span className="flex shrink-0 gap-0.5">
+                  <IconButton label="変更" onClick={() => startEdit(c)} className="size-6!">
+                    <EditIcon size={12} />
+                  </IconButton>
+                  <IconButton label="削除" danger onClick={() => setDeletingId(c.id)} className="size-6!">
+                    <DeleteIcon size={12} />
+                  </IconButton>
                 </span>
               )}
             </div>

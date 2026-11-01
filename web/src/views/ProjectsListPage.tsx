@@ -129,7 +129,7 @@ export function ProjectsListPage({
               </ViewToggle>
             </div>
             <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setCreating(true)}>
-              新規プロジェクト
+              New Project
             </Button>
           </div>
         </div>
@@ -137,7 +137,7 @@ export function ProjectsListPage({
         {visible.length === 0 ? (
           <div className="rounded-md border border-dashed border-border-strong px-6 py-12 text-center text-[13px] text-fg-muted">
             {projects.length === 0
-              ? "プロジェクトがありません。「新規プロジェクト」から作成してください。"
+              ? "プロジェクトがありません。「New Project」から作成してください。"
               : "条件に合うプロジェクトがありません。"}
           </div>
         ) : view === "grid" ? (

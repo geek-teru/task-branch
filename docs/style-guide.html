@@ -397,6 +397,31 @@
   </tbody>
 </table>
 
+<h3>アイコン・ボタン・バッジの使い分け</h3>
+<p>同じ操作は、どの画面でも同じアイコン・同じ形のボタンで出す。アイコンは <code>web/src/components/Icons.tsx</code>、ボタンは <code>components/ui/Button.tsx</code> の <code>Button</code> / <code>IconButton</code>、バッジは <code>components/ui/Badge.tsx</code> と <code>components/IdBadge.tsx</code> を使う。</p>
+<table>
+  <thead><tr><th>操作</th><th>アイコン</th><th>ボタンの形</th><th>例</th></tr></thead>
+  <tbody>
+    <tr><td>追加（画面・セクションの上部）</td><td class="mono">AddIcon（プラス）</td><td>primary（緑）の <code>Button</code>。ラベルは英語の「New {object}」</td><td>New Project / New Story（バックログ・カンバン）</td></tr>
+    <tr><td>追加（ガントの行・カンバンのレーンの中）</td><td class="mono">AddIcon</td><td><code>IconButton</code>（アイコンのみ・ghost）。<code>label</code> は「{object}を追加」。行が密なので緑にしない</td><td>ガントのストーリー行の「タスクを追加」。同じ行にプラスが2つ並ぶガントのプロジェクト行だけ、グループ追加をテキストの「New Group」（ghost）にする</td></tr>
+    <tr><td>変更</td><td class="mono">EditIcon（ペン）</td><td><code>IconButton</code>（アイコンのみ・ghost・<code>text-fg-muted</code>）。<code>label</code> は「変更」（対象を言う必要があれば「コンテキストを変更」など）</td><td>プロジェクト詳細・ストーリー詳細の見出し横、詳細パネル、コメント</td></tr>
+    <tr><td>削除</td><td class="mono">DeleteIcon（ゴミ箱）</td><td><code>IconButton danger</code>（アイコンのみ・ghost・danger 色）。<code>label</code> は「削除」</td><td>詳細パネル、コメント、ガントのグループ行。…メニューの中では「削除」のテキスト＋アイコンの項目（danger）</td></tr>
+    <tr><td>閉じる</td><td class="mono">CloseIcon（×）</td><td><code>IconButton</code>（アイコンのみ・ghost）。<code>label</code> は「閉じる」</td><td>詳細パネル、エラーの帯（danger 色）</td></tr>
+    <tr><td>コメント</td><td class="mono">CommentIcon（吹き出し）</td><td>ボタンではなく見出しの頭に置く</td><td>詳細パネルの「コメント（n）」</td></tr>
+  </tbody>
+</table>
+<p class="note">ダイアログのフッター（キャンセル・追加・保存）と、着手・完了などの確定の操作はテキストのボタンのまま。アイコンだけのボタンは <code>title</code> と <code>aria-label</code> に必ず名前を入れる（<code>IconButton</code> の <code>label</code> が両方に入る）。</p>
+<table>
+  <thead><tr><th>バッジに出す情報</th><th>部品・tone</th><th>表記</th></tr></thead>
+  <tbody>
+    <tr><td>状態（todo / in_progress / done / closed）</td><td><code>Badge tone={status}</code>（ステータスの色）</td><td>未着手 / 進行中 / 完了 / クローズ</td></tr>
+    <tr><td>Active / InActive（プロジェクト・ストーリー）</td><td>Active は <code>brand</code>、InActive は <code>neutral</code>。切り替えられる場所は <code>EpicStateBadge</code></td><td>Active / InActive</td></tr>
+    <tr><td>ID</td><td><code>IdBadge</code>（等幅・neutral。クリックで uuid 全体をコピー）</td><td>uuid の先頭8桁</td></tr>
+    <tr><td>コメントの作成者</td><td>AI は <code>brand</code>、自分・人は <code>neutral</code></td><td>AI / 自分 / 人</td></tr>
+  </tbody>
+</table>
+<p class="note">バッジはどれも 11px / 400。色の意味は上の4種類だけに使い、ほかの情報（件数・期間など）はバッジにせず補助の文字（<code>text-fg-muted</code>）で出す。</p>
+
 <h3>バッジ・ピル・ID</h3>
 <div class="demo row">
   <span class="badge badge-todo">未着手</span>

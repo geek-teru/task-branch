@@ -5,9 +5,9 @@ import { useResizableWidth } from "../lib/useResizableWidth";
 import { IdBadge } from "./IdBadge";
 import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
-import { DeleteIcon, EditIcon } from "./Icons";
+import { CloseIcon, DeleteIcon, EditIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
-import { Button } from "./ui/Button";
+import { Button, IconButton } from "./ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "./ui/DropdownMenu";
 import { Select } from "./ui/Select";
 
@@ -83,26 +83,19 @@ export function DetailPanel<T extends DetailNode>({
           {node && <IdBadge id={node.id} />}
           <span className="ml-auto flex items-center gap-0.5">
             {node && onEdit && (
-              <Button size="sm" variant="ghost" onClick={() => onEdit(node)} title="変更" aria-label="変更" className="w-7 px-0">
+              <IconButton label="変更" onClick={() => onEdit(node)}>
                 <EditIcon size={14} />
-              </Button>
+              </IconButton>
             )}
             {node && onDelete && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onDelete(node)}
-                title="削除"
-                aria-label="削除"
-                className="w-7 px-0 text-danger"
-              >
+              <IconButton label="削除" danger onClick={() => onDelete(node)}>
                 <DeleteIcon size={14} />
-              </Button>
+              </IconButton>
             )}
           </span>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            閉じる
-          </Button>
+          <IconButton label="閉じる" onClick={onClose}>
+            <CloseIcon size={14} />
+          </IconButton>
         </div>
         <div className="mt-1 break-words text-sm font-medium text-fg">{title}</div>
       </div>
@@ -193,16 +186,9 @@ function StoryPicker({
     return (
       <div className="flex items-center gap-1">
         <span className="min-w-0 break-words">{text ?? "-"}</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setEditing(true)}
-          title="ストーリーを変更"
-          aria-label="ストーリーを変更"
-          className="h-6 w-6 px-0 text-fg-muted"
-        >
+        <IconButton label="ストーリーを変更" onClick={() => setEditing(true)} className="size-6!">
           <EditIcon size={13} />
-        </Button>
+        </IconButton>
       </div>
     );
   }

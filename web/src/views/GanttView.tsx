@@ -10,7 +10,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon, DeleteIcon, EditIcon } from "../components/Icons";
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
@@ -26,7 +26,7 @@ const BAR_BG: Record<Status, string> = {
 };
 
 // 行の中の小さなボタン。Button の sm（h-7）は行の高さ 26px に入らないので詰める。
-// 文字色は呼び出し側で付ける。削除の赤は ghost の text-fg に CSS の順で負けるので important にする。
+// アイコンだけのボタンは IconButton が文字色を付ける。テキストのボタンは呼び出し側で付ける。
 const rowBtn = "h-5 rounded px-1.5 text-[11px]";
 const rowBtnMuted = "text-fg-muted hover:text-fg";
 
@@ -501,16 +501,14 @@ export function GanttView({
                   {toggle?.collapsed && <span className="ml-1 font-normal text-fg-muted">({toggle.count})</span>}
                 </span>
                 {r.kind === "project" && onAddStory && (
-                  <Button
-                    variant="ghost"
+                  <IconButton
+                    label="ストーリーを追加"
                     onClick={(e) => {
                       e.stopPropagation();
                       setForm({ mode: "create", prevEnd: lastStoryEnd });
                     }}
-                    title="ストーリーを追加"
-                    aria-label="ストーリーを追加"
                     icon={<AddIcon size={12} />}
-                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                    className={cn(rowBtn, "size-5! px-0")}
                   />
                 )}
                 {r.kind === "project" && onAddGroup && (
@@ -524,25 +522,24 @@ export function GanttView({
                     icon={<AddIcon size={11} />}
                     className={cn(rowBtn, rowBtnMuted, "gap-0.5")}
                   >
-                    グループを追加
+                    New Group
                   </Button>
                 )}
                 {r.kind === "group" && r.groupId && onRenameGroup && (
-                  <Button
-                    variant="ghost"
+                  <IconButton
+                    label="グループ名を変更"
                     onClick={(e) => {
                       e.stopPropagation();
                       setGroupForm({ id: r.groupId, name: r.label });
                     }}
-                    title="グループ名を変更"
-                    aria-label="グループ名を変更"
                     icon={<EditIcon size={12} />}
-                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                    className={cn(rowBtn, "size-5! px-0")}
                   />
                 )}
                 {r.kind === "group" && r.groupId && onDeleteGroup && (
-                  <Button
-                    variant="ghost"
+                  <IconButton
+                    label="グループを削除"
+                    danger
                     onClick={(e) => {
                       e.stopPropagation();
                       const id = r.groupId!;
@@ -552,23 +549,19 @@ export function GanttView({
                         onConfirm: () => onDeleteGroup(id),
                       });
                     }}
-                    title="グループを削除"
-                    aria-label="グループを削除"
                     icon={<DeleteIcon size={12} />}
-                    className={cn(rowBtn, "w-5 px-0 text-danger!")}
+                    className={cn(rowBtn, "size-5! px-0")}
                   />
                 )}
                 {r.kind === "story" && r.node && onAddTask && (
-                  <Button
-                    variant="ghost"
+                  <IconButton
+                    label="タスクを追加"
                     onClick={(e) => {
                       e.stopPropagation();
                       setForm({ mode: "create-task", story: r.node! });
                     }}
-                    title="タスクを追加"
-                    aria-label="タスクを追加"
                     icon={<AddIcon size={12} />}
-                    className={cn(rowBtn, rowBtnMuted, "w-5 px-0")}
+                    className={cn(rowBtn, "size-5! px-0")}
                   />
                 )}
                 <ResizeHandle onMouseDown={startResize} />

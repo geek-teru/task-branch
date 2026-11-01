@@ -47,3 +47,34 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     </button>
   );
 });
+
+type IconButtonProps = Omit<ButtonProps, "variant" | "title"> & {
+  // Shown as the tooltip and read out as the button's name (e.g. 変更 / 削除 / 閉じる).
+  label: string;
+  // Delete actions: the icon turns the danger color.
+  danger?: boolean;
+};
+
+// Icon-only ghost button for edit / delete / close and the add buttons inside rows.
+// The text colors are important because ghost's text-fg would otherwise win by CSS order.
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { label, danger, size = "sm", className, ...props },
+  ref,
+) {
+  return (
+    <Button
+      ref={ref}
+      variant="ghost"
+      size={size}
+      title={label}
+      aria-label={label}
+      className={cn(
+        size === "sm" ? "w-7" : "w-8",
+        "px-0",
+        danger ? "text-danger!" : "text-fg-muted! hover:text-fg!",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
