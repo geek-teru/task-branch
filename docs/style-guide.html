@@ -422,6 +422,21 @@
 </table>
 <p class="note">バッジはどれも 11px / 400。色の意味は上の4種類だけに使い、ほかの情報（件数・期間など）はバッジにせず補助の文字（<code>text-fg-muted</code>）で出す。</p>
 
+<h3>検索・絞り込み・並び替え（ツールバー）</h3>
+<p>一覧の上に置く検索・絞り込み・並び替え・切替は、<code>components/ui/Toolbar.tsx</code> の <code>Toolbar</code> に並べる。部品の高さはどれも <code>h-8</code>。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>置き場所</td><td>画面いっぱいの画面（バックログ・カンバン）は上部の <code>Toolbar</code>（白地・<code>border-b</code>・<code>px-3 py-2</code>）。見出しのある本文の画面（プロジェクト一覧）は見出しの下に <code>Toolbar variant="inline"</code>（枠線なし）</td></tr>
+    <tr><td>並び</td><td>左から 検索 → 絞り込み Select → 並び替え Select → トグル。右端（<code>ToolbarEnd</code>、<code>ml-auto</code>）に 切替 → primary の追加ボタン</td></tr>
+    <tr><td>検索</td><td><code>SearchInput</code>（虫めがね付き・既定 <code>w-60</code>）。placeholder は「{object}を検索」。入力があると × と Esc で消せる</td></tr>
+    <tr><td>状態の絞り込み</td><td><code>StateFilterSelect</code>（<code>w-32</code>）。選択肢は すべて / Active / InActive の順。ラベルは画面に出さず <code>aria-label="状態"</code>。既定値は画面ごと（プロジェクト一覧は Active、バックログはすべて）</td></tr>
+    <tr><td>並び替え</td><td><code>Select</code>（<code>w-32</code>・<code>aria-label="並び"</code>）。選択肢は「〇〇順」（作成順 / 名前順）</td></tr>
+    <tr><td>オン / オフ</td><td><code>Switch</code>（ラベル付き、12px <code>text-fg-muted</code>）。ネイティブのチェックボックスは使わない</td></tr>
+    <tr><td>表示の切替</td><td><code>SegmentedControl</code>（グリッド / リストなど。アイコンだけのときも <code>label</code> を入れる）</td></tr>
+  </tbody>
+</table>
+
 <h3>バッジ・ピル・ID</h3>
 <div class="demo row">
   <span class="badge badge-todo">未着手</span>
@@ -501,19 +516,33 @@
   確認の文言は「何を・どうする」を書き、末尾は「よろしいですか？」。ボタンは動詞（「変更する」「移動する」）。
 </p>
 
-<h3>ドロップダウン（…メニュー）</h3>
-<div class="demo row" style="align-items:flex-start">
-  <button class="btn-secondary" style="padding:5px 10px;font-size:14px;line-height:14px">…</button>
-  <div class="menu">
-    <button>バックログ</button>
-    <button>ガントチャート</button>
-    <button>カンバン</button>
-    <button class="sep">JSONエクスポート</button>
-    <button>アーカイブする</button>
-    <button class="danger">削除</button>
-  </div>
-</div>
-<p class="note">主要な操作だけ画面に出し、残りは「…」にまとめる。項目は 12px・角丸 4px、区切りは上線 <code>#e5e8eb</code>。背面のクリックで閉じる。</p>
+<h3>ドロップダウン</h3>
+<p>開いたリストはどれも同じ見た目にする。操作のメニューは <code>components/ui/DropdownMenu.tsx</code> の <code>DropdownMenu</code>、入力欄の選択は <code>components/ui/Select.tsx</code> の <code>Select</code> を使う。ネイティブの <code>&lt;select&gt;</code> と、部品を使わない手書きのメニューは使わない。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>部品の使い分け</td><td>操作を並べるもの（…メニュー、ユーザーメニュー）と、バッジを押して値を変えるもの（ステータス、Active / InActive）は <code>DropdownMenu</code>。フォームとツールバーの選択欄は <code>Select</code>（閉じた状態は Input と同じ見た目・h-8）</td></tr>
+    <tr><td>開いたリスト</td><td>白地・枠 <code>border-border</code>・角丸 <code>rounded-md</code>・<code>shadow-md</code>・上下 4px・最小幅 160px・最大高さ 320px（超えたらスクロール）。<code>position: fixed</code> で出すので、表や詳細パネルの中でも切れない。下に入らないときは上に開く</td></tr>
+    <tr><td>項目</td><td>13px / 400・<code>px-3 py-1.5</code>。hover とキーボードで選んでいる項目は背景 <code>bg-surface-muted</code>。破壊的な操作は <code>danger</code>（文字だけ赤）。区切りは 1px の <code>bg-border</code></td></tr>
+    <tr><td>選択中の値</td><td>1つを選ぶリスト（Select、ステータス、Active / InActive、プロジェクトの切替）は、選択中の項目の左に緑のチェック（<code>CheckIcon</code>）を出す。チェックの無い項目も同じ幅を空けて、文字の頭をそろえる。太字にはしない</td></tr>
+    <tr><td>値の出し方</td><td>ステータスと Active / InActive は、閉じた状態も選択肢もバッジで出す</td></tr>
+    <tr><td>開くしるし</td><td>リストが開くものは右に <code>ChevronDownIcon</code>（12px・<code>text-fg-muted</code>）。ヘッダーのプロジェクトの切替だけは、切り替える意味で <code>ChevronUpDownIcon</code>。…メニューはアイコン（<code>MoreIcon</code>）だけで、しるしは付けない。文字の ▾ ⇅ は使わない</td></tr>
+    <tr><td>閉じ方・キーボード</td><td>外側のクリックと Escape で閉じる（ダイアログの中の Select では、Escape はリストだけを閉じる）。Select は ↑ ↓ Home End で動き、Enter / Space で選ぶ</td></tr>
+  </tbody>
+</table>
+
+<h3>ツールチップ</h3>
+<p>マウスを合わせたとき・キーボードでフォーカスしたときに出る補足は、<code>components/ui/Tooltip.tsx</code> の <code>TooltipLayer</code>（<code>main.tsx</code> で1つだけ置く）が描く。要素には <code>title</code> ではなく <code>data-tooltip</code> を付ける。<code>title</code> はブラウザ標準の黒い枠になり、デザインに合わないので使わない。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>見た目</td><td>白地・枠 <code>border-border</code>・角丸 <code>rounded-md</code>・<code>shadow-md</code>・<code>px-2 py-1</code>・12px / 400 の <code>text-fg</code>・最大幅 320px。開いたドロップダウンのリストと同じ面</td></tr>
+    <tr><td>出し方</td><td>要素の下の中央に 6px 空けて出す。下に入らなければ上、左右は画面内に収める。マウスは 0.5 秒待ってから出し、続けて隣の要素に移ったときはすぐ出す</td></tr>
+    <tr><td>消え方</td><td>要素から外れたとき、クリック・スクロール・Escape のとき。ドラッグ中（列幅・ガントのバー・カンバンのカード）は出さない</td></tr>
+    <tr><td>文言</td><td>改行は <code>\n</code>（例: ID は「uuid 全体＋改行＋クリックでコピー」、ガントのバーは「名前＋改行＋期間」）。アイコンだけのボタンは <code>IconButton</code> の <code>label</code> が <code>aria-label</code> とツールチップの両方に入る</td></tr>
+    <tr><td>部品の props</td><td><code>DropdownMenu</code> と <code>Select</code> は <code>tooltip</code> で渡す</td></tr>
+  </tbody>
+</table>
 
 <h3>サイドナビ</h3>
 <div class="demo row" style="align-items:flex-start;gap:16px">

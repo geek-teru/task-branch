@@ -11,6 +11,8 @@ import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { Switch } from "../components/ui/Switch";
+import { Toolbar } from "../components/ui/Toolbar";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
@@ -252,17 +254,9 @@ export function KanbanView({
   return (
     <div className="flex h-full text-sm text-fg">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
-            <input
-              type="checkbox"
-              checked={showClosed}
-              onChange={(e) => toggleShowClosed(e.target.checked)}
-              className="m-0 h-3.5 w-3.5 cursor-pointer accent-brand"
-            />
-            クローズしたタスクも表示
-          </label>
-        </div>
+        <Toolbar>
+          <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
+        </Toolbar>
 
         <div
           ref={boardRef}
@@ -441,7 +435,7 @@ function TaskCard({
       }}
       onDragEnd={onDragEnd}
       onClick={onSelect}
-      title={task.description ?? task.title}
+      data-tooltip={task.description ?? task.title}
       className={cn(
         // 幅は列に合わせ、高さだけ最小を取って縦長に見せる
         "relative box-border min-h-20 px-2.5 py-2 text-fg",
@@ -470,7 +464,7 @@ function AssigneeAvatar({ name = SAMPLE_ASSIGNEE }: { name?: string }) {
   return (
     <span
       className="absolute right-2 bottom-2 flex size-5 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-medium text-fg"
-      title={name}
+      data-tooltip={name}
     >
       {name.slice(0, 1).toUpperCase()}
     </span>
@@ -482,7 +476,7 @@ function ResizeHandle({ onMouseDown }: { onMouseDown: (e: MouseEvent) => void })
   return (
     <div
       onMouseDown={onMouseDown}
-      title="ドラッグで幅を変更"
+      data-tooltip="ドラッグで幅を変更"
       className="absolute inset-y-0 -right-[3px] z-5 w-[7px] cursor-col-resize select-none"
     />
   );

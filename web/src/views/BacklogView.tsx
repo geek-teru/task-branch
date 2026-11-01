@@ -8,9 +8,10 @@ import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
 import { AddIcon } from "../components/Icons";
+import { StateFilterSelect, type StateFilter } from "../components/StateFilterSelect";
 import { Button } from "../components/ui/Button";
-import { Select } from "../components/ui/Select";
 import { Input } from "../components/ui/Input";
+import { Toolbar, ToolbarEnd } from "../components/ui/Toolbar";
 import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
 import { Badge } from "../components/ui/Badge";
@@ -34,7 +35,7 @@ export function BacklogView({
   const status = useResizableWidth("backlog.statusWidth", 96, 72, 240, { invert: true });
   const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
   // 状態での絞り込み。all = 両方出す
-  const [stateFilter, setStateFilter] = useState<"all" | "active" | "inactive">("all");
+  const [stateFilter, setStateFilter] = useState<StateFilter>("all");
 
   const visible = useMemo(() => {
     if (!stories) return null;
@@ -44,21 +45,14 @@ export function BacklogView({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
-        <label className="text-xs text-fg-muted">状態</label>
-        <Select
-          value={stateFilter}
-          onChange={(e) => setStateFilter(e.target.value as "all" | "active" | "inactive")}
-          className="w-32"
-        >
-          <option value="all">すべて</option>
-          <option value="active">Active</option>
-          <option value="inactive">InActive</option>
-        </Select>
-        <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setAdding(true)} className="ml-auto">
-          New Story
-        </Button>
-      </div>
+      <Toolbar>
+        <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
+        <ToolbarEnd>
+          <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setAdding(true)}>
+            New Story
+          </Button>
+        </ToolbarEnd>
+      </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto p-6">
         {!visible ? (
@@ -101,7 +95,7 @@ export function BacklogView({
                       <td className="relative truncate px-3 py-2">
                         <Link
                           to={`/stories/${s.id}`}
-                          title="詳細を開く"
+                          data-tooltip="詳細を開く"
                           className="font-medium text-fg no-underline hover:underline"
                         >
                           {s.title}
@@ -161,7 +155,7 @@ function ResizeHandle({ onMouseDown, side }: { onMouseDown: (e: MouseEvent) => v
   return (
     <div
       onMouseDown={onMouseDown}
-      title="ドラッグで幅を変更"
+      data-tooltip="ドラッグで幅を変更"
       className={cn(
         "absolute inset-y-0 z-[5] w-[7px] cursor-col-resize select-none",
         side === "left" ? "-left-[3px]" : "-right-[3px]",

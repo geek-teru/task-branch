@@ -144,6 +144,33 @@ export function CommentIcon(p: IconProps) {
 }
 
 // Search: a magnifier.
+// Opens a dropdown (Select, status / state pickers).
+export function ChevronDownIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M4 6l4 4 4-4" />
+    </Icon>
+  );
+}
+
+// Opens a switcher (the header's project switcher).
+export function ChevronUpDownIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M5 6l3-3 3 3M5 10l3 3 3-3" />
+    </Icon>
+  );
+}
+
+// The chosen item in a dropdown.
+export function CheckIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M3.5 8.5l3 3 6-7" />
+    </Icon>
+  );
+}
+
 export function SearchIcon(p: IconProps) {
   return (
     <Icon {...p}>
