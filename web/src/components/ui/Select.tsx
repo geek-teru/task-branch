@@ -13,7 +13,8 @@ type SelectProps<T extends string> = {
   options: SelectOption<T>[];
   placeholder?: ReactNode;
   "aria-label"?: string;
-  title?: string;
+  // Shown as a tooltip on the field.
+  tooltip?: string;
   // Goes on the wrapper, so width utilities size the field (as in Input).
   className?: string;
   autoFocus?: boolean;
@@ -32,7 +33,7 @@ export function Select<T extends string>({
   options,
   placeholder = "選択してください",
   "aria-label": ariaLabel,
-  title,
+  tooltip,
   className,
   autoFocus,
   defaultOpen = false,
@@ -104,7 +105,7 @@ export function Select<T extends string>({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
-        title={title}
+        data-tooltip={tooltip}
         autoFocus={autoFocus || defaultOpen}
         disabled={disabled}
         onClick={() => (open ? close() : openList())}

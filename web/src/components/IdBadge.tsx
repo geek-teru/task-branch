@@ -21,7 +21,7 @@ export function IdBadge({ id }: { id: string }) {
     <button
       type="button"
       onClick={copy}
-      title={`${id}\nクリックでコピー`}
+      data-tooltip={`${id}\nクリックでコピー`}
       className={cn(
         "m-0 inline-flex h-5 shrink-0 cursor-pointer items-center whitespace-nowrap rounded border px-1.5 text-[11px] leading-none transition-colors",
         copied

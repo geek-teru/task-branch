@@ -74,7 +74,7 @@ export function DetailPanel<T extends DetailNode>({
     <div style={{ width }} className="relative flex shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
       <div
         onMouseDown={startResize}
-        title="ドラッグで幅を変更"
+        data-tooltip="ドラッグで幅を変更"
         className="absolute inset-y-0 left-0 z-[5] w-[7px] cursor-col-resize select-none"
       />
       <div className="shrink-0 border-b border-border px-4 py-3">
@@ -143,7 +143,7 @@ export function DetailPanel<T extends DetailNode>({
             <Button
               variant="primary"
               onClick={() => onStart(node)}
-              title={`この${LEVEL_LABEL[node.level]}を進行中にします`}
+              data-tooltip={`この${LEVEL_LABEL[node.level]}を進行中にします`}
             >
               進行中にする
             </Button>
@@ -201,7 +201,6 @@ function StoryPicker({
       options={options.map((story) => ({ value: story.id, label: story.label }))}
       placeholder={text ?? "-"}
       aria-label="ストーリーを変更"
-      title="ストーリーを変更"
     />
   );
 }

@@ -197,7 +197,7 @@ export function StoryDetailPage({
                     <td className="px-3 py-2">
                       <IdBadge id={s.id} />
                     </td>
-                    <td className="truncate px-3 py-2 font-medium text-fg" title={s.title}>
+                    <td className="truncate px-3 py-2 font-medium text-fg" data-tooltip={s.title}>
                       {s.title}
                     </td>
                     <td className={cn("hidden truncate px-3 py-2 @2xl:table-cell", s.description ? "text-fg-muted" : "text-fg-muted/60")}>

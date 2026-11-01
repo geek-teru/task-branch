@@ -431,7 +431,7 @@ export function GanttView({
               <div key={`m:${mo.x}`} className="absolute top-0 h-full w-px bg-border/70" style={{ left: mo.x }} />
             ))}
             {todayX != null && (
-              <div className="absolute top-0 h-full w-0.5 bg-brand" style={{ left: todayX }} title="今日" />
+              <div className="absolute top-0 h-full w-0.5 bg-brand" style={{ left: todayX }} data-tooltip="今日" />
             )}
           </div>
 
@@ -516,7 +516,7 @@ export function GanttView({
                   dragStory && r.node?.id === dragStory.id && "opacity-50",
                 )}
                 style={{ width: LABEL_W, paddingLeft: indent }}
-                title={r.label}
+                data-tooltip={r.label}
               >
                 <span
                   onClick={(e) => {
@@ -524,7 +524,7 @@ export function GanttView({
                     e.stopPropagation();
                     toggle.onToggle();
                   }}
-                  title={toggle ? `クリックで${toggle.noun}を${toggle.collapsed ? "表示" : "隠す"}` : undefined}
+                  data-tooltip={toggle ? `クリックで${toggle.noun}を${toggle.collapsed ? "表示" : "隠す"}` : undefined}
                   className={cn("w-3 shrink-0 text-fg-muted", toggle ? "cursor-pointer" : "cursor-default")}
                 >
                   {toggle ? (toggle.collapsed ? "▸" : "▾") : ""}
@@ -559,7 +559,7 @@ export function GanttView({
                       e.stopPropagation();
                       setGroupForm({ id: null, name: "" });
                     }}
-                    title="グループを追加"
+                    data-tooltip="グループを追加"
                     icon={<AddIcon size={11} />}
                     className={cn(rowBtn, rowBtnMuted, "gap-0.5")}
                   >
@@ -773,7 +773,7 @@ function ResizeHandle({ onMouseDown }: { onMouseDown: (e: ReactMouseEvent) => vo
   return (
     <div
       onMouseDown={onMouseDown}
-      title="ドラッグで幅を変更"
+      data-tooltip="ドラッグで幅を変更"
       className="absolute inset-y-0 -right-[3px] z-[5] w-[7px] cursor-col-resize select-none"
     />
   );
@@ -811,7 +811,7 @@ function InheritedBar({
   return (
     <div
       onClick={onSelect}
-      title={`${row.label}\n期間未設定（ストーリーの期間を表示）`}
+      data-tooltip={`${row.label}\n期間未設定（ストーリーの期間を表示）`}
       className={cn(
         "absolute h-1.5 cursor-pointer rounded opacity-40",
         row.status ? BAR_BG[row.status] : "bg-status-closed-border",
@@ -833,7 +833,7 @@ function GroupBar({ row, timelineStart }: { row: Row; timelineStart: Date }) {
   return (
     <>
       <div
-        title={`${row.label}\n${fmt(start)} 〜 ${fmt(end)}`}
+        data-tooltip={`${row.label}\n${fmt(start)} 〜 ${fmt(end)}`}
         className="absolute h-2 rounded bg-border-strong"
         style={{ left, width, top: (ROW_H - 8) / 2 }}
       />
@@ -942,7 +942,7 @@ function Bar({
           if (drag) return;
           onSelect();
         }}
-        title={`${row.label}\n${fmt(pStart)} 〜 ${fmt(pEnd)}`}
+        data-tooltip={`${row.label}\n${fmt(pStart)} 〜 ${fmt(pEnd)}`}
         className={cn(
           "absolute rounded",
           row.status ? BAR_BG[row.status] : "bg-status-closed-border",
@@ -956,14 +956,14 @@ function Bar({
           <div
             onMouseDown={(e) => beginResize("start", e)}
             onClick={(e) => e.stopPropagation()}
-            title="ドラッグで開始日を変更"
+            data-tooltip="ドラッグで開始日を変更"
             className="absolute z-10 cursor-ew-resize"
             style={{ left: left - HANDLE_W / 2, width: HANDLE_W, top: 4, height: ROW_H - 10 }}
           />
           <div
             onMouseDown={(e) => beginResize("end", e)}
             onClick={(e) => e.stopPropagation()}
-            title="ドラッグで期限を変更"
+            data-tooltip="ドラッグで期限を変更"
             className="absolute z-10 cursor-ew-resize"
             style={{ left: left + width - HANDLE_W / 2, width: HANDLE_W, top: 4, height: ROW_H - 10 }}
           />

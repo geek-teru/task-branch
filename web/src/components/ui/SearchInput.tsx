@@ -34,7 +34,7 @@ export function SearchInput({ value, onChange, placeholder, label, className }: 
       {value && (
         <button
           type="button"
-          title="検索をクリア"
+          data-tooltip="検索をクリア"
           aria-label="検索をクリア"
           onClick={() => onChange("")}
           className="absolute right-1 m-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"

@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({ value, onChange, options, l
           <button
             key={o.value}
             type="button"
-            title={o.label}
+            data-tooltip={o.label}
             aria-label={o.label}
             aria-pressed={active}
             onClick={() => onChange(o.value)}

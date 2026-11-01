@@ -66,7 +66,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       ref={ref}
       variant="ghost"
       size={size}
-      title={label}
+      data-tooltip={label}
       aria-label={label}
       className={cn(
         size === "sm" ? "w-7" : "w-8",

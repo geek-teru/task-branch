@@ -95,7 +95,7 @@ export function BacklogView({
                       <td className="relative truncate px-3 py-2">
                         <Link
                           to={`/stories/${s.id}`}
-                          title="詳細を開く"
+                          data-tooltip="詳細を開く"
                           className="font-medium text-fg no-underline hover:underline"
                         >
                           {s.title}
@@ -155,7 +155,7 @@ function ResizeHandle({ onMouseDown, side }: { onMouseDown: (e: MouseEvent) => v
   return (
     <div
       onMouseDown={onMouseDown}
-      title="ドラッグで幅を変更"
+      data-tooltip="ドラッグで幅を変更"
       className={cn(
         "absolute inset-y-0 z-[5] w-[7px] cursor-col-resize select-none",
         side === "left" ? "-left-[3px]" : "-right-[3px]",

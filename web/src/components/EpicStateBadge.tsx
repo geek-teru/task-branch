@@ -15,7 +15,7 @@ export function EpicStateBadge({ active, onPick }: { active: boolean; onPick?: (
       variant="ghost"
       size="sm"
       label="状態を変更"
-      title="クリックで状態を変更"
+      tooltip="クリックで状態を変更"
       menuClassName="min-w-[120px]"
       className="-mx-2.5"
       trigger={

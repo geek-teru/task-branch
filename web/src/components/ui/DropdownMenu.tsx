@@ -97,7 +97,7 @@ export function DropdownMenu({
   variant = "default",
   size = "md",
   label,
-  title,
+  tooltip,
   children,
   className,
   menuClassName,
@@ -111,7 +111,7 @@ export function DropdownMenu({
   // aria-label for icon-only triggers such as ⋮.
   label?: string;
   // Tooltip on the trigger.
-  title?: string;
+  tooltip?: string;
   children: ReactNode;
   className?: string;
   menuClassName?: string;
@@ -129,7 +129,7 @@ export function DropdownMenu({
         variant={variant}
         size={size}
         aria-label={label}
-        title={title}
+        data-tooltip={tooltip}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {

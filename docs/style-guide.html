@@ -531,6 +531,19 @@
   </tbody>
 </table>
 
+<h3>ツールチップ</h3>
+<p>マウスを合わせたとき・キーボードでフォーカスしたときに出る補足は、<code>components/ui/Tooltip.tsx</code> の <code>TooltipLayer</code>（<code>main.tsx</code> で1つだけ置く）が描く。要素には <code>title</code> ではなく <code>data-tooltip</code> を付ける。<code>title</code> はブラウザ標準の黒い枠になり、デザインに合わないので使わない。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>見た目</td><td>白地・枠 <code>border-border</code>・角丸 <code>rounded-md</code>・<code>shadow-md</code>・<code>px-2 py-1</code>・12px / 400 の <code>text-fg</code>・最大幅 320px。開いたドロップダウンのリストと同じ面</td></tr>
+    <tr><td>出し方</td><td>要素の下の中央に 6px 空けて出す。下に入らなければ上、左右は画面内に収める。マウスは 0.5 秒待ってから出し、続けて隣の要素に移ったときはすぐ出す</td></tr>
+    <tr><td>消え方</td><td>要素から外れたとき、クリック・スクロール・Escape のとき。ドラッグ中（列幅・ガントのバー・カンバンのカード）は出さない</td></tr>
+    <tr><td>文言</td><td>改行は <code>\n</code>（例: ID は「uuid 全体＋改行＋クリックでコピー」、ガントのバーは「名前＋改行＋期間」）。アイコンだけのボタンは <code>IconButton</code> の <code>label</code> が <code>aria-label</code> とツールチップの両方に入る</td></tr>
+    <tr><td>部品の props</td><td><code>DropdownMenu</code> と <code>Select</code> は <code>tooltip</code> で渡す</td></tr>
+  </tbody>
+</table>
+
 <h3>サイドナビ</h3>
 <div class="demo row" style="align-items:flex-start;gap:16px">
   <div class="nav">

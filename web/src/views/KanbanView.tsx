@@ -435,7 +435,7 @@ function TaskCard({
       }}
       onDragEnd={onDragEnd}
       onClick={onSelect}
-      title={task.description ?? task.title}
+      data-tooltip={task.description ?? task.title}
       className={cn(
         // 幅は列に合わせ、高さだけ最小を取って縦長に見せる
         "relative box-border min-h-20 px-2.5 py-2 text-fg",
@@ -464,7 +464,7 @@ function AssigneeAvatar({ name = SAMPLE_ASSIGNEE }: { name?: string }) {
   return (
     <span
       className="absolute right-2 bottom-2 flex size-5 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-medium text-fg"
-      title={name}
+      data-tooltip={name}
     >
       {name.slice(0, 1).toUpperCase()}
     </span>
@@ -476,7 +476,7 @@ function ResizeHandle({ onMouseDown }: { onMouseDown: (e: MouseEvent) => void })
   return (
     <div
       onMouseDown={onMouseDown}
-      title="ドラッグで幅を変更"
+      data-tooltip="ドラッグで幅を変更"
       className="absolute inset-y-0 -right-[3px] z-5 w-[7px] cursor-col-resize select-none"
     />
   );

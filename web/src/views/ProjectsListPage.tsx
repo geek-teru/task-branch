@@ -280,7 +280,7 @@ function ExternalLink({ href, label, children }: { href: string; label: string; 
       href={href}
       target="_blank"
       rel="noreferrer"
-      title={href}
+      data-tooltip={href}
       aria-label={`${label}: ${href}`}
       onClick={(e: MouseEvent) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}

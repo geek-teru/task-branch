@@ -59,7 +59,7 @@ export function Sidebar({
               key={m.key}
               type="button"
               onClick={() => onNavigate(m.key)}
-              title={m.label}
+              data-tooltip={m.label}
               className={cn(
                 "m-0 flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-md border-0 font-sans text-sm transition-colors",
                 collapsed ? "justify-center px-0" : "justify-start px-2.5 text-left",
@@ -76,7 +76,7 @@ export function Sidebar({
       </nav>
 
       <div className={cn("flex items-center border-t border-border py-2", collapsed ? "justify-center" : "justify-end px-2")}>
-        <Button variant="ghost" size="sm" onClick={toggle} title={toggleLabel} aria-label={toggleLabel} className="w-7 px-0 text-fg-muted">
+        <Button variant="ghost" size="sm" onClick={toggle} data-tooltip={toggleLabel} aria-label={toggleLabel} className="w-7 px-0 text-fg-muted">
           {collapsed ? "»" : "«"}
         </Button>
       </div>
@@ -84,7 +84,7 @@ export function Sidebar({
       {!collapsed && (
         <div
           onMouseDown={startResize}
-          title="Drag to resize"
+          data-tooltip="Drag to resize"
           className="absolute inset-y-0 -right-[3px] z-5 w-[7px] cursor-col-resize select-none"
         />
       )}
