@@ -11,6 +11,11 @@ import { DetailPanel } from "../components/DetailPanel";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon, DeleteIcon, EditIcon } from "../components/Icons";
 import { Button, IconButton } from "../components/ui/Button";
+import { Switch } from "../components/ui/Switch";
+import { Toolbar } from "../components/ui/Toolbar";
+
+// 「クローズしたストーリーも表示」の状態。ブラウザごとに覚える（カンバンの kanban.showClosed と同じ扱い）。
+const SHOW_CLOSED_STORIES_KEY = "gantt.showClosedStories";
 
 const PX_PER_DAY = 8;
 const ROW_H = 26;
@@ -243,7 +248,30 @@ export function GanttView({
     setCollapsedGroups(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id]);
-  const filtered = useMemo(() => [{ project, graph }], [project, graph]);
+  const [showClosedStories, setShowClosedStories] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_CLOSED_STORIES_KEY) === "1";
+    } catch {
+      // Storage can be unavailable (private mode); fall back to hidden.
+      return false;
+    }
+  });
+  const toggleShowClosedStories = (on: boolean) => {
+    setShowClosedStories(on);
+    try {
+      localStorage.setItem(SHOW_CLOSED_STORIES_KEY, on ? "1" : "0");
+    } catch {
+      // Ignore: the toggle still applies for this session.
+    }
+  };
+  // クローズしたストーリーは、配下のタスクごと既定で隠す。開いているストーリーのクローズしたタスクは出す。
+  // 隠した行は期間の計算にも入れない（古いストーリーでタイムラインが伸びないように）。
+  const filtered = useMemo(() => {
+    if (showClosedStories) return [{ project, graph }];
+    const closedStoryIds = new Set(graph.nodes.filter((n) => n.level === "story" && n.status === "closed").map((n) => n.id));
+    const nodes = graph.nodes.filter((n) => !closedStoryIds.has(n.id) && !closedStoryIds.has(n.parent_id ?? ""));
+    return [{ project, graph: { ...graph, nodes } }];
+  }, [project, graph, showClosedStories]);
 
   const model = useMemo(() => {
     const rows = buildRows(filtered);
@@ -287,8 +315,19 @@ export function GanttView({
   // プロジェクトはヘッダーの切替で選ぶ。プロジェクトが変わったら詳細パネルを閉じる。
   useEffect(() => setSelectedKey(null), [project.id]);
 
+  const toolbar = (
+    <Toolbar>
+      <Switch checked={showClosedStories} onChange={toggleShowClosedStories} label="クローズしたストーリーも表示" />
+    </Toolbar>
+  );
+
   if (!model) {
-    return <div className="p-6 text-[13px] text-fg-muted">期間（開始日・期限）が設定されたタスクがありません。</div>;
+    return (
+      <div className="flex h-full flex-col">
+        {toolbar}
+        <div className="p-6 text-[13px] text-fg-muted">期間（開始日・期限）が設定されたタスクがありません。</div>
+      </div>
+    );
   }
 
   const { rows, timelineStart, timelineW, months, weeks, weekends, todayX } = model;
@@ -343,7 +382,9 @@ export function GanttView({
 
   return (
     <div className="flex h-full">
-      <div className="min-w-0 flex-1 overflow-auto bg-surface">
+      <div className="flex min-w-0 flex-1 flex-col">
+      {toolbar}
+      <div className="min-h-0 flex-1 overflow-auto bg-surface">
         <div className="relative" style={{ width: totalW }}>
         {/* header */}
         <div className="sticky top-0 z-[3] flex" style={{ height: HEADER_H }}>
@@ -635,6 +676,7 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
         {/* extra room so the last row's status menu (opens below the bar) stays on-screen */}
         <div className="h-40" />
         </div>
+      </div>
       </div>
       {selectedRow && (
         <DetailPanel
