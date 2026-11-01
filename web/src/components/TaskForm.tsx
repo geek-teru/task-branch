@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Status, StoryInput } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
 import { Dialog } from "./ui/Dialog";
 import { Input } from "./ui/Input";
@@ -72,13 +73,12 @@ export function TaskForm({
       />
 
       <label className={`${fieldLabel} mt-3.5`}>ステータス</label>
-      <Select value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-        {STATUS_ORDER.map((s) => (
-          <option key={s} value={s}>
-            {STATUS_LABEL[s]}
-          </option>
-        ))}
-      </Select>
+      <Select
+        value={status}
+        onChange={setStatus}
+        options={STATUS_ORDER.map((s) => ({ value: s, label: <Badge tone={s}>{STATUS_LABEL[s]}</Badge> }))}
+        aria-label="ステータス"
+      />
       {todoHint && status === "todo" && <div className="mt-1.5 text-[11px] text-fg-muted">{todoHint}</div>}
 
       <div className="mt-3.5 flex gap-3">

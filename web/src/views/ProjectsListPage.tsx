@@ -101,13 +101,14 @@ export function ProjectsListPage({
           <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
           <Select
             value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+            onChange={setSortOrder}
+            options={[
+              { value: "created", label: "作成順" },
+              { value: "name", label: "名前順" },
+            ]}
             aria-label="並び"
             className="w-32"
-          >
-            <option value="created">作成順</option>
-            <option value="name">名前順</option>
-          </Select>
+          />
 
           <ToolbarEnd>
             <SegmentedControl

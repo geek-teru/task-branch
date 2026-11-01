@@ -516,19 +516,20 @@
   確認の文言は「何を・どうする」を書き、末尾は「よろしいですか？」。ボタンは動詞（「変更する」「移動する」）。
 </p>
 
-<h3>ドロップダウン（…メニュー）</h3>
-<div class="demo row" style="align-items:flex-start">
-  <button class="btn-secondary" style="padding:5px 10px;font-size:14px;line-height:14px">…</button>
-  <div class="menu">
-    <button>バックログ</button>
-    <button>ガントチャート</button>
-    <button>カンバン</button>
-    <button class="sep">JSONエクスポート</button>
-    <button>アーカイブする</button>
-    <button class="danger">削除</button>
-  </div>
-</div>
-<p class="note">主要な操作だけ画面に出し、残りは「…」にまとめる。項目は 12px・角丸 4px、区切りは上線 <code>#e5e8eb</code>。背面のクリックで閉じる。</p>
+<h3>ドロップダウン</h3>
+<p>開いたリストはどれも同じ見た目にする。操作のメニューは <code>components/ui/DropdownMenu.tsx</code> の <code>DropdownMenu</code>、入力欄の選択は <code>components/ui/Select.tsx</code> の <code>Select</code> を使う。ネイティブの <code>&lt;select&gt;</code> と、部品を使わない手書きのメニューは使わない。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>部品の使い分け</td><td>操作を並べるもの（…メニュー、ユーザーメニュー）と、バッジを押して値を変えるもの（ステータス、Active / InActive）は <code>DropdownMenu</code>。フォームとツールバーの選択欄は <code>Select</code>（閉じた状態は Input と同じ見た目・h-8）</td></tr>
+    <tr><td>開いたリスト</td><td>白地・枠 <code>border-border</code>・角丸 <code>rounded-md</code>・<code>shadow-md</code>・上下 4px・最小幅 160px・最大高さ 320px（超えたらスクロール）。<code>position: fixed</code> で出すので、表や詳細パネルの中でも切れない。下に入らないときは上に開く</td></tr>
+    <tr><td>項目</td><td>13px / 400・<code>px-3 py-1.5</code>。hover とキーボードで選んでいる項目は背景 <code>bg-surface-muted</code>。破壊的な操作は <code>danger</code>（文字だけ赤）。区切りは 1px の <code>bg-border</code></td></tr>
+    <tr><td>選択中の値</td><td>1つを選ぶリスト（Select、ステータス、Active / InActive、プロジェクトの切替）は、選択中の項目の左に緑のチェック（<code>CheckIcon</code>）を出す。チェックの無い項目も同じ幅を空けて、文字の頭をそろえる。太字にはしない</td></tr>
+    <tr><td>値の出し方</td><td>ステータスと Active / InActive は、閉じた状態も選択肢もバッジで出す</td></tr>
+    <tr><td>開くしるし</td><td>リストが開くものは右に <code>ChevronDownIcon</code>（12px・<code>text-fg-muted</code>）。ヘッダーのプロジェクトの切替だけは、切り替える意味で <code>ChevronUpDownIcon</code>。…メニューはアイコン（<code>MoreIcon</code>）だけで、しるしは付けない。文字の ▾ ⇅ は使わない</td></tr>
+    <tr><td>閉じ方・キーボード</td><td>外側のクリックと Escape で閉じる（ダイアログの中の Select では、Escape はリストだけを閉じる）。Select は ↑ ↓ Home End で動き、Enter / Space で選ぶ</td></tr>
+  </tbody>
+</table>
 
 <h3>サイドナビ</h3>
 <div class="demo row" style="align-items:flex-start;gap:16px">

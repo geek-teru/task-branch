@@ -5,7 +5,7 @@ import { useResizableWidth } from "../lib/useResizableWidth";
 import { IdBadge } from "./IdBadge";
 import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
-import { CloseIcon, DeleteIcon, EditIcon } from "./Icons";
+import { ChevronDownIcon, CloseIcon, DeleteIcon, EditIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
 import { Button, IconButton } from "./ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "./ui/DropdownMenu";
@@ -194,25 +194,15 @@ function StoryPicker({
   }
   return (
     <Select
-      autoFocus
-      value={currentStoryId ?? ""}
-      onChange={(e) => {
-        setEditing(false);
-        if (e.target.value !== currentStoryId) onPick(e.target.value);
-      }}
-      onBlur={() => setEditing(false)}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") setEditing(false);
-      }}
+      defaultOpen
+      value={currentStoryId}
+      onChange={onPick}
+      onClose={() => setEditing(false)}
+      options={options.map((story) => ({ value: story.id, label: story.label }))}
+      placeholder={text ?? "-"}
+      aria-label="ストーリーを変更"
       title="ストーリーを変更"
-    >
-      {currentStoryId == null && <option value="">{text ?? "-"}</option>}
-      {options.map((story) => (
-        <option key={story.id} value={story.id}>
-          {story.label}
-        </option>
-      ))}
-    </Select>
+    />
   );
 }
 
@@ -228,12 +218,14 @@ function StatusPicker({ status, onPick }: { status: Status; onPick: (status: Sta
       trigger={
         <>
           <Badge tone={status}>{STATUS_LABEL[status]}</Badge>
-          <span className="text-[10px] text-fg-muted">▾</span>
+          <span className="flex text-fg-muted">
+            <ChevronDownIcon size={12} />
+          </span>
         </>
       }
     >
       {STATUS_ORDER.map((s) => (
-        <DropdownMenuItem key={s} onSelect={() => s !== status && onPick(s)}>
+        <DropdownMenuItem key={s} selected={s === status} onSelect={() => s !== status && onPick(s)}>
           <Badge tone={s}>{STATUS_LABEL[s]}</Badge>
         </DropdownMenuItem>
       ))}

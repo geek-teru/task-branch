@@ -1,5 +1,5 @@
 import type { Project } from "../lib/types";
-import { ServiceIcon } from "./Icons";
+import { ChevronUpDownIcon, ServiceIcon } from "./Icons";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
 export const HEADER_H = 48;
@@ -33,7 +33,7 @@ export function GlobalHeader({
   // Active projects first; archived ones follow, greyed out.
   const ordered = [...projects.filter((p) => p.is_active), ...projects.filter((p) => !p.is_active)];
   const allItem = (
-    <DropdownMenuItem onSelect={onSelectAllProjects} icon={<Check on={!!allProjectsLabel && !current} />}>
+    <DropdownMenuItem onSelect={onSelectAllProjects} selected={!!allProjectsLabel && !current}>
       すべてのプロジェクト
     </DropdownMenuItem>
   );
@@ -62,8 +62,8 @@ export function GlobalHeader({
               <span className={current ? "max-w-[320px] truncate" : allProjectsLabel ? undefined : "text-fg-muted"}>
                 {current?.name ?? allProjectsLabel ?? "プロジェクトを選択"}
               </span>
-              <span className="text-fg-muted" aria-hidden>
-                ⇅
+              <span className="flex text-fg-muted">
+                <ChevronUpDownIcon size={12} />
               </span>
             </>
           }
@@ -75,7 +75,7 @@ export function GlobalHeader({
             </>
           )}
           {ordered.map((p) => (
-            <DropdownMenuItem key={p.id} onSelect={() => onSelectProject(p.id)} icon={<Check on={p.id === current?.id} />}>
+            <DropdownMenuItem key={p.id} onSelect={() => onSelectProject(p.id)} selected={p.id === current?.id}>
               <span className={p.is_active ? "truncate" : "truncate text-fg-muted"}>{p.name}</span>
             </DropdownMenuItem>
           ))}
@@ -113,14 +113,6 @@ export function GlobalHeader({
 }
 
 // Fixed-width slot so checked and unchecked items line up.
-function Check({ on }: { on: boolean }) {
-  return (
-    <span className="w-3 shrink-0 text-brand" aria-hidden>
-      {on ? "✓" : ""}
-    </span>
-  );
-}
-
 function initial(name: string): string {
   const first = [...name.trim()][0];
   return first ? first.toUpperCase() : "?";
