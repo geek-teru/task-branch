@@ -56,7 +56,7 @@ export function BacklogView({
           <option value="inactive">InActive</option>
         </Select>
         <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setAdding(true)} className="ml-auto">
-          バックログを追加
+          New Story
         </Button>
       </div>
 
@@ -64,7 +64,7 @@ export function BacklogView({
         {!visible ? (
           <div className="text-[13px] text-fg-muted">読み込み中…</div>
         ) : stories!.length === 0 ? (
-          <div className="text-[13px] text-fg-muted">ストーリーがありません。「バックログを追加」から登録してください。</div>
+          <div className="text-[13px] text-fg-muted">ストーリーがありません。「New Story」から登録してください。</div>
         ) : visible.length === 0 ? (
           <div className="text-[13px] text-fg-muted">
             {stateFilter === "active" ? "Active" : "InActive"}のストーリーはありません。

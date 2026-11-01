@@ -125,6 +125,24 @@ export function AddIcon(p: IconProps) {
   );
 }
 
+// Close: a cross.
+export function CloseIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </Icon>
+  );
+}
+
+// Comment: a speech bubble.
+export function CommentIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M2.5 3.5c0-.6.4-1 1-1h9c.6 0 1 .4 1 1v6.5c0 .6-.4 1-1 1H7l-3 2.5V11h-.5c-.6 0-1-.4-1-1z" />
+    </Icon>
+  );
+}
+
 // Search: a magnifier.
 export function SearchIcon(p: IconProps) {
   return (

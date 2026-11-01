@@ -9,7 +9,7 @@ import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
-import { Button } from "../components/ui/Button";
+import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 
 
@@ -32,7 +32,6 @@ export function KanbanView({
   projectFilter,
   onChangeStatus,
   onMoveTask,
-  onAddStory,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
@@ -42,7 +41,6 @@ export function KanbanView({
   projectFilter: string | null;
   onChangeStatus: (taskId: string, status: Status) => void;
   onMoveTask: (taskId: string, storyId: string, status: Status) => void;
-  onAddStory: (projectId: string, values: StoryInput) => void;
   onAddTask: (story: Task, values: StoryInput) => void;
   onUpdateTask: (id: string, values: StoryInput) => void;
   onDeleteTask: (id: string) => void;
@@ -67,8 +65,6 @@ export function KanbanView({
   };
   const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<Task | null>(null);
-  // ストーリー追加: いつもの TaskForm で名前と期間を入れる。親なしのストーリーになる。
-  const [storyForm, setStoryForm] = useState<Project | null>(null);
   // targetStory がある＝別ストーリーへの移動。無ければ同じストーリー内のステータス変更。
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
@@ -186,16 +182,9 @@ export function KanbanView({
             <div className="flex-1">
               <IdBadge id={story.id} />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setAdding(story)}
-              title="タスクを追加"
-              aria-label="タスクを追加"
-              className="h-6 w-6 px-0 text-fg-muted"
-            >
+            <IconButton label="タスクを追加" onClick={() => setAdding(story)} className="size-6!">
               <AddIcon size={12} />
-            </Button>
+            </IconButton>
           </div>
           <div className="mt-0.5 text-xs text-fg">{story.title}</div>
           <div className="mt-1 text-[11px] text-fg-muted">
@@ -290,12 +279,7 @@ export function KanbanView({
               const projectLanes = lanesByProject.get(p.id) ?? [];
               return (
                 <section key={p.id} className="mb-7">
-                  <div className="mb-2 flex items-center gap-2.5">
-                    <h3 className="m-0 text-sm font-medium">{p.name}</h3>
-                    <Button size="sm" icon={<AddIcon size={13} />} onClick={() => setStoryForm(p)}>
-                      ストーリーを追加
-                    </Button>
-                  </div>
+                  <h3 className="m-0 mb-2 text-sm font-medium">{p.name}</h3>
                   {projectLanes.length === 0 ? (
                     <div className="text-[13px] text-fg-muted">進行中のストーリーがありません。</div>
                   ) : (
@@ -376,20 +360,6 @@ export function KanbanView({
             setEditing(null);
           }}
           onCancel={() => setEditing(null)}
-        />
-      )}
-
-      {storyForm && (
-        <TaskForm
-          heading={`ストーリーを追加（${storyForm.name}）`}
-          submitLabel="追加"
-          initial={{ title: "", status: "in_progress", start_date: null, due_date: null, description: null }}
-          todoHint="未着手のままだとカンバンには出ません（ガントチャートとバックログから見えます）。"
-          onSubmit={(values) => {
-            onAddStory(storyForm.id, values);
-            setStoryForm(null);
-          }}
-          onCancel={() => setStoryForm(null)}
         />
       )}
 
