@@ -156,18 +156,6 @@ export default function App() {
   }, []);
 
   // Kanban: add a story without a parent, already started (Active).
-  const handleKanbanAddStory = useCallback(
-    async (projectId: string, values: StoryInput) => {
-      try {
-        await addRootStory(projectId, values, true);
-        setLanes(await getKanbanLanes());
-      } catch (e: any) {
-        setError(String(e.message ?? e));
-      }
-    },
-    []
-  );
-
   const handleKanbanMove = useCallback(async (taskId: string, storyId: string, status: Status) => {
     try {
       await moveTask(taskId, storyId, status);
@@ -671,7 +659,6 @@ export default function App() {
                       projectFilter={searchParams.get("project")}
                       onChangeStatus={handleKanbanStatus}
                       onMoveTask={handleKanbanMove}
-                      onAddStory={handleKanbanAddStory}
                       onAddTask={handleAddTask}
                       onUpdateTask={handleKanbanUpdate}
                       onDeleteTask={handleKanbanDelete}
