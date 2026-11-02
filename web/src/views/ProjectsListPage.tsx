@@ -1,6 +1,7 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import type { Project, ProjectInput } from "../lib/types";
 import { cn } from "../lib/cn";
+import { useTableSort, type SortValue } from "../lib/useTableSort";
 import { ProjectForm } from "../components/ProjectForm";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -10,6 +11,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "../compon
 import { SearchInput } from "../components/ui/SearchInput";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Select } from "../components/ui/Select";
+import { SortableTh } from "../components/ui/SortableTh";
 import { Toolbar, ToolbarEnd } from "../components/ui/Toolbar";
 import { StateFilterSelect, type StateFilter } from "../components/StateFilterSelect";
 import {
@@ -29,6 +31,14 @@ type SortOrder = "created" | "name";
 type ViewMode = "grid" | "list";
 
 const VIEW_KEY = "projects.view";
+
+// List view columns sortable by a header click. While one is sorted it wins over the toolbar's 並び.
+const SORT_COLUMNS = {
+  name: (p) => p.name,
+  description: (p) => p.description,
+  state: (p) => (p.is_active ? 0 : 1),
+  created: (p) => p.created_at,
+} satisfies Record<string, (p: Project) => SortValue>;
 
 // Project list: navigate only. Editing / deleting / exporting lives on the detail page.
 export function ProjectsListPage({
@@ -77,6 +87,7 @@ export function ProjectsListPage({
     // projects already arrive in creation order.
     return sortOrder === "name" ? [...filtered].sort((a, b) => a.name.localeCompare(b.name, "ja")) : filtered;
   }, [projects, query, stateFilter, sortOrder]);
+  const { sorted: listRows, sort, toggle } = useTableSort(visible, SORT_COLUMNS);
 
   const menu = (p: Project) => (
     <ProjectMenu
@@ -197,14 +208,14 @@ export function ProjectsListPage({
             <table className="w-full table-fixed border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
-                  <th className="w-[32%] px-4 py-2 font-medium">名前</th>
-                  <th className="px-4 py-2 font-medium">説明</th>
-                  <th className="w-28 px-4 py-2 font-medium">状態</th>
-                  <th className="w-32 px-4 py-2 font-medium">作成日</th>
+                  <SortableTh label="名前" sortKey="name" sort={sort} onSort={toggle} className="w-[32%] px-4 py-2" />
+                  <SortableTh label="説明" sortKey="description" sort={sort} onSort={toggle} className="px-4 py-2" />
+                  <SortableTh label="状態" sortKey="state" sort={sort} onSort={toggle} className="w-28 px-4 py-2" />
+                  <SortableTh label="作成日" sortKey="created" sort={sort} onSort={toggle} className="w-32 px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {visible.map((p) => (
+                {listRows.map((p) => (
                   <tr
                     key={p.id}
                     onClick={() => onShowDetail(p.id)}

@@ -1,9 +1,10 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogStory } from "../lib/types";
-import { STATUS_LABEL } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useResizableWidth } from "../lib/useResizableWidth";
+import { useTableSort, type SortValue } from "../lib/useTableSort";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
@@ -16,9 +17,20 @@ import { Toolbar } from "../components/ui/Toolbar";
 import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
 import { Badge } from "../components/ui/Badge";
+import { SortableTh } from "../components/ui/SortableTh";
 
 // 「InActive も表示」の状態。ブラウザごとに覚える（カンバンの「クローズしたタスクも表示」と同じ扱い）。
 const SHOW_INACTIVE_KEY = "backlog.showInactive";
+
+// 列見出しのクリックで並べ替える列（ID 以外）。
+const SORT_COLUMNS = {
+  title: (s) => s.title,
+  description: (s) => s.description,
+  start_date: (s) => s.start_date,
+  due_date: (s) => s.due_date,
+  status: (s) => STATUS_ORDER.indexOf(s.status),
+  state: (s) => (s.activated_at != null ? 0 : 1),
+} satisfies Record<string, (s: BacklogStory) => SortValue>;
 
 // Stories of one project: active ones and inactive ones (バックログ). Inactive ones are hidden by default.
 // Only name / description / period / status / state are shown; the document (context) is not loaded here.
@@ -39,7 +51,7 @@ export function BacklogView({
   const [pendingState, setPendingState] = useState<{ story: BacklogStory; active: boolean } | null>(null);
   // 名前・ステータス・状態はドラッグで幅を変えられる。説明は残り幅を使う。
   const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
-  const status = useResizableWidth("backlog.statusWidth", 96, 72, 240, { invert: true });
+  const status = useResizableWidth("backlog.statusWidth", 112, 72, 240, { invert: true });
   const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
   const [showInactive, setShowInactive] = useState(() => {
     try {
@@ -63,6 +75,7 @@ export function BacklogView({
     if (showInactive) return stories;
     return stories.filter((s) => s.activated_at != null);
   }, [stories, showInactive]);
+  const { sorted, sort, toggle } = useTableSort(visible ?? [], SORT_COLUMNS);
 
   return (
     <div className="flex h-full flex-col">
@@ -96,25 +109,22 @@ export function BacklogView({
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
                   <th className="w-24 px-3 py-2 font-medium">ID</th>
-                  <th className="relative px-3 py-2 font-medium" style={{ width: name.width }}>
-                    名前
+                  <SortableTh label="名前" sortKey="title" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: name.width }}>
                     <ResizeHandle onMouseDown={name.startResize} side="right" />
-                  </th>
-                  <th className="hidden px-3 py-2 font-medium @5xl:table-cell">説明</th>
-                  <th className="w-28 px-3 py-2 font-medium">開始日</th>
-                  <th className="w-28 px-3 py-2 font-medium">期限</th>
-                  <th className="relative px-3 py-2 font-medium" style={{ width: status.width }}>
-                    ステータス
+                  </SortableTh>
+                  <SortableTh label="説明" sortKey="description" sort={sort} onSort={toggle} className="hidden px-3 py-2 @5xl:table-cell" />
+                  <SortableTh label="開始日" sortKey="start_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
+                  <SortableTh label="期限" sortKey="due_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
+                  <SortableTh label="ステータス" sortKey="status" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: status.width }}>
                     <ResizeHandle onMouseDown={status.startResize} side="left" />
-                  </th>
-                  <th className="relative px-3 py-2 font-medium" style={{ width: state.width }}>
-                    状態
+                  </SortableTh>
+                  <SortableTh label="状態" sortKey="state" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: state.width }}>
                     <ResizeHandle onMouseDown={state.startResize} side="left" />
-                  </th>
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {visible.map((s) => {
+                {sorted.map((s) => {
                   const active = s.activated_at != null;
                   // InActive はグレーアウト。opacity は tr ではなく状態以外のセルに付ける
                   // （tr に付けると状態のメニューが行の重なりに閉じ込められ、下の行に隠れる）。

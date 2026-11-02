@@ -9,8 +9,9 @@ import {
   updateStoryInfo,
 } from "../lib/api";
 import type { ContextRevision, Project, Task } from "../lib/types";
-import { STATUS_LABEL } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { cn } from "../lib/cn";
+import { useTableSort, type SortValue } from "../lib/useTableSort";
 import { IdBadge } from "../components/IdBadge";
 import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -22,7 +23,16 @@ import { Card } from "../components/ui/Card";
 import { Dialog } from "../components/ui/Dialog";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
+import { SortableTh } from "../components/ui/SortableTh";
 import { Textarea } from "../components/ui/Textarea";
+
+// Task table columns sortable by a header click (all but ID). 期間 compares the start date, then the due date.
+const SORT_COLUMNS = {
+  title: (t) => t.title,
+  description: (t) => t.description,
+  status: (t) => STATUS_ORDER.indexOf(t.status),
+  period: (t) => (t.start_date || t.due_date ? [t.start_date, t.due_date] : null),
+} satisfies Record<string, (t: Task) => SortValue>;
 
 // Story detail: name / description, Active / InActive, the context document and the story's tasks.
 // Loads its own data through the api layer (the story's context is only needed here).
@@ -45,6 +55,7 @@ export function StoryDetailPage({
   const [saving, setSaving] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [pendingState, setPendingState] = useState<boolean | null>(null);
+  const { sorted: sortedTasks, sort, toggle } = useTableSort(tasks, SORT_COLUMNS);
 
   const load = useCallback(async () => {
     try {
@@ -195,14 +206,14 @@ export function StoryDetailPage({
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
                   <th className="w-24 px-3 py-2 font-medium">ID</th>
-                  <th className="px-3 py-2 font-medium @2xl:w-[38%]">名前</th>
-                  <th className="hidden px-3 py-2 font-medium @2xl:table-cell">説明</th>
-                  <th className="w-24 px-3 py-2 font-medium">ステータス</th>
-                  <th className="w-44 px-3 py-2 font-medium">期間</th>
+                  <SortableTh label="名前" sortKey="title" sort={sort} onSort={toggle} className="px-3 py-2 @2xl:w-[38%]" />
+                  <SortableTh label="説明" sortKey="description" sort={sort} onSort={toggle} className="hidden px-3 py-2 @2xl:table-cell" />
+                  <SortableTh label="ステータス" sortKey="status" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
+                  <SortableTh label="期間" sortKey="period" sort={sort} onSort={toggle} className="w-44 px-3 py-2" />
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((s) => (
+                {sortedTasks.map((s) => (
                   <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
                     <td className="px-3 py-2">
                       <IdBadge id={s.id} />
