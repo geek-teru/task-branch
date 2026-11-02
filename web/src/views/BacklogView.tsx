@@ -18,7 +18,7 @@ import { Dialog } from "../components/ui/Dialog";
 import { Badge } from "../components/ui/Badge";
 
 // Stories of one project: active ones and inactive ones (バックログ).
-// Only name / description / status / state are shown; the document (context) is not loaded here.
+// Only name / description / period / status / state are shown; the document (context) is not loaded here.
 // The project is picked in the global header (/backlog?project=).
 export function BacklogView({
   stories,
@@ -69,7 +69,8 @@ export function BacklogView({
             {stateFilter === "active" ? "Active" : "InActive"}のストーリーはありません。
           </div>
         ) : (
-          <div className="overflow-hidden rounded-md border border-border bg-surface">
+          // @container: the description column is dropped when the table is narrow.
+          <div className="@container overflow-hidden rounded-md border border-border bg-surface">
             <table className="w-full table-fixed border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
@@ -78,7 +79,9 @@ export function BacklogView({
                     名前
                     <ResizeHandle onMouseDown={name.startResize} side="right" />
                   </th>
-                  <th className="px-3 py-2 font-medium">説明</th>
+                  <th className="hidden px-3 py-2 font-medium @5xl:table-cell">説明</th>
+                  <th className="w-28 px-3 py-2 font-medium">開始日</th>
+                  <th className="w-28 px-3 py-2 font-medium">期限</th>
                   <th className="relative px-3 py-2 font-medium" style={{ width: status.width }}>
                     ステータス
                     <ResizeHandle onMouseDown={status.startResize} side="left" />
@@ -107,9 +110,11 @@ export function BacklogView({
                         </Link>
                         <ResizeHandle onMouseDown={name.startResize} side="right" />
                       </td>
-                      <td className={cn("truncate px-3 py-2", s.description ? "text-fg-muted" : "text-fg-muted/60")}>
+                      <td className={cn("hidden truncate px-3 py-2 @5xl:table-cell", s.description ? "text-fg-muted" : "text-fg-muted/60")}>
                         {s.description ?? "（説明なし）"}
                       </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{s.start_date ?? "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{s.due_date ?? "—"}</td>
                       <td className="relative px-3 py-2">
                         <Badge tone={s.status}>{STATUS_LABEL[s.status]}</Badge>
                         <ResizeHandle onMouseDown={status.startResize} side="left" />
