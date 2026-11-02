@@ -5,6 +5,7 @@ import { ProjectForm } from "../components/ProjectForm";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "../components/ui/DropdownMenu";
 import { SearchInput } from "../components/ui/SearchInput";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
@@ -88,10 +89,17 @@ export function ProjectsListPage({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-[1200px] px-6 py-8">
-        <h1 className="m-0 mb-6 text-2xl font-medium text-fg">プロジェクト</h1>
-
-        <Toolbar variant="inline" className="mb-5">
+      <PageHeader
+        title="プロジェクト"
+        meta={`${visible.length} 件`}
+        actions={
+          <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setCreating(true)}>
+            New Project
+          </Button>
+        }
+      />
+      <div className="max-w-[1200px] px-6 pb-6">
+        <Toolbar variant="inline" className="mb-4">
           <SearchInput
             value={query}
             onChange={setQuery}
@@ -120,9 +128,6 @@ export function ProjectsListPage({
                 { value: "list", label: "リスト表示", icon: <ListIcon size={14} /> },
               ]}
             />
-            <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setCreating(true)}>
-              New Project
-            </Button>
           </ToolbarEnd>
         </Toolbar>
 

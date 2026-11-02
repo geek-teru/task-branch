@@ -11,7 +11,8 @@ import { AddIcon } from "../components/Icons";
 import { StateFilterSelect, type StateFilter } from "../components/StateFilterSelect";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { Toolbar, ToolbarEnd } from "../components/ui/Toolbar";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Toolbar } from "../components/ui/Toolbar";
 import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
 import { Badge } from "../components/ui/Badge";
@@ -45,16 +46,20 @@ export function BacklogView({
 
   return (
     <div className="flex h-full flex-col">
-      <Toolbar>
-        <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
-        <ToolbarEnd>
+      <PageHeader
+        title="バックログ"
+        meta={visible && `ストーリー ${visible.length} 件`}
+        actions={
           <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setAdding(true)}>
             New Story
           </Button>
-        </ToolbarEnd>
+        }
+      />
+      <Toolbar>
+        <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
       </Toolbar>
 
-      <div className="min-h-0 flex-1 overflow-auto p-6">
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
         {!visible ? (
           <div className="text-[13px] text-fg-muted">読み込み中…</div>
         ) : stories!.length === 0 ? (

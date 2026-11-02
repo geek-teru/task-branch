@@ -21,6 +21,7 @@ import { Button, IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Dialog } from "../components/ui/Dialog";
 import { Input } from "../components/ui/Input";
+import { PageHeader } from "../components/ui/PageHeader";
 import { Textarea } from "../components/ui/Textarea";
 
 // Story detail: name / description, Active / InActive, the context document and the story's tasks.
@@ -109,24 +110,29 @@ export function StoryDetailPage({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-4xl px-6 py-8">
-        <Link to={`/backlog?project=${story.project_id}`} className="text-xs text-fg-muted no-underline hover:text-fg">
-          ← バックログ{project ? `（${project.name}）` : ""}
-        </Link>
-
-        <div className="mt-3 flex items-start gap-3">
-          <h1 className="m-0 min-w-0 flex-1 text-2xl font-medium leading-tight text-fg">{story.title}</h1>
+      <PageHeader
+        back={
+          <Link to={`/backlog?project=${story.project_id}`} className="text-fg-muted no-underline hover:text-fg">
+            ← バックログ{project ? `（${project.name}）` : ""}
+          </Link>
+        }
+        title={story.title}
+        meta={
+          <>
+            <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
+            <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
+            <span className="text-[11px]">{period(story)}</span>
+            <IdBadge id={story.id} />
+          </>
+        }
+        actions={
           <IconButton label="変更" size="md" onClick={() => setEditingInfo(true)}>
             <EditIcon size={14} />
           </IconButton>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
-          <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
-          <span className="text-[11px] text-fg-muted">{period(story)}</span>
-          <IdBadge id={story.id} />
-        </div>
-        <p className={cn("m-0 mt-3 text-sm", story.description ? "text-fg" : "text-fg-muted")}>
+        }
+      />
+      <div className="max-w-[960px] px-6 pb-6">
+        <p className={cn("m-0 text-sm", story.description ? "text-fg" : "text-fg-muted")}>
           {story.description ?? "（説明なし）"}
         </p>
 

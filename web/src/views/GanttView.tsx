@@ -12,6 +12,7 @@ import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon, DeleteIcon, EditIcon } from "../components/Icons";
 import { Button, IconButton } from "../components/ui/Button";
 import { Switch } from "../components/ui/Switch";
+import { PageHeader } from "../components/ui/PageHeader";
 import { Toolbar } from "../components/ui/Toolbar";
 
 // 「クローズしたストーリーも表示」の状態。ブラウザごとに覚える（カンバンの kanban.showClosed と同じ扱い）。
@@ -315,10 +316,14 @@ export function GanttView({
   // プロジェクトはヘッダーの切替で選ぶ。プロジェクトが変わったら詳細パネルを閉じる。
   useEffect(() => setSelectedKey(null), [project.id]);
 
+  const storyCount = filtered[0].graph.nodes.filter((n) => n.level === "story").length;
   const toolbar = (
+    <>
+    <PageHeader title="ガントチャート" meta={`ストーリー ${storyCount} 件`} />
     <Toolbar>
       <Switch checked={showClosedStories} onChange={toggleShowClosedStories} label="クローズしたストーリーも表示" />
     </Toolbar>
+    </>
   );
 
   if (!model) {

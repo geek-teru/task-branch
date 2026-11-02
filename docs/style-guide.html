@@ -269,6 +269,7 @@
         <li><a href="#space-1">4.1 余白・高さ</a></li>
         <li><a href="#space-2">4.2 角丸</a></li>
         <li><a href="#space-3">4.3 影・重なり</a></li>
+        <li><a href="#space-4">4.4 ページの骨格</a></li>
       </ul>
     </li>
     <li><a href="#parts">5. コンポーネント</a>
@@ -474,11 +475,11 @@
 <table>
   <thead><tr><th>クラス（値）</th><th>使うところ</th></tr></thead>
   <tbody>
-    <tr><td class="mono">px-6 py-8（24px / 32px）</td><td>見出しのある本文の画面（プロジェクト一覧・詳細）の外周。本文の最大幅は <code>max-w-[1200px]</code></td></tr>
+    <tr><td class="mono">px-6 pt-6 pb-4（24px / 24px / 16px）</td><td>ページ見出しの帯（<code>PageHeader</code>）。左端の 24px は見出し・ツールバー・本文で揃える（<a href="#space-4">4.4</a>）</td></tr>
     <tr><td class="mono">p-4（16px）</td><td>カードの内側、詳細パネルのヘッダー（<code>px-4 py-3</code>）と本体</td></tr>
     <tr><td class="mono">gap-4（16px）</td><td>カードのグリッドの間隔（<code>repeat(auto-fill, minmax(300px, 1fr))</code>）</td></tr>
     <tr><td class="mono">px-5 py-4 / px-5 py-3</td><td>Dialog の本文 / タイトル・フッター</td></tr>
-    <tr><td class="mono">px-3 py-2（12px / 8px）</td><td>ツールバー、表の見出し・セル</td></tr>
+    <tr><td class="mono">px-3 py-2（12px / 8px）</td><td>表の見出し・セル</td></tr>
     <tr><td class="mono">gap-2（8px）</td><td>ボタン・ツールバーの部品の並び、Dialog のフッター</td></tr>
     <tr><td class="mono">h-12（48px）</td><td>グローバルヘッダー（<code>HEADER_H</code>）</td></tr>
     <tr><td class="mono">h-8（32px）</td><td>md の Button、Input・Select・SearchInput・Switch・SegmentedControl、サイドナビの項目。ツールバーに並ぶものはこの高さにそろえる</td></tr>
@@ -510,6 +511,34 @@
   </tbody>
 </table>
 <p class="note">フォーカスは影ではなく <code>ring-2</code>: ボタン・カードは <code>ring-brand/30</code>、入力欄は枠を <code>border-brand</code> にして <code>ring-brand/20</code>。<code>z-index</code> はリスト 40／Dialog 50。Dialog の背景幕は <code>bg-black/40</code>。</p>
+
+<h3 id="space-4">ページの骨格（<code>ui/PageHeader.tsx</code>）</h3>
+<p>どの画面も、本文の一番上に <code>PageHeader</code>（ページ見出しの帯）を置く。帯は画面ごとに書き直さず、この部品を使う。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>見出しの帯</td><td><code>px-6 pt-6 pb-4</code>。左に見出し（<code>text-2xl font-medium</code>）と補助の1行（13px <code>text-fg-muted</code>。件数、詳細画面ならバッジ・期間・ID）。右端に主操作（New Project / New Story、詳細の変更・⋮）。親へ戻るリンク（← プロジェクト など）は見出しの上に 12px で置く</td></tr>
+    <tr><td>見出しの文言</td><td>プロジェクト / バックログ / ガントチャート / カンバン。詳細画面はその項目の名前</td></tr>
+    <tr><td>左端</td><td>見出し・ツールバー・本文とも <code>px-6</code>（24px）に揃える</td></tr>
+    <tr><td>読む画面</td><td>プロジェクト一覧・プロジェクト詳細・ストーリー詳細。見出しの下の本文を左寄せ＋最大幅（一覧 <code>max-w-[1200px]</code>、詳細 <code>max-w-[960px]</code>）にする。<code>mx-auto</code> で中央に寄せない</td></tr>
+    <tr><td>作業画面</td><td>バックログ・ガント・カンバン。全幅のまま、見出しの下に <code>Toolbar</code>（<code>px-6 pb-3</code>・<code>border-b</code>）、その下に本文（<code>px-6 py-4</code>。ガントのタイムラインは全幅）</td></tr>
+  </tbody>
+</table>
+
+<div class="demo" style="padding:0;overflow:hidden">
+  <div style="display:flex;align-items:flex-end;gap:16px;padding:24px 24px 16px">
+    <div style="flex:1;min-width:0">
+      <div style="margin:0;font-size:24px;font-weight:500;line-height:1.25">バックログ</div>
+      <div style="margin-top:4px;font-size:13px;color:var(--color-fg-muted)">ストーリー 12 件</div>
+    </div>
+    <button class="btn primary"><svg><use href="#i-add"/></svg>New Story</button>
+  </div>
+  <div class="row" style="padding:0 24px 12px;border-bottom:1px solid var(--color-border)">
+    <div class="field-wrap" style="width:128px"><button type="button" class="field select" aria-label="状態">すべて</button><span class="chev"><svg width="12" height="12"><use href="#i-chev"/></svg></span></div>
+  </div>
+  <div style="padding:16px 24px;font-size:13px;color:var(--color-fg-muted)">本文（表・ボード・タイムライン）</div>
+</div>
+<p class="note">作業画面の骨格の見本。読む画面ではツールバーの <code>border-b</code> が無く（<code>Toolbar variant="inline"</code>）、本文が最大幅で止まる。</p>
 
 <h2 id="parts">5. コンポーネント</h2>
 <p>部品は <code>web/src/components/ui/</code> にある。画面はこれを使い、同じ見た目を <code>className</code> で書き直さない。見本は部品のクラスと同じ値で描いている（hover・フォーカスも動く）。</p>
@@ -607,8 +636,8 @@
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
   <tbody>
-    <tr><td>置き場所</td><td>画面いっぱいの画面（バックログ・カンバン）は上部の <code>Toolbar</code>（白地・<code>border-b</code>・<code>px-3 py-2</code>）。見出しのある本文の画面（プロジェクト一覧）は見出しの下に <code>Toolbar variant="inline"</code>（枠線なし）</td></tr>
-    <tr><td>並び</td><td>左から 検索 → 絞り込み Select → 並び替え Select → トグル。右端（<code>ToolbarEnd</code>、<code>ml-auto</code>）に 切替 → primary の追加ボタン</td></tr>
+    <tr><td>置き場所</td><td>どの画面も <code>PageHeader</code> の下。作業画面（バックログ・ガント・カンバン）は <code>Toolbar</code>（<code>border-b</code>・<code>px-6 pb-3</code>）。読む画面（プロジェクト一覧）は <code>Toolbar variant="inline"</code>（枠線なし）</td></tr>
+    <tr><td>並び</td><td>左から 検索 → 絞り込み Select → 並び替え Select → トグル。右端（<code>ToolbarEnd</code>、<code>ml-auto</code>）に表示の切替。primary の追加ボタンはツールバーに置かず、<code>PageHeader</code> の右端に置く</td></tr>
     <tr><td>検索</td><td><code>SearchInput</code>（虫めがね付き・既定 <code>w-60</code>）。placeholder は「{object}を検索」。入力があると × と Esc で消せる</td></tr>
     <tr><td>状態の絞り込み</td><td><code>StateFilterSelect</code>（<code>w-32</code>）。選択肢は すべて / Active / InActive の順。ラベルは画面に出さず <code>aria-label="状態"</code>。既定値は画面ごと（プロジェクト一覧は Active、バックログはすべて）</td></tr>
     <tr><td>並び替え</td><td><code>Select</code>（<code>w-32</code>・<code>aria-label="並び"</code>）。選択肢は「〇〇順」（作成順 / 名前順）</td></tr>
@@ -627,7 +656,6 @@
       <button type="button" aria-pressed="true" aria-label="グリッド" style="width:28px;padding:0"><svg width="16" height="16"><use href="#i-grid"/></svg></button>
       <button type="button" aria-pressed="false" aria-label="リスト" style="width:28px;padding:0"><svg width="16" height="16"><use href="#i-list"/></svg></button>
     </span>
-    <button class="btn primary"><svg><use href="#i-add"/></svg>New Project</button>
   </span>
 </div>
 <p class="note">ツールバーの並びの見本（<code>Toolbar variant="inline"</code>）。<code>Switch</code> は 28×16 のトラック（オンで <code>brand</code>）＋ 12px <code>text-fg-muted</code> のラベル。<code>SegmentedControl</code> は枠 <code>border-strong</code> の中に 26px のボタンを並べ、選択中は地 <code>surface-muted</code>＋内側に 1px の枠。</p>
