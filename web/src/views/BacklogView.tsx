@@ -8,8 +8,8 @@ import { EpicStateBadge } from "../components/EpicStateBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
 import { AddIcon } from "../components/Icons";
-import { StateFilterSelect, type StateFilter } from "../components/StateFilterSelect";
 import { Button } from "../components/ui/Button";
+import { Switch } from "../components/ui/Switch";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toolbar } from "../components/ui/Toolbar";
@@ -17,7 +17,10 @@ import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
 import { Badge } from "../components/ui/Badge";
 
-// Stories of one project: active ones and inactive ones (バックログ).
+// 「InActive も表示」の状態。ブラウザごとに覚える（カンバンの「クローズしたタスクも表示」と同じ扱い）。
+const SHOW_INACTIVE_KEY = "backlog.showInactive";
+
+// Stories of one project: active ones and inactive ones (バックログ). Inactive ones are hidden by default.
 // Only name / description / period / status / state are shown; the document (context) is not loaded here.
 // The project is picked in the global header or the toolbar's picker (/backlog?project=).
 export function BacklogView({
@@ -38,14 +41,28 @@ export function BacklogView({
   const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
   const status = useResizableWidth("backlog.statusWidth", 96, 72, 240, { invert: true });
   const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
-  // 状態での絞り込み。all = 両方出す
-  const [stateFilter, setStateFilter] = useState<StateFilter>("all");
+  const [showInactive, setShowInactive] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_INACTIVE_KEY) === "1";
+    } catch {
+      // Storage can be unavailable (private mode); fall back to hidden.
+      return false;
+    }
+  });
+  const toggleShowInactive = (on: boolean) => {
+    setShowInactive(on);
+    try {
+      localStorage.setItem(SHOW_INACTIVE_KEY, on ? "1" : "0");
+    } catch {
+      // Ignore: the toggle still applies for this session.
+    }
+  };
 
   const visible = useMemo(() => {
     if (!stories) return null;
-    if (stateFilter === "all") return stories;
-    return stories.filter((s) => (stateFilter === "active" ? s.activated_at != null : s.activated_at == null));
-  }, [stories, stateFilter]);
+    if (showInactive) return stories;
+    return stories.filter((s) => s.activated_at != null);
+  }, [stories, showInactive]);
 
   return (
     <div className="flex h-full flex-col">
@@ -60,7 +77,7 @@ export function BacklogView({
       />
       <Toolbar>
         {projectSelect}
-        <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
+        <Switch checked={showInactive} onChange={toggleShowInactive} label="InActive も表示" />
       </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
@@ -70,7 +87,7 @@ export function BacklogView({
           <div className="text-[13px] text-fg-muted">ストーリーがありません。「New Story」から登録してください。</div>
         ) : visible.length === 0 ? (
           <div className="text-[13px] text-fg-muted">
-            {stateFilter === "active" ? "Active" : "InActive"}のストーリーはありません。
+            Active のストーリーはありません。InActive は「InActive も表示」で出せます。
           </div>
         ) : (
           // @container: the description column is dropped when the table is narrow.
@@ -99,12 +116,15 @@ export function BacklogView({
               <tbody>
                 {visible.map((s) => {
                   const active = s.activated_at != null;
+                  // InActive はグレーアウト。opacity は tr ではなく状態以外のセルに付ける
+                  // （tr に付けると状態のメニューが行の重なりに閉じ込められ、下の行に隠れる）。
+                  const dim = !active && "opacity-60";
                   return (
                     <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
-                      <td className="px-3 py-2">
+                      <td className={cn("px-3 py-2", dim)}>
                         <IdBadge id={s.id} />
                       </td>
-                      <td className="relative truncate px-3 py-2">
+                      <td className={cn("relative truncate px-3 py-2", dim)}>
                         <Link
                           to={`/stories/${s.id}`}
                           data-tooltip="詳細を開く"
@@ -114,12 +134,12 @@ export function BacklogView({
                         </Link>
                         <ResizeHandle onMouseDown={name.startResize} side="right" />
                       </td>
-                      <td className={cn("hidden truncate px-3 py-2 @5xl:table-cell", s.description ? "text-fg-muted" : "text-fg-muted/60")}>
+                      <td className={cn("hidden truncate px-3 py-2 @5xl:table-cell", s.description ? "text-fg-muted" : "text-fg-muted/60", dim)}>
                         {s.description ?? "（説明なし）"}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{s.start_date ?? "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-fg-muted">{s.due_date ?? "—"}</td>
-                      <td className="relative px-3 py-2">
+                      <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.start_date ?? "—"}</td>
+                      <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.due_date ?? "—"}</td>
+                      <td className={cn("relative px-3 py-2", dim)}>
                         <Badge tone={s.status}>{STATUS_LABEL[s.status]}</Badge>
                         <ResizeHandle onMouseDown={status.startResize} side="left" />
                       </td>
