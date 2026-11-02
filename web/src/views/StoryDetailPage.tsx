@@ -30,10 +30,13 @@ export function StoryDetailPage({
   storyId,
   projects,
   onError,
+  onLoadProject,
 }: {
   storyId: string;
   projects: Project[];
   onError: (message: string) => void;
+  // Called with the story's project once loaded, so it becomes the app-wide selection.
+  onLoadProject?: (projectId: string) => void;
 }) {
   const [story, setStory] = useState<Task | null | undefined>(undefined); // undefined = loading
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -49,10 +52,11 @@ export function StoryDetailPage({
       setStory(s);
       setTasks(t);
       setRevision(r);
+      if (s) onLoadProject?.(s.project_id);
     } catch (err: any) {
       onError(String(err.message ?? err));
     }
-  }, [storyId, onError]);
+  }, [storyId, onError, onLoadProject]);
 
   useEffect(() => {
     setStory(undefined);

@@ -1,6 +1,6 @@
 // Gantt view: a project's stories and their tasks on a shared timeline.
 // Built from start_date/due_date on the story and task nodes.
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
 import { cn } from "../lib/cn";
@@ -187,6 +187,7 @@ function buildRows(data: { project: Project; graph: ProjectGraph }[]): Row[] {
 export function GanttView({
   project,
   graph,
+  projectSelect,
   onAddStory,
   onAddTask,
   onUpdateTask,
@@ -204,6 +205,8 @@ export function GanttView({
 }: {
   project: Project;
   graph: ProjectGraph;
+  // The project picker, first in the toolbar.
+  projectSelect?: ReactNode;
   onAddStory?: (values: StoryInput) => void;
   onAddTask?: (story: GraphNode, values: StoryInput) => void;
   onUpdateTask?: (id: string, values: StoryInput) => void;
@@ -313,7 +316,7 @@ export function GanttView({
     return { rows, timelineStart, timelineW, months, weeks, weekends, todayX };
   }, [filtered]);
 
-  // プロジェクトはヘッダーの切替で選ぶ。プロジェクトが変わったら詳細パネルを閉じる。
+  // プロジェクトはヘッダーの切替かツールバーの選択欄で選ぶ。プロジェクトが変わったら詳細パネルを閉じる。
   useEffect(() => setSelectedKey(null), [project.id]);
 
   const storyCount = filtered[0].graph.nodes.filter((n) => n.level === "story").length;
@@ -321,6 +324,7 @@ export function GanttView({
     <>
     <PageHeader title="ガントチャート" meta={`ストーリー ${storyCount} 件`} />
     <Toolbar>
+      {projectSelect}
       <Switch checked={showClosedStories} onChange={toggleShowClosedStories} label="クローズしたストーリーも表示" />
     </Toolbar>
     </>
