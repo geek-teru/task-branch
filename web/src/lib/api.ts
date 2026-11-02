@@ -75,7 +75,7 @@ export async function exportProject(projectId: string): Promise<unknown> {
 export async function listBacklogStories(projectId: string): Promise<BacklogStory[]> {
   const { data, error } = await supabase
     .from("tasks")
-    .select("id, title, description, status, activated_at, sort_order")
+    .select("id, title, description, status, activated_at, sort_order, start_date, due_date")
     .eq("project_id", projectId)
     .eq("level", "story")
     .order("sort_order", { ascending: true });

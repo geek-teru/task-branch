@@ -70,7 +70,7 @@ export interface StoryGroup {
 // A row of the backlog page (stories of a project, without the context document).
 export type BacklogStory = Pick<
   Task,
-  "id" | "title" | "description" | "status" | "activated_at" | "sort_order"
+  "id" | "title" | "description" | "status" | "activated_at" | "sort_order" | "start_date" | "due_date"
 >;
 
 // Latest saved version of a story's context document (story_context_revisions).
