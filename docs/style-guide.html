@@ -4,215 +4,353 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>task-branch スタイルガイド</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+/>
 <style>
-  /* このページ自身も task-branch の決まりで作っている（色・文字サイズ・余白はすべて下記の値） */
+  /* トークンは web/src/index.css の @theme と同じ値。アプリと食い違ったら index.css が正 */
+  :root {
+    --color-bg: #fcfcfc;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f8f8f8;
+    --color-border: #e6e6e6;
+    --color-border-strong: #d4d4d4;
+    --color-fg: #171717;
+    --color-fg-muted: #707070;
+    --color-brand: #1f7a4d;
+    --color-brand-hover: #18633e;
+    --color-accent: #3ecf8e;
+    --color-danger: #c4352b;
+
+    --color-status-todo-bg: #e8f3f7;
+    --color-status-todo-border: #5aa5ba;
+    --color-status-todo-fg: #1f5a69;
+    --color-status-in_progress-bg: #ebf1f8;
+    --color-status-in_progress-border: #3f78b5;
+    --color-status-in_progress-fg: #24507e;
+    --color-status-done-bg: #ecf4ee;
+    --color-status-done-border: #4a8a5c;
+    --color-status-done-fg: #2a5e39;
+    --color-status-closed-bg: #f3f3f3;
+    --color-status-closed-border: #9a9a9a;
+    --color-status-closed-fg: #616161;
+
+    --font-sans: Inter, "Noto Sans JP", system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Tailwind v4 の既定値（shadow-sm / md / lg） */
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  /* このページ自身も task-branch の決まりで作っている */
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
-      "Noto Sans JP", Meiryo, sans-serif;
-    color: #16191d;
-    background: #f4f5f6;
-    line-height: 1.7;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-fg);
+    background: var(--color-bg);
   }
-  .page { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
-  h1 { font-size: 22px; margin: 0 0 6px; }
-  h2 { font-size: 16px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e5e8eb; }
-  h3 { font-size: 14px; margin: 24px 0 8px; }
-  p, li { font-size: 13px; color: #3b4149; }
-  .lead { color: #5f6b7a; font-size: 13px; margin: 0 0 8px; }
-  code { background: #eff1f3; padding: 1px 4px; border-radius: 4px; font-size: 0.9em; }
+  .page { max-width: 1000px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 24px; font-weight: 500; margin: 0 0 6px; }
+  h2 { font-size: 15px; font-weight: 500; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-border); }
+  h3 { font-size: 14px; font-weight: 500; margin: 24px 0 8px; }
+  p, li { font-size: 13px; }
+  .lead { color: var(--color-fg-muted); font-size: 13px; margin: 0 0 8px; }
+  code { background: var(--color-surface-muted); padding: 1px 4px; border-radius: 4px; font-size: 0.9em; font-family: var(--font-mono); }
   pre {
-    background: #1f2933; color: #e5e8eb; border-radius: 6px; padding: 12px 14px;
+    background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: 6px; padding: 12px 14px;
     font-size: 12px; line-height: 1.6; overflow-x: auto;
   }
-  pre code { background: none; padding: 0; color: inherit; font-size: 12px; }
-  .card { background: #fff; border: 1px solid #e5e8eb; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
-  .toc { columns: 2; font-size: 13px; }
-  .toc a { color: #0972d3; text-decoration: none; }
+  pre code { background: none; padding: 0; font-size: 12px; }
+  .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+  .toc { margin: 0; padding-left: 0; list-style: none; font-size: 13px; }
+  .toc > li + li { margin-top: 6px; }
+  .toc ul { margin: 2px 0 0; padding-left: 20px; list-style: none; }
+  .toc li { font-size: 13px; }
+  .toc a { color: var(--color-brand); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
   table { border-collapse: collapse; width: 100%; }
-  th { text-align: left; padding: 6px 8px; font-size: 12px; font-weight: 600; color: #5f6b7a; border-bottom: 1px solid #e5e8eb; }
-  td { padding: 8px; border-bottom: 1px solid #eef0f2; vertical-align: top; font-size: 13px; }
-  td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  th { text-align: left; padding: 8px 12px; font-size: 12px; font-weight: 500; color: var(--color-fg-muted); background: var(--color-surface-muted); border-bottom: 1px solid var(--color-border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); vertical-align: top; font-size: 13px; }
+  td.mono, .mono { font-family: var(--font-mono); font-size: 12px; }
+  .muted { color: var(--color-fg-muted); }
 
   /* 色見本 */
-  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-  .swatch { border: 1px solid #e5e8eb; border-radius: 6px; overflow: hidden; background: #fff; }
-  .swatch .chip { height: 44px; }
-  .swatch .meta { padding: 6px 8px; font-size: 11px; color: #5f6b7a; }
-  .swatch .meta b { display: block; color: #1f2933; font-size: 12px; font-weight: 600; }
-  .swatch .meta .mono { color: #94a0ad; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .swatch { border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden; background: var(--color-surface); }
+  .swatch .chip { height: 44px; border-bottom: 1px solid var(--color-border); }
+  .swatch .meta { padding: 6px 8px; font-size: 11px; color: var(--color-fg-muted); }
+  .swatch .meta b { display: block; color: var(--color-fg); font-size: 12px; font-weight: 500; }
+  .swatch .meta .mono { font-size: 11px; }
 
   /* 見本置き場 */
-  .demo { background: #f7f8f9; border: 1px dashed #cbd2d9; border-radius: 6px; padding: 16px; margin: 8px 0 10px; }
-  .demo.dark { background: #1f2933; border-color: #3d4b57; }
+  .demo { background: var(--color-bg); border: 1px dashed var(--color-border-strong); border-radius: 6px; padding: 16px; margin: 8px 0 10px; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .note { font-size: 12px; color: #5f6b7a; margin: 4px 0 0; }
+  .note { font-size: 12px; color: var(--color-fg-muted); margin: 4px 0 0; }
 
-  /* --- アプリのコンポーネント（実物と同じ値） --- */
-  .btn-primary { background: #0972d3; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
-  .btn-secondary { background: #fff; color: #3b4149; border: 1px solid #cbd2d9; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-  .btn-panel { background: #fff; color: #3b4149; border: 1px solid #cbd2d9; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
-  .btn-danger { background: #fff; color: #a3210b; border: 1px solid #f0c2ba; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
-  .btn-start { background: #0972d3; color: #fff; border: 1px solid #0972d3; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
-  .btn-done { background: #1a7f37; color: #fff; border: 1px solid #1a7f37; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
-  .btn-confirm { background: #1f2933; color: #fff; border: 1px solid #1f2933; border-radius: 6px; padding: 7px 16px; font-size: 13px; cursor: pointer; }
-  .btn-quiet { background: none; border: none; padding: 4px 6px; font-size: 12px; color: #5f6b7a; cursor: pointer; text-decoration: underline; }
-  .btn-add { width: 18px; height: 18px; line-height: 16px; padding: 0; border: 1px solid #cbd2d9; border-radius: 4px; background: #fff; color: #0972d3; cursor: pointer; font-size: 13px; }
-
-  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid; white-space: nowrap; }
-  .badge-todo { background: #e2f4fb; color: #0b5e73; border-color: #33a9c9; }
-  .badge-doing { background: #eaf2fc; color: #0b4a8a; border-color: #0972d3; }
-  .badge-done { background: #eaf6ec; color: #12652b; border-color: #1a7f37; }
-  .badge-closed { background: #f4f5f6; color: #5f6b7a; border-color: #8d99a8; }
-  .pill { font-size: 11px; border-radius: 999px; padding: 2px 10px; border: 1px solid; white-space: nowrap; }
-  .pill-active { background: #e8f3ff; color: #0972d3; border-color: #b5d6f7; }
-  .pill-inactive { background: #f2f3f4; color: #5f6b7a; border-color: #d5dbdb; }
-  .id-badge {
-    background: none; border: none; border-bottom: 1px dotted #cbd2d9; padding: 0;
-    font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: #94a0ad; cursor: pointer; white-space: nowrap; line-height: 1.6;
+  /* --- アプリの部品（components/ui の Tailwind クラスと同じ値） --- */
+  /* Button: rounded-md border font-medium leading-none / sm: h-7 px-2.5 text-[13px] / md: h-8 px-3 text-sm */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0;
+    border: 1px solid; border-radius: 6px; font-family: var(--font-sans); font-weight: 500; line-height: 1;
+    white-space: nowrap; cursor: pointer; transition: background-color .15s, border-color .15s;
+    height: 32px; padding: 0 12px; font-size: 14px;
   }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 30%, transparent); }
+  .btn.sm { height: 28px; padding: 0 10px; font-size: 13px; gap: 4px; }
+  .btn.primary { background: var(--color-brand); color: #fff; border-color: var(--color-brand); }
+  .btn.primary:hover { background: var(--color-brand-hover); border-color: var(--color-brand-hover); }
+  .btn.default { background: var(--color-surface); color: var(--color-fg); border-color: var(--color-border-strong); }
+  .btn.default:hover { background: var(--color-surface-muted); }
+  .btn.ghost { background: transparent; color: var(--color-fg); border-color: transparent; }
+  .btn.ghost:hover { background: var(--color-surface-muted); }
+  .btn.danger { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
+  .btn.danger:hover { filter: brightness(.9); }
+  .btn:disabled { cursor: not-allowed; opacity: .5; }
+  /* IconButton: ghost・アイコンのみ・正方形（sm は 28px）・text-fg-muted、danger は text-danger */
+  .btn.icon { padding: 0; width: 28px; color: var(--color-fg-muted); }
+  .btn.icon:hover { color: var(--color-fg); }
+  .btn.icon.danger-icon, .btn.icon.danger-icon:hover { color: var(--color-danger); }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-  .app-card { background: #fff; border: 1px solid #e5e8eb; border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); max-width: 300px; }
-  .app-card .title { font-weight: 600; font-size: 15px; color: #0972d3; }
-  .app-card .desc { font-size: 12px; color: #5f6b7a; margin-top: 4px; }
-  .app-card .meta { font-size: 11px; color: #94a0ad; margin-top: 10px; }
+  /* Input / Select / Textarea: fieldClass（rounded-md border-border-strong text-[13px]）・h-8・px-2.5 */
+  .field {
+    width: 100%; height: 32px; margin: 0; padding: 0 10px; border: 1px solid var(--color-border-strong); border-radius: 6px;
+    background: var(--color-surface); font-family: var(--font-sans); font-size: 13px; color: var(--color-fg); outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field::placeholder { color: var(--color-fg-muted); }
+  .field:focus, .field.focus { border-color: var(--color-brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 20%, transparent); }
+  .field:disabled { cursor: not-allowed; background: var(--color-surface-muted); color: var(--color-fg-muted); }
+  textarea.field { height: auto; padding: 6px 10px; line-height: 1.625; resize: vertical; display: block; }
+  .field-wrap { position: relative; display: flex; align-items: center; }
+  .field-wrap .lead-icon { position: absolute; left: 8px; display: flex; color: var(--color-fg-muted); pointer-events: none; }
+  .field-wrap .lead-icon + .field { padding-left: 28px; }
+  .field-wrap .chev { position: absolute; right: 8px; display: flex; color: var(--color-fg-muted); pointer-events: none; }
+  .select { display: flex; align-items: center; padding-right: 28px; cursor: pointer; text-align: left; }
+  .field-label { display: block; font-size: 12px; color: var(--color-fg-muted); margin-bottom: 4px; }
 
-  .dialog-form { background: #fff; border-radius: 12px; padding: 24px; width: 420px; max-width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-  .dialog-confirm { background: #fff; border-radius: 8px; padding: 20px; width: 380px; max-width: 100%; box-shadow: 0 8px 28px rgba(31,41,51,0.25); }
-  .field-label { display: block; font-size: 12px; font-weight: 600; color: #5f6b7a; margin-bottom: 6px; }
-  .text-input { width: 100%; font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd2d9; }
+  /* Badge: h-5 rounded border px-1.5 text-[11px] leading-none */
+  .badge {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid; border-radius: 4px;
+    font-size: 11px; line-height: 1; white-space: nowrap;
+  }
+  .badge.neutral { background: var(--color-surface-muted); border-color: var(--color-border-strong); color: var(--color-fg-muted); }
+  .badge.brand { background: color-mix(in srgb, var(--color-accent) 10%, transparent); border-color: var(--color-accent); color: var(--color-brand); }
+  .badge.todo { background: var(--color-status-todo-bg); border-color: var(--color-status-todo-border); color: var(--color-status-todo-fg); }
+  .badge.in_progress { background: var(--color-status-in_progress-bg); border-color: var(--color-status-in_progress-border); color: var(--color-status-in_progress-fg); }
+  .badge.done { background: var(--color-status-done-bg); border-color: var(--color-status-done-border); color: var(--color-status-done-fg); }
+  .badge.closed { background: var(--color-status-closed-bg); border-color: var(--color-status-closed-border); color: var(--color-status-closed-fg); }
+  /* IdBadge: Badge と同じ形・等幅・border-border。コピー後は brand の見た目 */
+  .id-badge {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 6px; margin: 0; border: 1px solid var(--color-border); border-radius: 4px;
+    background: var(--color-surface-muted); font-family: var(--font-mono); font-size: 11px; line-height: 1; color: var(--color-fg-muted);
+    cursor: pointer; white-space: nowrap; transition: border-color .15s, color .15s;
+  }
+  .id-badge:hover { border-color: var(--color-border-strong); color: var(--color-fg); }
+  .id-badge.copied { font-family: var(--font-sans); border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-brand); }
 
-  .panel { width: 320px; background: #fff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden; }
-  .panel .head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #e5e8eb; background: #f7f9fa; font-size: 12px; font-weight: 600; color: #5f6b7a; }
+  /* Card: rounded-md border border-border bg-surface（影なし）。interactive は hover で border-border-strong */
+  .app-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; transition: border-color .15s; }
+  .app-card.interactive { cursor: pointer; }
+  .app-card.interactive:hover { border-color: var(--color-border-strong); }
+
+  /* Dialog: 背景幕 bg-black/40・z-50。本体 w-[400px] rounded-md border shadow-lg */
+  .backdrop { background: rgb(0 0 0 / 0.4); border-radius: 6px; padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: center; }
+  .dialog { width: 400px; max-width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; box-shadow: var(--shadow-lg); }
+  .dialog .d-title { padding: 12px 20px; border-bottom: 1px solid var(--color-border); font-size: 14px; font-weight: 500; }
+  .dialog .d-body { padding: 16px 20px; font-size: 14px; line-height: 1.625; }
+  .dialog .d-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--color-border); }
+
+  /* DropdownMenu / Select の開いたリスト: menuPanelClass と menuItemClass */
+  .menu { min-width: 160px; max-height: 320px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; box-shadow: var(--shadow-md); padding: 4px 0; }
+  .menu .item { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 12px; border: 0; background: transparent; font-family: var(--font-sans); font-size: 13px; color: var(--color-fg); text-align: left; cursor: pointer; }
+  .menu .item:hover, .menu .item.active { background: var(--color-surface-muted); }
+  .menu .item.danger { color: var(--color-danger); }
+  .menu .check { display: flex; width: 14px; flex-shrink: 0; color: var(--color-brand); }
+  .menu .sep { height: 1px; margin: 4px 0; background: var(--color-border); }
+
+  /* Switch / SegmentedControl */
+  .switch { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 4px; margin: 0; border: 0; background: transparent; font-family: var(--font-sans); font-size: 12px; color: var(--color-fg-muted); cursor: pointer; }
+  .switch:hover { color: var(--color-fg); }
+  .switch .track { position: relative; display: inline-flex; width: 28px; height: 16px; border-radius: 999px; background: var(--color-border-strong); transition: background-color .15s; }
+  .switch[aria-checked="true"] .track { background: var(--color-brand); }
+  .switch .knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 999px; background: #fff; box-shadow: var(--shadow-sm); transition: left .15s; }
+  .switch[aria-checked="true"] .knob { left: 14px; }
+  .seg { display: inline-flex; align-items: center; height: 32px; padding: 2px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--color-surface); }
+  .seg button { display: flex; align-items: center; justify-content: center; height: 26px; margin: 0; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; font-family: var(--font-sans); font-size: 12px; color: var(--color-fg-muted); cursor: pointer; }
+  .seg button:hover { color: var(--color-fg); }
+  .seg button[aria-pressed="true"] { background: var(--color-surface-muted); color: var(--color-fg); box-shadow: inset 0 0 0 1px var(--color-border); }
+
+  /* 詳細パネル（components/DetailPanel.tsx） */
+  .panel { width: 320px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden; }
+  .panel .head { padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+  .panel .kind { font-size: 12px; color: var(--color-fg-muted); }
+  .panel .name { margin-top: 4px; font-size: 14px; font-weight: 500; }
   .panel .body { padding: 16px; }
-  .panel .name { font-size: 15px; font-weight: 600; color: #1f2933; margin-bottom: 14px; }
-  .panel .f-label { font-size: 11px; font-weight: 600; color: #94a0ad; margin-bottom: 3px; }
-  .panel .f-value { font-size: 13px; color: #1f2933; margin-bottom: 12px; }
+  .panel .f-label { font-size: 12px; color: var(--color-fg-muted); margin-bottom: 4px; }
+  .panel .f-value { font-size: 13px; margin-bottom: 12px; }
+  .panel .foot { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-top: 1px solid var(--color-border); }
 
-  .menu { min-width: 160px; background: #fff; border: 1px solid #cbd2d9; border-radius: 6px; box-shadow: 0 4px 12px rgba(31,41,51,0.18); padding: 4px; }
-  .menu button { display: block; width: 100%; text-align: left; padding: 6px 12px; border: none; border-radius: 4px; background: transparent; color: #1f2933; font-size: 12px; cursor: pointer; }
-  .menu button.sep { border-top: 1px solid #e5e8eb; margin-top: 4px; padding-top: 10px; }
-  .menu button.danger { color: #a3210b; }
-
-  .nav { width: 220px; background: #1f2933; color: #e5e8eb; border-radius: 6px; overflow: hidden; }
-  .nav .brand { padding: 14px 16px; font-weight: 700; font-size: 16px; border-bottom: 1px solid #2f3b46; }
-  .nav .item { padding: 9px 10px; margin: 2px 8px; border-radius: 6px; font-size: 13px; color: #cbd2d9; }
-  .nav .item.active { background: #0972d3; color: #fff; font-weight: 600; }
-
-  .bar { height: 16px; border-radius: 3px; }
+  /* サイドナビ（components/Sidebar.tsx） */
+  .nav { display: flex; flex-direction: column; width: 220px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden; }
+  .nav .items { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+  .nav .item { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 6px; font-size: 14px; color: var(--color-fg-muted); cursor: pointer; }
+  .nav .item:hover { background: var(--color-surface-muted); color: var(--color-fg); }
+  .nav .item.active { background: #ededed; color: var(--color-fg); font-weight: 500; }
+  .nav .foot { display: flex; justify-content: flex-end; padding: 8px; border-top: 1px solid var(--color-border); }
+  .nav.collapsed { width: 52px; }
+  .nav.collapsed .item { justify-content: center; padding: 0; }
+  .nav.collapsed .foot { justify-content: center; }
+  .nav svg { width: 16px; height: 16px; flex-shrink: 0; }
 
   /* 文字の大きさ・太さの表（セル結合あり） */
-  .type-table td, .type-table th { border: 1px solid #e5e8eb; }
-  .type-table td.cat { font-weight: 600; background: #f7f9fa; }
-  .type-table td.sub-cat { background: #fbfbfc; }
-  .type-table .sub { font-size: 11px; font-weight: 400; color: #5f6b7a; }
-  .type-table .ex { color: #94a0ad; }
-  .type-table .ng { color: #a3210b; }
+  .type-table td, .type-table th { border: 1px solid var(--color-border); }
+  .type-table td.cat { font-weight: 500; background: var(--color-surface-muted); }
+  .type-table td.sub-cat { background: var(--color-bg); }
+  .type-table .sub { font-size: 11px; font-weight: 400; color: var(--color-fg-muted); }
+  .type-table .ex { color: var(--color-fg-muted); }
+  .type-table .ng { color: var(--color-danger); }
 </style>
 </head>
 <body>
+<!-- 見本で使うアイコン（web/src/components/Icons.tsx と同じ形） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-add" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/><path d="M9 4l3 3"/></symbol>
+  <symbol id="i-delete" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M6 4V2.5h4V4"/><path d="M3.8 4l.7 9.5h7l.7-9.5"/><path d="M6.5 6.5v4.5M9.5 6.5v4.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-more" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h.01M8 8h.01M8 13h.01" stroke-width="2.2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></symbol>
+  <symbol id="i-project" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5c0-.6.4-1 1-1h3.2l1.5 1.5H13c.6 0 1 .4 1 1v6.5c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z"/></symbol>
+  <symbol id="i-backlog" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8M6 8h8M6 12h8"/><path d="M2.5 4h.01M2.5 8h.01M2.5 12h.01" stroke-width="2"/></symbol>
+  <symbol id="i-gantt" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2v12h12"/><path d="M4.5 5h4M6.5 8h5M9 11h4" stroke-width="2"/></symbol>
+  <symbol id="i-kanban" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="3.2" height="11" rx="0.8"/><rect x="6.4" y="2.5" width="3.2" height="11" rx="0.8"/><rect x="10.8" y="2.5" width="3.2" height="11" rx="0.8"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="0.8"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="0.8"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="0.8"/><rect x="9" y="9" width="4.5" height="4.5" rx="0.8"/></symbol>
+  <symbol id="i-list" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></symbol>
+</svg>
 <div class="page">
 
 <h1>task-branch スタイルガイド</h1>
 <p class="lead">
-  画面の見た目をそろえるための決まり。値は <code>web/src</code> の実装から起こしたもので、ここが正。
-  新しい画面を作るとき、既存の値にないものを足す前にこのページを見る。
+  画面の見た目をそろえるための決まり。値は <code>web/src/index.css</code> の <code>@theme</code> と
+  <code>web/src/components/ui</code> の実装から起こしたもので、見本も実物と同じ値で描いている。
+  新しい画面を作るとき、既存のトークン・部品にないものを足す前にこのページを見る。
 </p>
 
 <div class="card">
-  <div class="toc">
-    <div><a href="#basis">1. 基本方針</a></div>
-    <div><a href="#color">2. 色</a></div>
-    <div><a href="#type">3. タイポグラフィ</a></div>
-    <div><a href="#space">4. 余白・角丸・影</a></div>
-    <div><a href="#parts">5. コンポーネント</a></div>
-    <div><a href="#rules">6. 書き方の決まり</a></div>
-  </div>
+  <ul class="toc">
+    <li><a href="#basis">1. 基本方針</a>
+    </li>
+    <li><a href="#color">2. 色</a>
+      <ul>
+        <li><a href="#color-1">2.1 文字・背景・枠線</a></li>
+        <li><a href="#color-2">2.2 ブランド・アクセント・危険</a></li>
+        <li><a href="#color-3">2.3 ステータス</a></li>
+      </ul>
+    </li>
+    <li><a href="#type">3. タイポグラフィ</a>
+      <ul>
+        <li><a href="#type-1">3.1 文字の大きさ・太さの決まり</a></li>
+        <li><a href="#type-2">3.2 要素ごとの大きさ・太さ</a></li>
+      </ul>
+    </li>
+    <li><a href="#space">4. 余白・角丸・影</a>
+      <ul>
+        <li><a href="#space-1">4.1 余白・高さ</a></li>
+        <li><a href="#space-2">4.2 角丸</a></li>
+        <li><a href="#space-3">4.3 影・重なり</a></li>
+      </ul>
+    </li>
+    <li><a href="#parts">5. コンポーネント</a>
+      <ul>
+        <li><a href="#parts-1">5.1 Button / IconButton</a></li>
+        <li><a href="#parts-2">5.2 Input / Select / Textarea</a></li>
+        <li><a href="#parts-3">5.3 アイコン・ボタン・バッジの使い分け</a></li>
+        <li><a href="#parts-4">5.4 検索・絞り込み・並び替え</a></li>
+        <li><a href="#parts-5">5.5 Badge / IdBadge</a></li>
+        <li><a href="#parts-6">5.6 Card</a></li>
+        <li><a href="#parts-7">5.7 表</a></li>
+        <li><a href="#parts-8">5.8 詳細パネル</a></li>
+        <li><a href="#parts-9">5.9 Dialog / ConfirmDialog</a></li>
+        <li><a href="#parts-10">5.10 ドロップダウン</a></li>
+        <li><a href="#parts-11">5.11 ツールチップ</a></li>
+        <li><a href="#parts-12">5.12 サイドナビ</a></li>
+        <li><a href="#parts-13">5.13 列幅のドラッグハンドル</a></li>
+      </ul>
+    </li>
+    <li><a href="#rules">6. 書き方の決まり</a>
+    </li>
+  </ul>
 </div>
 
 <h2 id="basis">1. 基本方針</h2>
 <ul>
-  <li>CSS フレームワークは使わない。スタイルは React のインライン <code>style</code>（<code>CSSProperties</code> オブジェクト）で書く。</li>
-  <li>配色は落ち着いた業務画面寄り（AWS コンソール風）。彩度の高い色はアクセント（青）とステータスだけに使う。</li>
-  <li>文字は小さめ（本文 13px）。情報量を詰めても読めるよう、色の濃淡で階層を出す。</li>
-  <li>UI の文言は日本語。ボタンは何が起きるかが分かる動詞にする（「変更」「削除」「移動する」）。</li>
-  <li>全体の背景は <code>#f4f5f6</code>、コンテンツは白いカードに載せる。</li>
+  <li>参考は Supabase のダッシュボード。ライトテーマのみ（ダークモードは別ストーリー。トークンを CSS 変数にしてあるので値の差し替えで足せる）。</li>
+  <li>スタイルは Tailwind CSS v4 の <code>className</code> で書く。色・フォントは <code>index.css</code> の <code>@theme</code> のトークン（<code>bg-surface</code>、<code>text-fg-muted</code> など）を使い、色コードを直書きしない。</li>
+  <li>ボタン・入力欄・カード・バッジ・ダイアログ・メニューは <code>components/ui</code> の部品で描く。同じ見た目を画面ごとに書き直さない。</li>
+  <li>骨格は 白いヘッダー（48px）＋明るいサイドナビ＋本文。本文の背景は <code>bg</code>、カード・表・パネルは白い <code>surface</code> に 1px の <code>border</code>。影はメニュー・ツールチップ・ダイアログだけに付け、カードには付けない。</li>
+  <li>色で意味を持たせるのはブランドの緑（主操作・選択中）、danger の赤（削除・エラー）、ステータスの4色だけ。</li>
+  <li>UI の文言は日本語。ボタンは何が起きるかが分かる動詞にする（「変更」「削除」「移動する」）。追加ボタンだけは英語の「New {object}」。</li>
 </ul>
 
 <h2 id="color">2. 色</h2>
+<p class="note">名前は <code>@theme</code> の <code>--color-*</code>。Tailwind では <code>bg-{名前}</code> <code>text-{名前}</code> <code>border-{名前}</code> で使い、<code>/30</code> のように付けると透明度を変えられる（例: <code>ring-brand/30</code>）。</p>
 
-<h3>テキスト</h3>
+<h3 id="color-1">文字・背景・枠線</h3>
 <div class="swatches">
-  <div class="swatch"><div class="chip" style="background:#16191d"></div><div class="meta"><b>本文（body）</b><span class="mono">#16191d</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#1f2933"></div><div class="meta"><b>見出し・強い文字</b><span class="mono">#1f2933</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#3b4149"></div><div class="meta"><b>通常の文字</b><span class="mono">#3b4149</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#5f6b7a"></div><div class="meta"><b>補助・ラベル</b><span class="mono">#5f6b7a</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#94a0ad"></div><div class="meta"><b>弱い補助・空値</b><span class="mono">#94a0ad</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-fg)"></div><div class="meta"><b>fg — 文字</b><span class="mono">#171717</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-fg-muted)"></div><div class="meta"><b>fg-muted — 補助の文字・ラベル・アイコン</b><span class="mono">#707070</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-bg)"></div><div class="meta"><b>bg — ページ・サイドナビの地</b><span class="mono">#fcfcfc</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-surface)"></div><div class="meta"><b>surface — ヘッダー・カード・表・パネル</b><span class="mono">#ffffff</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-surface-muted)"></div><div class="meta"><b>surface-muted — hover・表の見出し行</b><span class="mono">#f8f8f8</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-border)"></div><div class="meta"><b>border — 枠線・区切り（標準）</b><span class="mono">#e6e6e6</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-border-strong)"></div><div class="meta"><b>border-strong — 入力欄・default ボタン・hover の枠</b><span class="mono">#d4d4d4</span></div></div>
+  <div class="swatch"><div class="chip" style="background:#ededed"></div><div class="meta"><b>サイドナビの選択中（トークン外）</b><span class="mono">#ededed</span></div></div>
 </div>
 
-<h3>背景・枠線</h3>
+<h3 id="color-2">ブランド・アクセント・危険</h3>
 <div class="swatches">
-  <div class="swatch"><div class="chip" style="background:#f4f5f6"></div><div class="meta"><b>ページ背景</b><span class="mono">#f4f5f6</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#ffffff;border-bottom:1px solid #e5e8eb"></div><div class="meta"><b>カード・表の地</b><span class="mono">#ffffff</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#f7f9fa"></div><div class="meta"><b>ヘッダ行・パネル頭</b><span class="mono">#f7f9fa</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#eef1f3"></div><div class="meta"><b>選択中・行の強調</b><span class="mono">#eef1f3</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#e5e8eb"></div><div class="meta"><b>枠線（標準）</b><span class="mono">#e5e8eb</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#cbd2d9"></div><div class="meta"><b>枠線（強・入力/ボタン）</b><span class="mono">#cbd2d9</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#eef0f2"></div><div class="meta"><b>表の行区切り</b><span class="mono">#eef0f2</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-brand)"></div><div class="meta"><b>brand — primary ボタン・フォーカス・選択のチェック・今日の線</b><span class="mono">#1f7a4d（白文字で約 5.3:1）</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-brand-hover)"></div><div class="meta"><b>brand-hover — primary の hover</b><span class="mono">#18633e</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-accent)"></div><div class="meta"><b>accent — brand バッジの枠（地は 10%）</b><span class="mono">#3ecf8e</span></div></div>
+  <div class="swatch"><div class="chip" style="background:var(--color-danger)"></div><div class="meta"><b>danger — 削除・エラー（帯は地 10%・枠 30%）</b><span class="mono">#c4352b</span></div></div>
 </div>
 
-<h3>アクセント（青）</h3>
-<div class="swatches">
-  <div class="swatch"><div class="chip" style="background:#0972d3"></div><div class="meta"><b>主ボタン・リンク・選択</b><span class="mono">#0972d3</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#eaf2fc"></div><div class="meta"><b>青の地（ドロップ先など）</b><span class="mono">#eaf2fc</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#e8f3ff"></div><div class="meta"><b>Active バッジの地</b><span class="mono">#e8f3ff</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#b5d6f7"></div><div class="meta"><b>Active バッジの枠</b><span class="mono">#b5d6f7</span></div></div>
-</div>
-
-<h3>ステータス（<code>lib/style.ts</code> の <code>STATUS_COLOR</code>）</h3>
+<h3 id="color-3">ステータス（DESIGN.md 5.2。<code>lib/style.ts</code> の <code>STATUS_CLASS</code> / <code>STATUS_COLOR</code>）</h3>
 <table>
   <thead><tr><th>状態</th><th>見本</th><th>bg</th><th>border</th><th>fg</th></tr></thead>
   <tbody>
-    <tr><td>未着手 todo</td><td><span class="badge badge-todo">未着手</span></td><td class="mono">#e2f4fb</td><td class="mono">#33a9c9</td><td class="mono">#0b5e73</td></tr>
-    <tr><td>進行中 in_progress</td><td><span class="badge badge-doing">進行中</span></td><td class="mono">#eaf2fc</td><td class="mono">#0972d3</td><td class="mono">#0b4a8a</td></tr>
-    <tr><td>完了 done</td><td><span class="badge badge-done">完了</span></td><td class="mono">#eaf6ec</td><td class="mono">#1a7f37</td><td class="mono">#12652b</td></tr>
-    <tr><td>クローズ closed</td><td><span class="badge badge-closed">クローズ</span></td><td class="mono">#f4f5f6</td><td class="mono">#8d99a8</td><td class="mono">#5f6b7a</td></tr>
+    <tr><td>未着手 todo</td><td><span class="badge todo">未着手</span></td><td class="mono">#e8f3f7</td><td class="mono">#5aa5ba</td><td class="mono">#1f5a69</td></tr>
+    <tr><td>進行中 in_progress</td><td><span class="badge in_progress">進行中</span></td><td class="mono">#ebf1f8</td><td class="mono">#3f78b5</td><td class="mono">#24507e</td></tr>
+    <tr><td>完了 done</td><td><span class="badge done">完了</span></td><td class="mono">#ecf4ee</td><td class="mono">#4a8a5c</td><td class="mono">#2a5e39</td></tr>
+    <tr><td>クローズ closed</td><td><span class="badge closed">クローズ</span></td><td class="mono">#f3f3f3</td><td class="mono">#9a9a9a</td><td class="mono">#616161</td></tr>
   </tbody>
 </table>
-<p class="note">クローズはカンバンの列にしない。ツールバーの「クローズしたタスクも表示」を入れたときだけ、完了列の下に不透明度 0.6 のカードと右上の小さなバッジ（同じ色）で出す。</p>
-<p class="note">ガントのバーとカンバンのカードも同じ色。バーは <code>border</code> 色で塗り、カードは左端 3px の線に使う。</p>
-
-<h3>危険・注意</h3>
-<div class="swatches">
-  <div class="swatch"><div class="chip" style="background:#a3210b"></div><div class="meta"><b>削除の文字</b><span class="mono">#a3210b</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#f0c2ba"></div><div class="meta"><b>削除ボタンの枠</b><span class="mono">#f0c2ba</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#fdeceb"></div><div class="meta"><b>エラーバーの地</b><span class="mono">#fdeceb</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#d13212"></div><div class="meta"><b>今日の線（ガント）</b><span class="mono">#d13212</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#1a7f37"></div><div class="meta"><b>完了にする</b><span class="mono">#1a7f37</span></div></div>
-</div>
-
-<h3>サイドナビ（暗い面）</h3>
-<div class="swatches">
-  <div class="swatch"><div class="chip" style="background:#1f2933"></div><div class="meta"><b>地</b><span class="mono">#1f2933</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#2f3b46"></div><div class="meta"><b>区切り線</b><span class="mono">#2f3b46</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#3d4b57"></div><div class="meta"><b>ボタンの枠</b><span class="mono">#3d4b57</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#cbd2d9"></div><div class="meta"><b>項目の文字</b><span class="mono">#cbd2d9</span></div></div>
-</div>
+<p class="note">トークン名は <code>status-{状態}-bg / -border / -fg</code>。クラス名は <code>STATUS_CLASS</code> に全文で書いてあるので（Tailwind がソースから拾うため）、画面で組み立てない。</p>
+<p class="note">ガントのバーとカンバンの列見出しの丸は、bg が淡いので <code>border</code> の色で塗る。クローズしたカードは不透明度 0.6。</p>
 
 <h2 id="type">3. タイポグラフィ</h2>
 <pre><code>font-family: Inter, "Noto Sans JP", sans-serif;  /* web/src/index.css の --font-sans */</code></pre>
 <p class="note">ID などの固定幅は <code>ui-monospace, SFMono-Regular, Menlo, monospace</code>（<code>--font-mono</code>）。</p>
 
-<h3>文字の大きさ・太さの決まり</h3>
+<h3 id="type-1">文字の大きさ・太さの決まり</h3>
 <ul>
   <li>太さは 400（通常）と 500（<code>font-medium</code>）の2つだけ。600 以上（<code>font-semibold</code> / <code>font-bold</code>）は使わない。</li>
   <li>本文の既定は 14px（<code>text-sm</code>）。補助の文字は 13px 以下で <code>text-fg-muted</code>。</li>
   <li>同じ小分類の要素は同じ大きさ・太さにそろえる。下の表にない要素を足すときは、まず既存の小分類に当てはめる。</li>
 </ul>
 
-<h3>要素ごとの大きさ・太さ</h3>
+<h3 id="type-2">要素ごとの大きさ・太さ</h3>
 <p class="note">「6fa86f5e: 画面の文字サイズ・太さの統一」で整理した一覧。<span class="ng">※</span> はルールからずれていて未修正のもの、<span class="ex">（例外）</span> は決定済みの例外。</p>
 <table class="type-table">
   <colgroup><col style="width:14%"><col style="width:18%"><col><col style="width:13%"><col style="width:11%"></colgroup>
@@ -330,74 +468,116 @@
 </table>
 
 <h2 id="space">4. 余白・角丸・影</h2>
+<p class="note">Tailwind の既定のスケール（1 = 4px）を使う。下の値にない余白を足すときは、まず近い既存の値に寄せる。</p>
 
-<h3>余白</h3>
+<h3 id="space-1">余白・高さ</h3>
 <table>
-  <thead><tr><th>値</th><th>使うところ</th></tr></thead>
+  <thead><tr><th>クラス（値）</th><th>使うところ</th></tr></thead>
   <tbody>
-    <tr><td class="mono">24px</td><td>ページの外周、フォームモーダルの内側</td></tr>
-    <tr><td class="mono">16px</td><td>カードの内側、パネル本体</td></tr>
-    <tr><td class="mono">12px</td><td>グリッドやボタン列の間隔（カード間は 12px、ボタン間は 6–8px）</td></tr>
-    <tr><td class="mono">8px 12px</td><td>ツールバー、表の見出し行</td></tr>
-    <tr><td class="mono">7px 14px</td><td>主ボタン</td></tr>
-    <tr><td class="mono">5px 10px</td><td>副ボタン（カード上・ツールバー）</td></tr>
-    <tr><td class="mono">2px 8px / 2px 10px</td><td>バッジ・ピル</td></tr>
+    <tr><td class="mono">px-6 py-8（24px / 32px）</td><td>見出しのある本文の画面（プロジェクト一覧・詳細）の外周。本文の最大幅は <code>max-w-[1200px]</code></td></tr>
+    <tr><td class="mono">p-4（16px）</td><td>カードの内側、詳細パネルのヘッダー（<code>px-4 py-3</code>）と本体</td></tr>
+    <tr><td class="mono">gap-4（16px）</td><td>カードのグリッドの間隔（<code>repeat(auto-fill, minmax(300px, 1fr))</code>）</td></tr>
+    <tr><td class="mono">px-5 py-4 / px-5 py-3</td><td>Dialog の本文 / タイトル・フッター</td></tr>
+    <tr><td class="mono">px-3 py-2（12px / 8px）</td><td>ツールバー、表の見出し・セル</td></tr>
+    <tr><td class="mono">gap-2（8px）</td><td>ボタン・ツールバーの部品の並び、Dialog のフッター</td></tr>
+    <tr><td class="mono">h-12（48px）</td><td>グローバルヘッダー（<code>HEADER_H</code>）</td></tr>
+    <tr><td class="mono">h-8（32px）</td><td>md の Button、Input・Select・SearchInput・Switch・SegmentedControl、サイドナビの項目。ツールバーに並ぶものはこの高さにそろえる</td></tr>
+    <tr><td class="mono">h-7（28px）</td><td>sm の Button、IconButton、ヘッダーのアバター</td></tr>
+    <tr><td class="mono">h-5（20px）</td><td>Badge・IdBadge、ガントの行のボタン</td></tr>
   </tbody>
 </table>
 
-<h3>角丸</h3>
+<h3 id="space-2">角丸</h3>
 <div class="demo row">
-  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:4px"></div>
-  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:6px"></div>
-  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:10px"></div>
-  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:12px"></div>
-  <div style="width:86px;height:44px;background:#fff;border:1px solid #cbd2d9;border-radius:999px"></div>
+  <div style="width:86px;height:44px;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:4px"></div>
+  <div style="width:86px;height:44px;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:6px"></div>
+  <div style="width:86px;height:44px;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:999px"></div>
 </div>
 <p class="note">
-  <code>4px</code> メニュー項目・小さい四角ボタン／<code>6px</code> ボタン・入力・確認モーダル（標準）／
-  <code>10px</code> カード・パネル・ステータスバッジ／<code>12px</code> フォームモーダル／<code>999px</code> 状態のピル。
+  <code>rounded</code>（4px）バッジ・ID・SegmentedControl の中のボタン・ガントのバー／
+  <code>rounded-md</code>（6px）ボタン・入力欄・カード・表の枠・パネル・メニュー・ダイアログ（標準）／
+  <code>rounded-full</code> アバター・Switch。これ以外の角丸は使わない。
 </p>
 
-<h3>影</h3>
+<h3 id="space-3">影・重なり</h3>
 <table>
-  <thead><tr><th>値</th><th>使うところ</th></tr></thead>
+  <thead><tr><th>クラス</th><th>値（Tailwind v4 の既定）</th><th>使うところ</th></tr></thead>
   <tbody>
-    <tr><td class="mono">0 1px 2px rgba(0,0,0,0.05)</td><td>カード（ほんのり浮かせる）</td></tr>
-    <tr><td class="mono">0 4px 12px rgba(31,41,51,0.18)</td><td>ドロップダウンメニュー</td></tr>
-    <tr><td class="mono">0 8px 28px rgba(31,41,51,0.25)</td><td>確認モーダル</td></tr>
-    <tr><td class="mono">0 8px 32px rgba(0,0,0,0.2)</td><td>フォームモーダル</td></tr>
+    <tr><td class="mono">（なし）</td><td class="mono">—</td><td>カード・表・パネル。浮かせず 1px の <code>border</code> で区切る</td></tr>
+    <tr><td class="mono">shadow-sm</td><td class="mono">0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1)</td><td>Switch のつまみ</td></tr>
+    <tr><td class="mono">shadow-md</td><td class="mono">0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1)</td><td>ドロップダウンの開いたリスト、ツールチップ</td></tr>
+    <tr><td class="mono">shadow-lg</td><td class="mono">0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1)</td><td>Dialog</td></tr>
   </tbody>
 </table>
-<p class="note">モーダルの背景幕は <code>rgba(31,41,51,0.4)</code>（確認モーダルは <code>0.35</code>）。<code>z-index</code> はメニュー 20／確認 50／フォーム 100。</p>
+<p class="note">フォーカスは影ではなく <code>ring-2</code>: ボタン・カードは <code>ring-brand/30</code>、入力欄は枠を <code>border-brand</code> にして <code>ring-brand/20</code>。<code>z-index</code> はリスト 40／Dialog 50。Dialog の背景幕は <code>bg-black/40</code>。</p>
 
 <h2 id="parts">5. コンポーネント</h2>
+<p>部品は <code>web/src/components/ui/</code> にある。画面はこれを使い、同じ見た目を <code>className</code> で書き直さない。見本は部品のクラスと同じ値で描いている（hover・フォーカスも動く）。</p>
 
-<h3>ボタン</h3>
-<div class="demo row">
-  <button class="btn-primary">新規プロジェクト</button>
-  <button class="btn-secondary">変更</button>
-  <button class="btn-panel">変更</button>
-  <button class="btn-start">進行中にする</button>
-  <button class="btn-done">完了にする</button>
-  <button class="btn-danger">削除</button>
-  <button class="btn-quiet">アーカイブする</button>
-  <button class="btn-add">+</button>
+<h3 id="parts-1">Button / IconButton（<code>ui/Button.tsx</code>）</h3>
+<div class="demo">
+  <div class="row">
+    <button class="btn primary"><svg><use href="#i-add"/></svg>New Project</button>
+    <button class="btn default">キャンセル</button>
+    <button class="btn ghost">New Group</button>
+    <button class="btn danger">削除する</button>
+    <button class="btn primary" disabled>保存</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn primary sm"><svg><use href="#i-add"/></svg>New Story</button>
+    <button class="btn default sm">キャンセル</button>
+    <button class="btn ghost sm">New Group</button>
+    <button class="btn danger sm">削除する</button>
+    <span style="width:12px"></span>
+    <button class="btn ghost sm icon" aria-label="変更" title="変更"><svg><use href="#i-edit"/></svg></button>
+    <button class="btn ghost sm icon danger-icon" aria-label="削除" title="削除"><svg><use href="#i-delete"/></svg></button>
+    <button class="btn ghost sm icon" aria-label="閉じる" title="閉じる"><svg><use href="#i-close"/></svg></button>
+    <button class="btn ghost sm icon" aria-label="タスクを追加" title="タスクを追加"><svg><use href="#i-add"/></svg></button>
+  </div>
 </div>
 <table>
-  <thead><tr><th>種類</th><th>見た目</th><th>使うところ</th></tr></thead>
+  <thead><tr><th>props</th><th>見た目</th><th>使うところ</th></tr></thead>
   <tbody>
-    <tr><td>プライマリ</td><td class="mono">#0972d3 / 白文字 / 13px / 7px 14px / r6</td><td>その画面の主役（新規作成、追加、保存）。1画面に1つ</td></tr>
-    <tr><td>セカンダリ</td><td class="mono">白 / #3b4149 / 12px / 5px 10px / 枠 #cbd2d9</td><td>カードやツールバーの操作</td></tr>
-    <tr><td>パネル</td><td class="mono">白 / #3b4149 / 13px / 6px 14px</td><td>詳細パネルの下部（変更・削除）</td></tr>
-    <tr><td>進行中にする</td><td class="mono">#0972d3</td><td>着手。パネル下部で横いっぱい</td></tr>
-    <tr><td>完了にする</td><td class="mono">#1a7f37</td><td>完了。同上</td></tr>
-    <tr><td>削除</td><td class="mono">文字 #a3210b / 枠 #f0c2ba</td><td>破壊的操作。右端に寄せる（<code>marginLeft: auto</code>）</td></tr>
-    <tr><td>控えめ</td><td class="mono">枠なし / 下線 / #5f6b7a / 12px</td><td>本筋でない操作（アーカイブ、区切り線の下）</td></tr>
-    <tr><td>小さい四角</td><td class="mono">18×18 / r4 / #0972d3</td><td>行の中の「追加（＋）」</td></tr>
+    <tr><td class="mono">variant="primary"</td><td>地・枠 <code>brand</code>、白文字。hover で <code>brand-hover</code></td><td>その画面の主役（New {object}、ダイアログの追加・保存・確定）。1画面・1ダイアログに1つ</td></tr>
+    <tr><td class="mono">variant="default"（既定）</td><td>地 <code>surface</code>・枠 <code>border-strong</code>・文字 <code>fg</code>。hover で <code>surface-muted</code></td><td>キャンセル、ほかの操作</td></tr>
+    <tr><td class="mono">variant="ghost"</td><td>地・枠なし。hover で <code>surface-muted</code></td><td>行の中・ツールバーの控えめな操作、IconButton</td></tr>
+    <tr><td class="mono">variant="danger"</td><td>地・枠 <code>danger</code>、白文字。hover で少し暗く</td><td>削除の確定（<code>ConfirmDialog danger</code>）</td></tr>
+    <tr><td class="mono">size="md"（既定）/ "sm"</td><td>md: <code>h-8 px-3</code> 14px ／ sm: <code>h-7 px-2.5</code> 13px。どちらも 500・<code>rounded-md</code></td><td>sm はコメント・ヘッダーのメニュー・行の中など密な場所。ふだんは md</td></tr>
+    <tr><td class="mono">icon</td><td>ラベルの前にアイコン（16px）</td><td><code>icon={&lt;AddIcon /&gt;}</code> など</td></tr>
+    <tr><td class="mono">IconButton label danger</td><td>ghost・正方形（sm 28px / md 32px）・<code>text-fg-muted</code>、hover で <code>fg</code>。<code>danger</code> は <code>text-danger</code></td><td>変更・削除・閉じる・行の中の追加。<code>label</code> がツールチップと <code>aria-label</code> に入る</td></tr>
   </tbody>
 </table>
+<p class="note">無効は <code>disabled</code> で不透明度 0.5・<code>cursor: not-allowed</code>。フォーカスは <code>focus-visible:ring-2 ring-brand/30</code>。</p>
+<pre><code>&lt;Button variant="primary" icon={&lt;AddIcon /&gt;} onClick={onAdd}&gt;New Story&lt;/Button&gt;
+&lt;Button size="sm" onClick={onCancel}&gt;キャンセル&lt;/Button&gt;
+&lt;IconButton label="削除" danger onClick={onDelete}&gt;&lt;DeleteIcon /&gt;&lt;/IconButton&gt;</code></pre>
 
-<h3>アイコン・ボタン・バッジの使い分け</h3>
+<h3 id="parts-2">Input / Select / Textarea（<code>ui/Input.tsx</code>・<code>ui/Select.tsx</code>・<code>ui/Textarea.tsx</code>）</h3>
+<div class="demo">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+    <div><label class="field-label">プロジェクト名</label><input class="field" placeholder="task-branch" /></div>
+    <div><label class="field-label">フォーカス中</label><input class="field focus" value="task-branch" /></div>
+    <div><label class="field-label">無効</label><input class="field" value="変更できない値" disabled /></div>
+    <div><label class="field-label">検索（icon 付き）</label><div class="field-wrap"><span class="lead-icon"><svg width="14" height="14"><use href="#i-search"/></svg></span><input class="field" placeholder="ストーリーを検索" /></div></div>
+    <div><label class="field-label">ステータス（Select）</label><div class="field-wrap"><button type="button" class="field select">進行中</button><span class="chev"><svg width="12" height="12"><use href="#i-chev"/></svg></span></div></div>
+    <div><label class="field-label">未選択の Select</label><div class="field-wrap"><button type="button" class="field select muted">選択してください</button><span class="chev"><svg width="12" height="12"><use href="#i-chev"/></svg></span></div></div>
+  </div>
+  <div style="margin-top:12px"><label class="field-label">説明（Textarea）</label><textarea class="field" rows="3">Markdown で書ける。</textarea></div>
+</div>
+<table>
+  <thead><tr><th>部品</th><th>見た目</th><th>使い方</th></tr></thead>
+  <tbody>
+    <tr><td>共通（<code>fieldClass</code>）</td><td><code>rounded-md</code>・枠 <code>border-strong</code>・地 <code>surface</code>・13px。placeholder は <code>fg-muted</code>。フォーカスで枠 <code>brand</code>＋<code>ring-brand/20</code>。無効は地 <code>surface-muted</code></td><td>3つとも同じ見た目。自前の <code>&lt;input&gt;</code> に同じクラスを書かず、部品を使う</td></tr>
+    <tr><td><code>Input</code></td><td><code>h-8 px-2.5</code>。<code>icon</code> を渡すと左にアイコン（<code>pl-7</code>）</td><td><code>className</code> は外側の枠に付くので、幅は <code>className="w-60"</code> のように渡す</td></tr>
+    <tr><td><code>Select</code></td><td>閉じた状態は Input と同じ（右に <code>ChevronDownIcon</code> 12px）。開いたリストは DropdownMenu と同じ</td><td><code>value</code> / <code>onChange</code> / <code>options</code>（<code>{ value, label }</code>）。未選択は <code>value={null}</code> で placeholder「選択してください」。ネイティブの <code>&lt;select&gt;</code> は使わない</td></tr>
+    <tr><td><code>Textarea</code></td><td><code>px-2.5 py-1.5</code>・行間 1.625・縦にだけリサイズ</td><td>説明・コメント。コンテキストの入力欄だけ等幅（<code>font-mono</code>）</td></tr>
+    <tr><td>ラベル</td><td>12px / 400・<code>text-fg-muted</code>・下に 4px</td><td>入力欄の上に置く。ツールバーではラベルを出さず <code>aria-label</code> を付ける</td></tr>
+  </tbody>
+</table>
+<pre><code>&lt;Input value={name} onChange={(e) =&gt; setName(e.target.value)} className="w-full" /&gt;
+&lt;Select value={status} onChange={setStatus} options={STATUS_OPTIONS} aria-label="ステータス" /&gt;</code></pre>
+
+<h3 id="parts-3">アイコン・ボタン・バッジの使い分け</h3>
 <p>同じ操作は、どの画面でも同じアイコン・同じ形のボタンで出す。アイコンは <code>web/src/components/Icons.tsx</code>、ボタンは <code>components/ui/Button.tsx</code> の <code>Button</code> / <code>IconButton</code>、バッジは <code>components/ui/Badge.tsx</code> と <code>components/IdBadge.tsx</code> を使う。</p>
 <table>
   <thead><tr><th>操作</th><th>アイコン</th><th>ボタンの形</th><th>例</th></tr></thead>
@@ -422,7 +602,7 @@
 </table>
 <p class="note">バッジはどれも 11px / 400。色の意味は上の4種類だけに使い、ほかの情報（件数・期間など）はバッジにせず補助の文字（<code>text-fg-muted</code>）で出す。</p>
 
-<h3>検索・絞り込み・並び替え（ツールバー）</h3>
+<h3 id="parts-4">検索・絞り込み・並び替え（ツールバー）</h3>
 <p>一覧の上に置く検索・絞り込み・並び替え・切替は、<code>components/ui/Toolbar.tsx</code> の <code>Toolbar</code> に並べる。部品の高さはどれも <code>h-8</code>。</p>
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
@@ -437,86 +617,147 @@
   </tbody>
 </table>
 
-<h3>バッジ・ピル・ID</h3>
 <div class="demo row">
-  <span class="badge badge-todo">未着手</span>
-  <span class="badge badge-doing">進行中</span>
-  <span class="badge badge-done">完了</span>
-  <span class="pill pill-active">Active</span>
-  <span class="pill pill-inactive">InActive（アーカイブ）</span>
-  <button class="id-badge" title="クリックでコピー">fb21e348</button>
+  <div class="field-wrap" style="width:240px"><span class="lead-icon"><svg width="14" height="14"><use href="#i-search"/></svg></span><input class="field" placeholder="プロジェクトを検索" /></div>
+  <div class="field-wrap" style="width:128px"><button type="button" class="field select" aria-label="状態">Active</button><span class="chev"><svg width="12" height="12"><use href="#i-chev"/></svg></span></div>
+  <div class="field-wrap" style="width:128px"><button type="button" class="field select" aria-label="並び">作成順</button><span class="chev"><svg width="12" height="12"><use href="#i-chev"/></svg></span></div>
+  <button type="button" class="switch" role="switch" aria-checked="true" onclick="this.setAttribute('aria-checked', this.getAttribute('aria-checked') !== 'true')"><span class="track"><span class="knob"></span></span>クローズしたタスクも表示</button>
+  <span style="margin-left:auto" class="row">
+    <span class="seg" role="group" aria-label="表示">
+      <button type="button" aria-pressed="true" aria-label="グリッド" style="width:28px;padding:0"><svg width="16" height="16"><use href="#i-grid"/></svg></button>
+      <button type="button" aria-pressed="false" aria-label="リスト" style="width:28px;padding:0"><svg width="16" height="16"><use href="#i-list"/></svg></button>
+    </span>
+    <button class="btn primary"><svg><use href="#i-add"/></svg>New Project</button>
+  </span>
+</div>
+<p class="note">ツールバーの並びの見本（<code>Toolbar variant="inline"</code>）。<code>Switch</code> は 28×16 のトラック（オンで <code>brand</code>）＋ 12px <code>text-fg-muted</code> のラベル。<code>SegmentedControl</code> は枠 <code>border-strong</code> の中に 26px のボタンを並べ、選択中は地 <code>surface-muted</code>＋内側に 1px の枠。</p>
+
+<h3 id="parts-5">Badge / IdBadge（<code>ui/Badge.tsx</code>・<code>components/IdBadge.tsx</code>）</h3>
+<div class="demo row">
+  <span class="badge todo">未着手</span>
+  <span class="badge in_progress">進行中</span>
+  <span class="badge done">完了</span>
+  <span class="badge closed">クローズ</span>
+  <span class="badge brand">Active</span>
+  <span class="badge neutral">InActive</span>
+  <span class="badge brand">AI</span>
+  <span class="badge neutral">自分</span>
+  <button type="button" class="id-badge" title="a0f920d0-6d0a-40f9-8d82-9336c350acd2&#10;クリックでコピー">a0f920d0</button>
+  <button type="button" class="id-badge copied">コピーしました</button>
 </div>
 <p class="note">
-  ステータスバッジは 12px・角丸 10px。状態のピル（Active / InActive、ストーリーのバックログ表示）は 11px・角丸 999px。
-  ID は uuid の先頭8桁だけを等幅・<code>#94a0ad</code>・点線の下線で出し、クリックで全体をコピーする。
+  どれも <code>h-5</code>・<code>rounded</code>（4px）・<code>px-1.5</code>・11px / 400・1px の枠。<code>tone</code> は
+  <code>todo</code> / <code>in_progress</code> / <code>done</code> / <code>closed</code>（ステータスの色）、<code>brand</code>（地 accent 10%・枠 accent・文字 brand）、<code>neutral</code>（既定。地 <code>surface-muted</code>・枠 <code>border-strong</code>・文字 <code>fg-muted</code>）。
+  <code>IdBadge</code> は同じ形の等幅（枠は <code>border</code>）で uuid の先頭8桁を出し、クリックで全体をコピーして 1.2 秒「コピーしました」（brand の見た目）にする。
 </p>
+<pre><code>&lt;Badge tone={task.status}&gt;{STATUS_LABEL[task.status]}&lt;/Badge&gt;
+&lt;IdBadge id={task.id} /&gt;</code></pre>
 
-<h3>カード</h3>
+<h3 id="parts-6">Card（<code>ui/Card.tsx</code>）</h3>
 <div class="demo">
-  <div class="app-card">
-    <div class="title">AI駆動タスク管理アプリケーション</div>
-    <div class="desc">AI で使うことを前提にしたタスク管理ツール自体の開発</div>
-    <div class="meta">作成: 2026/9/19</div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn-secondary">バックログ</button>
-      <button class="btn-secondary">ガントチャート</button>
-      <button class="btn-secondary">カンバン</button>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+    <div class="app-card interactive" style="padding:16px;min-height:148px" tabindex="0">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <span style="margin-top:2px;display:flex;width:32px;height:32px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-fg-muted)"><svg width="16" height="16"><use href="#i-project"/></svg></span>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">AI駆動タスク管理アプリケーション</div>
+          <div style="margin-top:4px;font-size:13px;line-height:1.375;color:var(--color-fg-muted)">AI で使うことを前提にしたタスク管理ツール自体の開発</div>
+        </div>
+        <button class="btn ghost sm icon" aria-label="その他の操作"><svg><use href="#i-more"/></svg></button>
+      </div>
+    </div>
+    <div class="app-card interactive" style="padding:8px 10px;min-height:80px;align-self:start">
+      <div style="display:flex;align-items:center;gap:6px"><button type="button" class="id-badge">a0f920d0</button></div>
+      <div style="margin-top:2px;font-size:12px">スタイルガイドの更新</div>
     </div>
   </div>
 </div>
-<p class="note">白地・枠 <code>#e5e8eb</code>・角丸 10px・内側 16px・影 <code>0 1px 2px</code>。一覧は <code>repeat(auto-fill, minmax(260px, 1fr))</code> のグリッドに 12px 間隔で並べる。</p>
+<p class="note">
+  <code>rounded-md</code>・枠 <code>border</code>・地 <code>surface</code>・影なし。余白は使う側で付ける（プロジェクト一覧は <code>p-4</code>、カンバンのカードは <code>px-2.5 py-2</code>）。
+  クリックできるカードは <code>interactive</code> を付け、hover で枠が <code>border-strong</code> になる。選択中は枠 <code>brand</code>＋<code>ring-2 ring-brand/30</code>。
+</p>
 
-<h3>表</h3>
-<div class="demo" style="background:#fff">
-  <table>
-    <thead><tr><th>名前</th><th>ID</th><th>状態</th><th>期間</th></tr></thead>
-    <tbody>
-      <tr><td>スタイルガイドの作成<div style="font-size:12px;color:#5f6b7a;margin-top:2px">UI の見た目の決まりを1枚の HTML にまとめる</div></td><td><button class="id-badge">fb21e348</button></td><td><span class="badge badge-doing">進行中</span></td><td style="color:#5f6b7a">2026-09-20 〜 2026-11-30</td></tr>
-      <tr><td>スタイルガイドの適用</td><td><button class="id-badge">1a2b3c4d</button></td><td><span class="badge badge-todo">未着手</span></td><td style="color:#5f6b7a">—</td></tr>
-    </tbody>
-  </table>
+<h3 id="parts-7">表</h3>
+<div class="demo" style="padding:12px">
+  <div style="overflow:hidden;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)">
+    <table style="table-layout:fixed">
+      <colgroup><col style="width:104px"><col style="width:220px"><col><col style="width:110px"></colgroup>
+      <thead><tr><th>ID</th><th>名前</th><th>説明</th><th>ステータス</th></tr></thead>
+      <tbody>
+        <tr><td><button type="button" class="id-badge">a0f920d0</button></td><td style="font-weight:500">スタイルガイドの更新</td><td class="muted">新しいトークンと部品の見本を載せる</td><td><span class="badge in_progress">進行中</span></td></tr>
+        <tr><td><button type="button" class="id-badge">6fa86f5e</button></td><td style="font-weight:500">画面の文字サイズ・太さの統一</td><td style="color:color-mix(in srgb, var(--color-fg-muted) 60%, transparent)">説明なし</td><td><span class="badge done">完了</span></td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
-<p class="note">見出しは 12px・<code>#5f6b7a</code>・下線 <code>#e5e8eb</code>、セルは 13px・区切り <code>#eef0f2</code>・<code>vertical-align: top</code>。値が無いときは「—」（<code>#94a0ad</code>）。</p>
+<p class="note">
+  外枠は <code>rounded-md border bg-surface</code> の箱で包む。見出し行は地 <code>surface-muted</code>・12px / 500・<code>text-fg-muted</code>、セルは <code>px-3 py-2</code>・13px、行の区切りは <code>border</code>。
+  名前のセルは 13px / 500。値が無いときは <code>text-fg-muted/60</code> で「説明なし」「-」を出し、空欄にしない。
+</p>
 
-<h3>詳細パネル</h3>
+<h3 id="parts-8">詳細パネル（<code>components/DetailPanel.tsx</code>）</h3>
 <div class="demo">
   <div class="panel">
-    <div class="head"><span>タスク</span><button class="btn-secondary">閉じる</button></div>
+    <div class="head">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="kind">タスク</span>
+        <span style="margin-left:auto;display:flex;gap:2px">
+          <button class="btn ghost sm icon" aria-label="変更"><svg><use href="#i-edit"/></svg></button>
+          <button class="btn ghost sm icon danger-icon" aria-label="削除"><svg><use href="#i-delete"/></svg></button>
+          <button class="btn ghost sm icon" aria-label="閉じる"><svg><use href="#i-close"/></svg></button>
+        </span>
+      </div>
+      <div class="name">スタイルガイドの更新</div>
+    </div>
     <div class="body">
-      <div class="name">スタイルガイドの作成</div>
-      <div class="f-label">ID</div><div class="f-value"><button class="id-badge">fb21e348</button></div>
-      <div class="f-label">ステータス</div><div class="f-value"><span class="badge badge-doing">進行中</span> <span style="font-size:10px;color:#5f6b7a">▾</span></div>
-      <div class="f-label">期限</div><div class="f-value" style="margin-bottom:0">2026/11/30</div>
+      <div class="f-label">ID</div><div class="f-value"><button type="button" class="id-badge">a0f920d0</button></div>
+      <div class="f-label">ステータス</div><div class="f-value"><span class="badge in_progress">進行中</span></div>
+      <div class="f-label">期限</div><div class="f-value" style="margin-bottom:0">2026/11/20</div>
     </div>
-  </div>
-</div>
-<p class="note">幅 320px・右側に固定。ヘッダは <code>#f7f9fa</code>、項目ラベルは 11px <code>#94a0ad</code>、値は 13px <code>#1f2933</code>、項目間は 12px。</p>
-
-<h3>モーダル</h3>
-<div class="demo row" style="align-items:flex-start;gap:16px">
-  <div class="dialog-form" style="width:340px">
-    <h3 style="margin:0 0 16px;font-size:16px">プロジェクトを変更</h3>
-    <label class="field-label">プロジェクト名</label>
-    <input class="text-input" value="task-branch" />
-    <div class="row" style="justify-content:flex-end;margin-top:20px">
-      <button class="btn-secondary">キャンセル</button>
-      <button class="btn-primary">保存</button>
-    </div>
-  </div>
-  <div class="dialog-confirm" style="width:320px">
-    <div style="font-size:14px;color:#1f2933;line-height:1.6">「スタイルガイドの作成」のステータスを『完了』に変更します。よろしいですか？</div>
-    <div class="row" style="justify-content:flex-end;margin-top:20px">
-      <button class="btn-secondary">キャンセル</button>
-      <button class="btn-confirm">変更する</button>
+    <div class="foot">
+      <button class="btn primary" style="width:100%">完了にする</button>
     </div>
   </div>
 </div>
 <p class="note">
-  入力フォームは幅 420px・角丸 12px・内側 24px。確認は幅 380px・角丸 8px・内側 20px で、確定ボタンは <code>#1f2933</code>。
-  確認の文言は「何を・どうする」を書き、末尾は「よろしいですか？」。ボタンは動詞（「変更する」「移動する」）。
+  右に固定。幅は既定 320px（左端のドラッグで 280–800px）。地 <code>surface</code>・左に 1px の <code>border</code>。
+  ヘッダーは <code>px-4 py-3</code> に種別（12px <code>fg-muted</code>）・IconButton・タイトル（14px / 500）。
+  プロパティ名は 12px <code>fg-muted</code>、値は 13px、項目の間は 12px。下部の確定の操作（着手・完了）は <code>p-3</code> の帯に横いっぱいで置く。
 </p>
 
-<h3>ドロップダウン</h3>
+<h3 id="parts-9">Dialog / ConfirmDialog（<code>ui/Dialog.tsx</code>・<code>components/ConfirmDialog.tsx</code>）</h3>
+<div class="backdrop">
+  <div class="dialog" style="width:360px">
+    <div class="d-title">プロジェクトを変更</div>
+    <div class="d-body">
+      <label class="field-label">プロジェクト名</label>
+      <input class="field" value="task-branch" />
+    </div>
+    <div class="d-foot">
+      <button class="btn default">キャンセル</button>
+      <button class="btn primary">保存</button>
+    </div>
+  </div>
+  <div class="dialog" style="width:340px">
+    <div class="d-body">「スタイルガイドの更新」を削除します。よろしいですか？</div>
+    <div class="d-foot">
+      <button class="btn default">キャンセル</button>
+      <button class="btn danger">削除する</button>
+    </div>
+  </div>
+</div>
+<p class="note">
+  背景幕 <code>bg-black/40</code>（<code>z-50</code>）の中央に、幅 400px（<code>max-w-[90vw]</code>）・<code>rounded-md</code>・枠 <code>border</code>・<code>shadow-lg</code> の本体。
+  <code>title</code> は 14px / 500 で下に区切り線、本文は <code>px-5 py-4</code> 14px、<code>footer</code> は右寄せ・<code>gap-2</code>・上に区切り線。Escape と背景幕のクリックで <code>onClose</code>。
+  確認は <code>ConfirmDialog</code>（幅 380px・タイトルなし）。確定ボタンは primary、削除など破壊的な操作は <code>danger</code> で赤にする。
+  文言は「何を・どうする」＋「よろしいですか？」、ボタンは動詞（「変更する」「削除する」「移動する」）。
+</p>
+<pre><code>&lt;Dialog title="プロジェクトを変更" onClose={onClose} footer={&lt;&gt;
+  &lt;Button onClick={onClose}&gt;キャンセル&lt;/Button&gt;
+  &lt;Button variant="primary" onClick={onSave}&gt;保存&lt;/Button&gt;
+&lt;/&gt;}&gt;…&lt;/Dialog&gt;</code></pre>
+
+<h3 id="parts-10">ドロップダウン</h3>
 <p>開いたリストはどれも同じ見た目にする。操作のメニューは <code>components/ui/DropdownMenu.tsx</code> の <code>DropdownMenu</code>、入力欄の選択は <code>components/ui/Select.tsx</code> の <code>Select</code> を使う。ネイティブの <code>&lt;select&gt;</code> と、部品を使わない手書きのメニューは使わない。</p>
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
@@ -530,8 +771,34 @@
     <tr><td>閉じ方・キーボード</td><td>外側のクリックと Escape で閉じる（ダイアログの中の Select では、Escape はリストだけを閉じる）。Select は ↑ ↓ Home End で動き、Enter / Space で選ぶ</td></tr>
   </tbody>
 </table>
+<div class="demo row" style="align-items:flex-start;gap:24px">
+  <div>
+    <button class="btn default"><span>操作</span><svg width="12" height="12" style="width:12px;height:12px;color:var(--color-fg-muted)"><use href="#i-chev"/></svg></button>
+    <div class="menu" style="margin-top:4px">
+      <button type="button" class="item"><svg width="16" height="16"><use href="#i-edit"/></svg>変更</button>
+      <button type="button" class="item">InActive にする</button>
+      <div class="sep" role="separator"></div>
+      <button type="button" class="item danger"><svg width="16" height="16"><use href="#i-delete"/></svg>削除</button>
+    </div>
+  </div>
+  <div>
+    <span class="badge in_progress">進行中</span>
+    <div class="menu" style="margin-top:4px">
+      <button type="button" class="item"><span class="check"></span><span class="badge todo">未着手</span></button>
+      <button type="button" class="item active"><span class="check"><svg width="14" height="14"><use href="#i-check"/></svg></span><span class="badge in_progress">進行中</span></button>
+      <button type="button" class="item"><span class="check"></span><span class="badge done">完了</span></button>
+      <button type="button" class="item"><span class="check"></span><span class="badge closed">クローズ</span></button>
+    </div>
+  </div>
+</div>
+<p class="note">左は操作のメニュー（<code>DropdownMenu</code>＋<code>DropdownMenuItem</code> / <code>DropdownMenuSeparator</code>）、右は1つを選ぶメニュー（<code>selected</code> を渡すと緑のチェックが付く）。</p>
+<pre><code>&lt;DropdownMenu trigger={&lt;MoreIcon /&gt;} label="その他の操作" variant="ghost" size="sm" align="end"&gt;
+  &lt;DropdownMenuItem icon={&lt;EditIcon /&gt;} onSelect={onEdit}&gt;変更&lt;/DropdownMenuItem&gt;
+  &lt;DropdownMenuSeparator /&gt;
+  &lt;DropdownMenuItem danger icon={&lt;DeleteIcon /&gt;} onSelect={onDelete}&gt;削除&lt;/DropdownMenuItem&gt;
+&lt;/DropdownMenu&gt;</code></pre>
 
-<h3>ツールチップ</h3>
+<h3 id="parts-11">ツールチップ</h3>
 <p>マウスを合わせたとき・キーボードでフォーカスしたときに出る補足は、<code>components/ui/Tooltip.tsx</code> の <code>TooltipLayer</code>（<code>main.tsx</code> で1つだけ置く）が描く。要素には <code>title</code> ではなく <code>data-tooltip</code> を付ける。<code>title</code> はブラウザ標準の黒い枠になり、デザインに合わないので使わない。</p>
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
@@ -544,54 +811,62 @@
   </tbody>
 </table>
 
-<h3>サイドナビ</h3>
+<h3 id="parts-12">サイドナビ（<code>components/Sidebar.tsx</code>）</h3>
 <div class="demo row" style="align-items:flex-start;gap:16px">
   <div class="nav">
-    <div class="brand">task-branch</div>
-    <div style="padding:8px 0">
-      <div class="item">プロジェクト</div>
-      <div class="item">バックログ</div>
-      <div class="item active">ガントチャート</div>
-      <div class="item">カンバン</div>
+    <div class="items">
+      <div class="item"><svg><use href="#i-project"/></svg>Projects</div>
+      <div class="item"><svg><use href="#i-backlog"/></svg>Backlog</div>
+      <div class="item active"><svg><use href="#i-gantt"/></svg>Gantt</div>
+      <div class="item"><svg><use href="#i-kanban"/></svg>Board</div>
     </div>
+    <div class="foot"><button class="btn ghost sm icon" aria-label="Collapse sidebar">«</button></div>
   </div>
-  <div class="nav" style="width:52px">
-    <div class="brand" style="text-align:center;padding:14px 0">»</div>
-    <div style="padding:8px 0;text-align:center;color:#cbd2d9;font-size:15px">
-      <div style="padding:9px 0">▦</div>
-      <div style="padding:9px 0">≡</div>
-      <div style="padding:9px 0;background:#0972d3;color:#fff;margin:0 8px;border-radius:6px">▬</div>
-      <div style="padding:9px 0">▥</div>
+  <div class="nav collapsed">
+    <div class="items">
+      <div class="item"><svg><use href="#i-project"/></svg></div>
+      <div class="item"><svg><use href="#i-backlog"/></svg></div>
+      <div class="item active"><svg><use href="#i-gantt"/></svg></div>
+      <div class="item"><svg><use href="#i-kanban"/></svg></div>
     </div>
-  </div>
-</div>
-<p class="note">幅は既定 220px（160–480 でドラッグ変更）。閉じると 52px でアイコンだけ。選択中は <code>#0972d3</code> の地に白・太字。</p>
-
-<h3>列幅のドラッグハンドル</h3>
-<div class="demo" style="padding:0">
-  <div style="display:flex;background:#fff;border-radius:6px;overflow:hidden">
-    <div style="position:relative;width:200px;padding:8px 12px;font-size:12px;font-weight:600;color:#3b4149;border-right:1px solid #cbd2d9">
-      プロジェクト / ストーリー
-      <span style="position:absolute;top:0;bottom:0;right:-3px;width:7px;background:rgba(9,114,211,0.25);cursor:col-resize"></span>
-    </div>
-    <div style="flex:1;padding:8px 12px;font-size:12px;color:#5f6b7a">…</div>
+    <div class="foot"><button class="btn ghost sm icon" aria-label="Expand sidebar">»</button></div>
   </div>
 </div>
 <p class="note">
-  幅 7px・<code>cursor: col-resize</code>・境界をまたいで <code>right: -3px</code> に置く（見た目は透明。上は分かるよう着色）。
-  ヘッダだけでなく<b>全行に置いて</b>、表のどこからでも掴めるようにする。変更した幅は localStorage に残す。
+  地 <code>bg</code>・右に 1px の <code>border</code>。幅は既定 220px（右端のドラッグで 160–480px）、閉じると 52px でアイコンだけ。
+  項目は <code>h-8 px-2.5 rounded-md</code>・14px・<code>text-fg-muted</code>、hover で地 <code>surface-muted</code>・文字 <code>fg</code>。
+  選択中は地 <code>#ededed</code>・文字 <code>fg</code>・500（青の塗りは使わない）。開閉と幅は localStorage に残す。
+</p>
+
+<h3 id="parts-13">列幅のドラッグハンドル</h3>
+<div class="demo" style="padding:0">
+  <div style="display:flex;background:var(--color-surface);border-radius:6px;overflow:hidden">
+    <div style="position:relative;width:220px;padding:8px 12px;font-size:12px;font-weight:500;color:var(--color-fg-muted);background:var(--color-surface-muted);border-right:1px solid var(--color-border)">
+      プロジェクト / ストーリー
+      <span style="position:absolute;top:0;bottom:0;right:-3px;width:7px;background:color-mix(in srgb, var(--color-brand) 25%, transparent);cursor:col-resize"></span>
+    </div>
+    <div style="flex:1;padding:8px 12px;font-size:12px;color:var(--color-fg-muted)">…</div>
+  </div>
+</div>
+<p class="note">
+  幅 7px・<code>cursor-col-resize</code>・境界をまたいで <code>-right-[3px]</code> に置く（見た目は透明。上は分かるよう着色）。
+  ヘッダだけでなく<b>全行に置いて</b>、表のどこからでも掴めるようにする。変更した幅は localStorage に残す（<code>lib/useResizableWidth.ts</code>）。
 </p>
 
 <h2 id="rules">6. 書き方の決まり</h2>
 <ul>
-  <li>スタイルはコンポーネントのファイル末尾に <code>const btn: CSSProperties = {…}</code> の形でまとめる。JSX の中に長い style を直接書かない。</li>
-  <li>複数の画面で使う値は <code>web/src/lib/style.ts</code> に置く（今は <code>STATUS_COLOR</code>）。色を新しく増やすときは、まずこのガイドの既存色で足りないかを見る。</li>
-  <li>ホバーなどの状態変化は <code>useState</code> で持って style を切り替える（CSS の <code>:hover</code> は使えないため）。</li>
-  <li>破壊的な操作（削除・ステータス変更・移動）は必ず確認を挟む。文面は「対象」と「起きること」を書く。</li>
-  <li>フォームは Enter で送信（IME 変換中は無視: <code>e.nativeEvent.isComposing</code>）、Escape でキャンセル。失敗したらモーダルは閉じない。</li>
+  <li>スタイルは Tailwind の <code>className</code> で書く。inline の <code>style</code> に残すのは、ドラッグで決まる幅・ガントのバーの位置など実行時に計算する値だけ。</li>
+  <li>色は <code>@theme</code> のトークンのクラス（<code>bg-surface</code>、<code>border-border</code>、<code>text-fg-muted</code>）で書き、<code>#xxxxxx</code> を直書きしない。inline style で色が要るときは <code>var(--color-*)</code>（ステータスは <code>STATUS_COLOR</code>）を使う。トークンを増やすときは <code>index.css</code> とこのページの両方を直す。</li>
+  <li>クラスの結合は <code>lib/cn.ts</code> の <code>cn()</code>（<code>cn("a", isActive &amp;&amp; "b")</code>）。clsx などの依存は足さない。</li>
+  <li>部品の見た目を画面側で上書きしない。幅・余白・配置（<code>w-60</code>、<code>ml-auto</code> など）だけを <code>className</code> で渡す。部品に無い見た目が要るなら、部品に variant を足す。</li>
+  <li>hover・フォーカス・無効は Tailwind の <code>hover:</code> <code>focus-visible:</code> <code>disabled:</code> で書く（<code>useState</code> で切り替えない）。</li>
+  <li>Tailwind がソースからクラス名を拾えるよう、クラス名は文字列を組み立てずに全文で書く（<code>`bg-status-${s}-bg`</code> は不可。<code>STATUS_CLASS</code> を使う）。</li>
+  <li>部品を使わずに素の <code>&lt;button&gt;</code> を置くときは、部品と同じく <code>m-0 border-0 bg-transparent font-sans</code> から始め、ブラウザ既定の見た目を残さない。</li>
+  <li>破壊的な操作（削除・ステータス変更・移動）は必ず <code>ConfirmDialog</code> を挟む。文面は「対象」と「起きること」を書く。</li>
+  <li>フォームは Enter で送信（IME 変換中は無視: <code>e.nativeEvent.isComposing</code>）、Escape でキャンセル。失敗したらダイアログは閉じない。</li>
   <li>表示の好み（列幅、開閉状態）は localStorage に保存し、読み書きは try/catch で囲む。</li>
-  <li>日付は <code>toLocaleString("ja-JP")</code>。値が無いときは「—」か「-」で埋め、空欄にしない。</li>
-  <li>読み込み中は「読み込み中…」、空のときは次の一手を書く（例:「プロジェクトがありません。「新規プロジェクト」から作成してください。」）。</li>
+  <li>日付は <code>toLocaleString("ja-JP")</code>。値が無いときは「-」か「説明なし」で埋め、空欄にしない。</li>
+  <li>読み込み中は「読み込み中…」、空のときは次の一手を書く（例:「ストーリーがありません。「New Story」から登録してください。」）。</li>
 </ul>
 
 </div>
