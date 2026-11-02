@@ -162,6 +162,23 @@ export function ChevronUpDownIcon(p: IconProps) {
   );
 }
 
+// A table column sorted ascending / descending.
+export function ArrowUpIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M8 13V3M4 7l4-4 4 4" />
+    </Icon>
+  );
+}
+
+export function ArrowDownIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M8 3v10M4 9l4 4 4-4" />
+    </Icon>
+  );
+}
+
 // The chosen item in a dropdown.
 export function CheckIcon(p: IconProps) {
   return (
