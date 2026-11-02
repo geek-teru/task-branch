@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { listProjectStories } from "../lib/api";
 import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
 import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
@@ -26,13 +26,15 @@ const AUTO_SCROLL_MAX_STEP = 18;
 const SHOW_CLOSED_KEY = "kanban.showClosed";
 
 // One board per project: a swimlane per in-progress story, columns = task status.
-// The project filter (null = all projects) is owned by the caller (kept in the URL, switched from the header).
+// The project filter (null = all projects) is owned by the caller (the app-wide selection, switched
+// from the header or the toolbar's picker).
 // A card can only move between columns of its own story (its parent is fixed),
 // and a drop is applied only after the user confirms it.
 export function KanbanView({
   projects,
   lanes,
   projectFilter,
+  projectSelect,
   onChangeStatus,
   onMoveTask,
   onAddTask,
@@ -42,6 +44,8 @@ export function KanbanView({
   projects: Project[];
   lanes: KanbanLane[];
   projectFilter: string | null;
+  // The project picker, first in the toolbar.
+  projectSelect?: ReactNode;
   onChangeStatus: (taskId: string, status: Status) => void;
   onMoveTask: (taskId: string, storyId: string, status: Status) => void;
   onAddTask: (story: Task, values: StoryInput) => void;
@@ -260,6 +264,7 @@ export function KanbanView({
           meta={`進行中のストーリー ${visibleProjects.reduce((n, p) => n + (lanesByProject.get(p.id)?.length ?? 0), 0)} 件`}
         />
         <Toolbar>
+          {projectSelect}
           <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
         </Toolbar>
 

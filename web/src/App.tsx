@@ -30,6 +30,7 @@ import {
 import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
+import { ProjectSelect } from "./components/ProjectSelect";
 import { CloseIcon } from "./components/Icons";
 import { IconButton } from "./components/ui/Button";
 import { ProjectsListPage } from "./views/ProjectsListPage";
@@ -41,9 +42,31 @@ import { StoryDetailPage } from "./views/StoryDetailPage";
 import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
 
+// The project picked in the header / toolbar, remembered per browser.
+const SELECTED_PROJECT_KEY = "project.selected";
+
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
+  // One project selection for the whole app (null = none picked), carried across pages.
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(SELECTED_PROJECT_KEY);
+    } catch {
+      return null; // storage can be unavailable (private mode)
+    }
+  });
+  const selectProject = useCallback((id: string | null) => {
+    setSelectedProjectId(id);
+    try {
+      if (id) localStorage.setItem(SELECTED_PROJECT_KEY, id);
+      else localStorage.removeItem(SELECTED_PROJECT_KEY);
+    } catch {
+      // Ignore: the selection still applies for this session.
+    }
+  }, []);
+  // A remembered project that no longer exists counts as none.
+  const selectedId = projects.some((p) => p.id === selectedProjectId) ? selectedProjectId : null;
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const ganttMatch = useMatch("/projects/:projectId/gantt");
@@ -53,8 +76,8 @@ export default function App() {
   const storyMatch = useMatch("/stories/:storyId");
   const isBacklog = pathname === "/backlog" || storyMatch !== null;
   const [searchParams] = useSearchParams();
-  // Gantt shows one project: the one in the URL, or the first active project for /gantt.
-  const defaultProjectId = (projects.find((p) => p.is_active) ?? projects[0])?.id;
+  // Gantt shows one project: the one in the URL, else the selected one, else the first active project.
+  const defaultProjectId = selectedId ?? (projects.find((p) => p.is_active) ?? projects[0])?.id;
   const ganttProjectId = isGantt ? ganttMatch?.params.projectId ?? defaultProjectId : undefined;
   const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,8 +107,19 @@ export default function App() {
     };
   }, [userId, ganttProjectId]);
 
-  // Backlog page: the project comes from ?project=, defaulting to the first project.
+  // Backlog page: the project comes from ?project=, defaulting as the Gantt does.
   const backlogProjectId = pathname === "/backlog" ? searchParams.get("project") ?? defaultProjectId : undefined;
+  // Kanban: ?project=, else the selected project; null shows all projects.
+  const kanbanProjectId = isKanban ? searchParams.get("project") ?? selectedId : null;
+
+  // A project named in the URL becomes the selection, so the next page opens on it too.
+  const urlProjectId =
+    ganttMatch?.params.projectId ??
+    projectMatch?.params.projectId ??
+    (pathname === "/backlog" || isKanban ? searchParams.get("project") : null);
+  useEffect(() => {
+    if (urlProjectId && projects.some((p) => p.id === urlProjectId)) selectProject(urlProjectId);
+  }, [urlProjectId, projects, selectProject]);
   const [backlog, setBacklog] = useState<{ projectId: string; stories: BacklogStory[] } | null>(null);
   useEffect(() => {
     if (!userId || !backlogProjectId) return;
@@ -412,11 +446,12 @@ export default function App() {
     try {
       await deleteProject(id);
       setProjects((prev) => prev.filter((x) => x.id !== id));
+      if (id === selectedProjectId) selectProject(null);
       setGraph((prev) => (prev?.projectId === id ? null : prev));
     } catch (e: any) {
       setError(String(e.message ?? e));
     }
-  }, []);
+  }, [selectedProjectId, selectProject]);
 
   // Download one project as <name>.json.
   const handleExportProject = useCallback(async (project: Project) => {
@@ -440,12 +475,13 @@ export default function App() {
     else navigate("/login");
   }, [navigate]);
 
+  // The side nav opens each page on the selected project.
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
-    else if (key === "gantt") navigate("/gantt");
-    else if (key === "kanban") navigate("/kanban");
-    else if (key === "backlog") navigate("/backlog");
-  }, [navigate]);
+    else if (key === "gantt") navigate(selectedId ? `/projects/${selectedId}/gantt` : "/gantt");
+    else if (key === "kanban") navigate(selectedId ? `/kanban?project=${selectedId}` : "/kanban");
+    else if (key === "backlog") navigate(selectedId ? `/backlog?project=${selectedId}` : "/backlog");
+  }, [navigate, selectedId]);
 
   if (!isConfigured) {
     return (
@@ -491,20 +527,34 @@ export default function App() {
 
   // The header's project switcher keeps the page and swaps the project; pages without one
   // (project list, story detail) go to that project's backlog.
-  const kanbanProjectId = isKanban ? searchParams.get("project") : null;
   const headerProjectId = isGantt
     ? ganttProjectId
     : pathname === "/backlog"
       ? backlogProjectId
       : isKanban
         ? kanbanProjectId
-        : projectMatch?.params.projectId;
+        : projectMatch?.params.projectId ?? selectedId;
   const handleHeaderSelectProject = (id: string) => {
+    selectProject(id);
     if (isGantt) navigate(`/projects/${id}/gantt`);
     else if (isKanban) navigate(`/kanban?project=${id}`);
     else if (projectMatch) navigate(`/projects/${id}`);
     else navigate(`/backlog?project=${id}`);
   };
+  // Clears the selection: the Kanban then shows every project; other pages go to the project list.
+  const handleSelectAllProjects = () => {
+    selectProject(null);
+    navigate(isKanban ? "/kanban" : "/projects");
+  };
+  // The toolbar's picker works on the same selection as the header's switcher.
+  const projectSelect = (value: string | null | undefined) => (
+    <ProjectSelect
+      projects={projects}
+      value={value ?? null}
+      allowAll={isKanban}
+      onChange={(id) => (id ? handleHeaderSelectProject(id) : handleSelectAllProjects())}
+    />
+  );
 
   const detailProject = projects.find((p) => p.id === projectMatch?.params.projectId);
   const ganttProject = projects.find((p) => p.id === ganttProjectId);
@@ -522,6 +572,7 @@ export default function App() {
         <GanttView
           project={ganttProject}
           graph={graph.graph}
+          projectSelect={projectSelect(ganttProjectId)}
           onAddStory={handleAddStory}
           onAddTask={handleGanttAddTask}
           onUpdateTask={handleUpdateTask}
@@ -548,7 +599,7 @@ export default function App() {
         currentProjectId={headerProjectId ?? null}
         allProjectsLabel={isKanban ? "すべてのプロジェクト" : undefined}
         onSelectProject={handleHeaderSelectProject}
-        onSelectAllProjects={() => navigate(isKanban ? "/kanban" : "/projects")}
+        onSelectAllProjects={handleSelectAllProjects}
         userName={userName}
         userEmail={session.user.email ?? null}
         onLogout={handleLogout}
@@ -627,6 +678,7 @@ export default function App() {
                   ) : (
                     <BacklogView
                       stories={backlog && backlog.projectId === backlogProjectId ? backlog.stories : null}
+                      projectSelect={projectSelect(backlogProjectId)}
                       onAddBacklog={handleAddBacklog}
                       onSetActive={handleSetStoryActive}
                     />
@@ -639,7 +691,12 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   {storyMatch?.params.storyId && (
-                    <StoryDetailPage storyId={storyMatch.params.storyId} projects={projects} onError={setError} />
+                    <StoryDetailPage
+                      storyId={storyMatch.params.storyId}
+                      projects={projects}
+                      onError={setError}
+                      onLoadProject={selectProject}
+                    />
                   )}
                 </main>
               }
@@ -654,9 +711,10 @@ export default function App() {
                     <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
                   ) : (
                     <KanbanView
-                      projects={pickerProjects(searchParams.get("project"))}
+                      projects={pickerProjects(kanbanProjectId)}
                       lanes={lanes}
-                      projectFilter={searchParams.get("project")}
+                      projectFilter={kanbanProjectId}
+                      projectSelect={projectSelect(kanbanProjectId)}
                       onChangeStatus={handleKanbanStatus}
                       onMoveTask={handleKanbanMove}
                       onAddTask={handleAddTask}

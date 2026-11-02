@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogStory } from "../lib/types";
 import { STATUS_LABEL } from "../lib/types";
@@ -19,13 +19,16 @@ import { Badge } from "../components/ui/Badge";
 
 // Stories of one project: active ones and inactive ones (バックログ).
 // Only name / description / period / status / state are shown; the document (context) is not loaded here.
-// The project is picked in the global header (/backlog?project=).
+// The project is picked in the global header or the toolbar's picker (/backlog?project=).
 export function BacklogView({
   stories,
+  projectSelect,
   onAddBacklog,
   onSetActive,
 }: {
   stories: BacklogStory[] | null;
+  // The project picker, first in the toolbar.
+  projectSelect?: ReactNode;
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
   onSetActive: (storyId: string, active: boolean) => void;
 }) {
@@ -56,6 +59,7 @@ export function BacklogView({
         }
       />
       <Toolbar>
+        {projectSelect}
         <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
       </Toolbar>
 
