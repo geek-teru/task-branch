@@ -8,6 +8,7 @@ import { IdBadge } from "../components/IdBadge";
 import { Badge } from "../components/ui/Badge";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "../components/ui/DropdownMenu";
 import { BacklogIcon, DeleteIcon, EditIcon, GanttIcon, KanbanIcon, MoreIcon } from "../components/Icons";
 
@@ -39,19 +40,23 @@ export function ProjectDetailPage({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-[1200px] px-6 py-8">
-        <Link to="/projects" className="text-xs text-fg-muted no-underline hover:text-fg">
-          ← プロジェクト
-        </Link>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="m-0 text-2xl font-medium text-fg">{project.name}</h1>
-          <Badge tone={project.is_active ? "brand" : "neutral"}>
-            {project.is_active ? "Active" : "InActive"}
-          </Badge>
-          <IdBadge id={project.id} />
-
-          <div className="ml-auto flex items-center gap-2">
+      <PageHeader
+        back={
+          <Link to="/projects" className="text-fg-muted no-underline hover:text-fg">
+            ← プロジェクト
+          </Link>
+        }
+        title={project.name}
+        meta={
+          <>
+            <Badge tone={project.is_active ? "brand" : "neutral"}>
+              {project.is_active ? "Active" : "InActive"}
+            </Badge>
+            <IdBadge id={project.id} />
+          </>
+        }
+        actions={
+          <>
             <IconButton label="変更" size="md" onClick={() => setEditing(true)}>
               <EditIcon size={14} />
             </IconButton>
@@ -74,9 +79,11 @@ export function ProjectDetailPage({
                 削除
               </DropdownMenuItem>
             </DropdownMenu>
-          </div>
-        </div>
-        <p className={cn("m-0 mt-2 text-sm", project.description ? "text-fg" : "text-fg-muted")}>
+          </>
+        }
+      />
+      <div className="max-w-[960px] px-6 pb-6">
+        <p className={cn("m-0 text-sm", project.description ? "text-fg" : "text-fg-muted")}>
           {project.description ?? "説明なし"}
         </p>
 

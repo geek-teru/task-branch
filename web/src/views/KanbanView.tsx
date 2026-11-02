@@ -12,6 +12,7 @@ import { AddIcon } from "../components/Icons";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Switch } from "../components/ui/Switch";
+import { PageHeader } from "../components/ui/PageHeader";
 import { Toolbar } from "../components/ui/Toolbar";
 
 
@@ -254,6 +255,10 @@ export function KanbanView({
   return (
     <div className="flex h-full text-sm text-fg">
       <div className="flex min-w-0 flex-1 flex-col">
+        <PageHeader
+          title="カンバン"
+          meta={`進行中のストーリー ${visibleProjects.reduce((n, p) => n + (lanesByProject.get(p.id)?.length ?? 0), 0)} 件`}
+        />
         <Toolbar>
           <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
         </Toolbar>
@@ -262,7 +267,7 @@ export function KanbanView({
           ref={boardRef}
           onDragOver={(e) => updateAutoScroll(e.clientY)}
           onDrop={stopAutoScroll}
-          className="box-border min-h-0 flex-1 overflow-auto p-6"
+          className="box-border min-h-0 flex-1 overflow-auto px-6 py-4"
         >
           {visibleProjects.length === 0 ? (
             <div className="text-fg-muted">

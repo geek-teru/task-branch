@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
 
 const VARIANT = {
-  // Top of a full-height screen (バックログ, カンバン): white bar with a bottom border.
-  bar: "shrink-0 border-b border-border bg-surface px-3 py-2",
+  // Work screens (バックログ, ガント, カンバン): right under the <PageHeader>, with a bottom border.
+  bar: "shrink-0 border-b border-border px-6 pb-3",
   // Inside a page's body, under its heading (プロジェクト一覧): no bar.
   inline: "",
 };
