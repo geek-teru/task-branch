@@ -160,6 +160,7 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 
 ```
 所有者（ユーザー） 1 ──< projects
+ユーザー 1 ── 0..1 profiles (表示名・アイコン画像のパス。画像は Storage の avatars バケット)
 projects 1 ──< tasks(自己参照ツリー parent_id)
 projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
                  ├──< story_context_revisions (story のドキュメントの更新履歴)
@@ -279,6 +280,23 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 - `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
 - 人か AI かは、リクエストの JWT の `client_id`（あれば AI）で判定する（`current_actor_type()`、§3.5）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
 
+#### profiles
+
+ユーザーのプロフィール（表示名とアイコン画像）。設定画面の「プロフィール」で変える。
+
+| カラム       | 型          | 制約                                                      | 説明                                                                    |
+| ------------ | ----------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| user_id      | uuid        | PK, FK→auth.users.id, on delete cascade                   | 本人                                                                    |
+| display_name | text        | null可, check (char_length(display_name) between 1 and 50) | 表示名。null なら Google の `full_name`、それも無ければ email を使う    |
+| avatar_path  | text        | null可                                                    | avatars バケット内のパス。null なら Google の `avatar_url` を使う        |
+| created_at   | timestamptz | not null, default now()                                   |                                                                         |
+| updated_at   | timestamptz | not null, default now()                                   | 更新時に now()（トリガ）                                                |
+
+- 行は画面からの初回保存で upsert する。`auth.users` のトリガでは作らない（行が無いユーザーは Google の値で表示する）。
+- 書き込みは本人の人だけ。AI は書けない（§3.5）。
+- アイコン画像は Supabase Storage の公開バケット `avatars` に `<uid>/<ランダム>.<拡張子>` で置く（2MB まで、png / jpeg / webp）。公開にするのは `<img>` で署名付き URL を作らずに出すため（アイコンは秘密ではない）。
+- `0020_profiles.sql` で入れた。
+
 ### 3.3 派生概念（計算で導出）
 
 いずれも依存から導出する。依存のデータの持ち方は未設計で、実装時に設計する（§1.2）。
@@ -387,9 +405,12 @@ $$ language sql stable;
 | story_groups           | 所有者                                          | 所有者 | 所有者                              | 所有者     |
 | story_context_revisions | 所有者                                         | 所有者 | 不可                                | 不可       |
 | task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
+| profiles               | 本人の人                                        | 本人   | 本人の人                            | 不可       |
+| storage.objects（avatars） | 本人の人（自分の uid のフォルダ）           | 本人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ） |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
 - 「書いた本人」は `author_id = auth.uid() and author_type = current_actor_type()`。人と AI は uid が同じなので、種別も合わせて別の投稿者として扱う（AI は人のコメントを、人は AI のコメントを編集・削除できない）。
+- 「本人」は `user_id = auth.uid()`（avatars はパスの先頭のフォルダが `auth.uid()`）。人と AI のどちらも含む。「本人の人」はそれに加えて `current_actor_type() = 'human'`（AI は書けない）。
 - 「不可」はポリシーを作らない。
 
 ポリシー定義:
@@ -516,6 +537,49 @@ create policy task_comments_update on task_comments
 create policy task_comments_delete on task_comments
   for delete to authenticated
   using (author_id = auth.uid() and author_type = current_actor_type());
+```
+
+##### profiles
+
+本人だけが読める。書けるのは本人の人だけで、AI は書けない。delete はポリシーを作らない。
+
+```sql
+alter table profiles enable row level security;
+
+create policy profiles_select on profiles
+  for select to authenticated
+  using (user_id = auth.uid());
+
+create policy profiles_insert on profiles
+  for insert to authenticated
+  with check (user_id = auth.uid() and current_actor_type() = 'human');
+
+create policy profiles_update on profiles
+  for update to authenticated
+  using      (user_id = auth.uid() and current_actor_type() = 'human')
+  with check (user_id = auth.uid() and current_actor_type() = 'human');
+```
+
+##### storage.objects（avatars バケット）
+
+自分の uid のフォルダにだけ、人だけが置ける・差し替えられる・消せる。公開バケットなので画像の取得（公開 URL）はポリシーに依らない。select は Storage の削除・差し替えが対象の行を読むために要るので、自分のフォルダだけ読めるようにする。
+
+```sql
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 2097152, array['image/png', 'image/jpeg', 'image/webp']);
+
+create policy avatars_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- insert は with check、update は using と with check、delete は using に同じ条件を書く
+create policy avatars_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and current_actor_type() = 'human'
+  );
 ```
 
 - `story_context_revisions` の insert は、ストーリーの `context` の保存時にトリガ（`save_story_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
