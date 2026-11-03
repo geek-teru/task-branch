@@ -735,7 +735,7 @@ export default function App() {
               path="/settings/profile"
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
-                  <SettingsPage tab="profile" />
+                  <SettingsPage tab="profile" session={session} />
                 </main>
               }
             />
@@ -743,7 +743,7 @@ export default function App() {
               path="/settings/agents"
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
-                  <SettingsPage tab="agents" />
+                  <SettingsPage tab="agents" session={session} />
                 </main>
               }
             />
