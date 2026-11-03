@@ -12,8 +12,10 @@ export function GlobalHeader({
   allProjectsLabel,
   onSelectProject,
   onSelectAllProjects,
+  pageTitle,
   userName,
   userEmail,
+  onOpenSettings,
   onLogout,
 }: {
   projects: Project[];
@@ -25,8 +27,11 @@ export function GlobalHeader({
   onSelectProject: (projectId: string) => void;
   // Clears the project (Kanban) or opens the project list (other pages).
   onSelectAllProjects: () => void;
+  // Set on pages that belong to no project (設定): the breadcrumb shows it instead of the switcher.
+  pageTitle?: string;
   userName: string;
   userEmail: string | null;
+  onOpenSettings: () => void;
   onLogout: () => void;
 }) {
   const current = projects.find((p) => p.id === currentProjectId);
@@ -51,42 +56,46 @@ export function GlobalHeader({
         <span className="shrink-0 text-lg text-border-strong" aria-hidden>
           /
         </span>
-        <DropdownMenu
-          variant="ghost"
-          size="sm"
-          label="プロジェクトを切り替える"
-          className="min-w-0"
-          menuClassName="max-h-[60vh] min-w-[240px] overflow-y-auto"
-          trigger={
-            <>
-              <span className={current ? "max-w-[320px] truncate" : allProjectsLabel ? undefined : "text-fg-muted"}>
-                {current?.name ?? allProjectsLabel ?? "プロジェクトを選択"}
-              </span>
-              <span className="flex text-fg-muted">
-                <ChevronUpDownIcon size={12} />
-              </span>
-            </>
-          }
-        >
-          {allProjectsLabel && (
-            <>
-              {allItem}
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {ordered.map((p) => (
-            <DropdownMenuItem key={p.id} onSelect={() => onSelectProject(p.id)} selected={p.id === current?.id}>
-              <span className={p.is_active ? "truncate" : "truncate text-fg-muted"}>{p.name}</span>
-            </DropdownMenuItem>
-          ))}
-          {ordered.length === 0 && <div className="px-3 py-1.5 text-[13px] text-fg-muted">プロジェクトがありません</div>}
-          {!allProjectsLabel && (
-            <>
-              <DropdownMenuSeparator />
-              {allItem}
-            </>
-          )}
-        </DropdownMenu>
+        {pageTitle ? (
+          <span className="truncate px-2 text-[13px] font-medium">{pageTitle}</span>
+        ) : (
+          <DropdownMenu
+            variant="ghost"
+            size="sm"
+            label="プロジェクトを切り替える"
+            className="min-w-0"
+            menuClassName="max-h-[60vh] min-w-[240px] overflow-y-auto"
+            trigger={
+              <>
+                <span className={current ? "max-w-[320px] truncate" : allProjectsLabel ? undefined : "text-fg-muted"}>
+                  {current?.name ?? allProjectsLabel ?? "プロジェクトを選択"}
+                </span>
+                <span className="flex text-fg-muted">
+                  <ChevronUpDownIcon size={12} />
+                </span>
+              </>
+            }
+          >
+            {allProjectsLabel && (
+              <>
+                {allItem}
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {ordered.map((p) => (
+              <DropdownMenuItem key={p.id} onSelect={() => onSelectProject(p.id)} selected={p.id === current?.id}>
+                <span className={p.is_active ? "truncate" : "truncate text-fg-muted"}>{p.name}</span>
+              </DropdownMenuItem>
+            ))}
+            {ordered.length === 0 && <div className="px-3 py-1.5 text-[13px] text-fg-muted">プロジェクトがありません</div>}
+            {!allProjectsLabel && (
+              <>
+                <DropdownMenuSeparator />
+                {allItem}
+              </>
+            )}
+          </DropdownMenu>
+        )}
       </div>
 
       <DropdownMenu
@@ -105,6 +114,7 @@ export function GlobalHeader({
           <div className="truncate text-[13px] font-medium text-fg">{userName}</div>
           {userEmail && userEmail !== userName && <div className="truncate text-xs text-fg-muted">{userEmail}</div>}
         </div>
+        <DropdownMenuItem onSelect={onOpenSettings}>設定</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogout}>ログアウト</DropdownMenuItem>
       </DropdownMenu>

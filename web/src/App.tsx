@@ -41,6 +41,7 @@ import { BacklogView } from "./views/BacklogView";
 import { StoryDetailPage } from "./views/StoryDetailPage";
 import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
+import { SettingsPage } from "./views/SettingsPage";
 
 // The project picked in the header / toolbar, remembered per browser.
 const SELECTED_PROJECT_KEY = "project.selected";
@@ -75,6 +76,8 @@ export default function App() {
   const isKanban = pathname === "/kanban";
   const storyMatch = useMatch("/stories/:storyId");
   const isBacklog = pathname === "/backlog" || storyMatch !== null;
+  // Settings belong to no project: no side nav item is current, and the breadcrumb says 設定.
+  const isSettings = pathname === "/settings" || pathname.startsWith("/settings/");
   const [searchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, else the selected one, else the first active project.
   const defaultProjectId = selectedId ?? (projects.find((p) => p.is_active) ?? projects[0])?.id;
@@ -600,13 +603,15 @@ export default function App() {
         allProjectsLabel={isKanban ? "すべてのプロジェクト" : undefined}
         onSelectProject={handleHeaderSelectProject}
         onSelectAllProjects={handleSelectAllProjects}
+        pageTitle={isSettings ? "設定" : undefined}
         userName={userName}
         userEmail={session.user.email ?? null}
+        onOpenSettings={() => navigate("/settings/profile")}
         onLogout={handleLogout}
       />
       <div className="flex min-h-0 flex-1">
         <Sidebar
-          active={isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
+          active={isSettings ? null : isGantt ? "gantt" : isKanban ? "kanban" : isBacklog ? "backlog" : "projects"}
           onNavigate={onNavigate}
         />
 
@@ -722,6 +727,23 @@ export default function App() {
                       onDeleteTask={handleKanbanDelete}
                     />
                   )}
+                </main>
+              }
+            />
+            <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
+            <Route
+              path="/settings/profile"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  <SettingsPage tab="profile" />
+                </main>
+              }
+            />
+            <Route
+              path="/settings/agents"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  <SettingsPage tab="agents" />
                 </main>
               }
             />
