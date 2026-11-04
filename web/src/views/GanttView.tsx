@@ -1,8 +1,8 @@
 // Gantt view: a project's stories and their tasks on a shared timeline.
 // Built from start_date/due_date on the story and task nodes.
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import type { GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL } from "../lib/types";
+import type { AssigneeOption, GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, assigneeFields } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { GroupForm } from "../components/GroupForm";
@@ -78,6 +78,7 @@ function editInitial(node: GraphNode): StoryInput {
     start_date: node.start_date,
     due_date: node.due_date,
     description: node.description,
+    assignee_id: node.assignee_id,
   };
 }
 
@@ -202,6 +203,7 @@ export function GanttView({
   onRenameGroup,
   onDeleteGroup,
   onMoveStoryToGroup,
+  assignees,
 }: {
   project: Project;
   graph: ProjectGraph;
@@ -225,6 +227,8 @@ export function GanttView({
   onDeleteGroup?: (id: string) => void;
   // Put a story into a group, or take it out of its group (null).
   onMoveStoryToGroup?: (storyId: string, groupId: string | null) => void;
+  // Candidates for a task's 担当者 (the form and the detail panel).
+  assignees?: AssigneeOption[];
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -718,6 +722,12 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
                   })
               : undefined
           }
+          assignees={assignees}
+          onChangeAssignee={
+            onUpdateTask
+              ? (node, assigneeId) => onUpdateTask(node.id, { ...editInitial(node), ...assigneeFields(assigneeId) })
+              : undefined
+          }
         />
       )}
 
@@ -742,6 +752,9 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
               : form.mode === "create-task"
               ? taskInitial()
               : editInitial(form.node)
+          }
+          assignees={
+            form.mode === "create-task" || (form.mode === "edit" && form.node.level === "task") ? assignees : undefined
           }
           onSubmit={submitForm}
           onCancel={() => setForm(null)}

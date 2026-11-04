@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { listProjectStories } from "../lib/api";
-import type { KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
-import { BOARD_STATUSES, STATUS_LABEL, isFinished } from "../lib/types";
+import type { AssigneeOption, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
+import { BOARD_STATUSES, STATUS_LABEL, assigneeFields, isFinished } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -17,6 +17,15 @@ import { Toolbar } from "../components/ui/Toolbar";
 
 
 const toDate = (s: string | null) => (s ? new Date(`${s}T00:00:00`) : null);
+
+// The task's current form values (the update API takes them all).
+const taskValues = (t: Task): StoryInput => ({
+  title: t.title,
+  status: t.status,
+  start_date: t.start_date,
+  due_date: t.due_date,
+  description: t.description,
+});
 
 // ドラッグ中、ボードの上下この幅に入ったら自動スクロールする（px / 1フレームの最大量）。
 const AUTO_SCROLL_EDGE = 72;
@@ -40,6 +49,7 @@ export function KanbanView({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  assignees,
 }: {
   projects: Project[];
   lanes: KanbanLane[];
@@ -51,6 +61,8 @@ export function KanbanView({
   onAddTask: (story: Task, values: StoryInput) => void;
   onUpdateTask: (id: string, values: StoryInput) => void;
   onDeleteTask: (id: string) => void;
+  // Candidates for a task's 担当者 (the form and the detail panel).
+  assignees: AssigneeOption[];
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("kanban.labelWidth", 280, 160, 640);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -344,6 +356,8 @@ export function KanbanView({
           onStart={(t) => onChangeStatus(t.id, "in_progress")}
           onComplete={(t) => onChangeStatus(t.id, "done")}
           onChangeStatus={(t, status) => setPendingMove({ task: t, status })}
+          assignees={assignees}
+          onChangeAssignee={(t, assigneeId) => onUpdateTask(t.id, { ...taskValues(t), ...assigneeFields(assigneeId) })}
         />
       )}
 
@@ -352,13 +366,8 @@ export function KanbanView({
           heading="タスクを変更"
           noun="タスク"
           submitLabel="保存"
-          initial={{
-            title: editing.title,
-            status: editing.status,
-            start_date: editing.start_date,
-            due_date: editing.due_date,
-            description: editing.description,
-          }}
+          initial={{ ...taskValues(editing), assignee_id: editing.assignee_id }}
+          assignees={assignees}
           onSubmit={(values) => {
             onUpdateTask(editing.id, values);
             setEditing(null);
@@ -373,6 +382,7 @@ export function KanbanView({
           noun="タスク"
           submitLabel="追加"
           initial={{ title: "", status: "todo", start_date: null, due_date: null, description: null }}
+          assignees={assignees}
           onSubmit={(values) => {
             onAddTask(adding, values);
             setAdding(null);
