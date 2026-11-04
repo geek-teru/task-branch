@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
 import { signOut, useSession } from "./lib/useSession";
@@ -28,7 +28,7 @@ import {
   deleteStoryGroup,
   setStoryGroup,
 } from "./lib/api";
-import type { BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import type { AssigneeOption, BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { ProjectSelect } from "./components/ProjectSelect";
@@ -89,6 +89,11 @@ export default function App() {
   const profile = useProfile(session);
   // Data is loaded only after sign-in; signed-out visitors are sent to /login below.
   const userId = session?.user.id;
+  // Candidates for a task's 担当者: only the project owner, and every project shown is the user's own.
+  const assignees = useMemo<AssigneeOption[]>(
+    () => (userId ? [{ id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl }] : []),
+    [userId, profile.displayName, profile.avatarUrl]
+  );
 
   useEffect(() => {
     if (!isConfigured || !userId) return;
@@ -588,6 +593,7 @@ export default function App() {
           onRenameGroup={handleRenameGroup}
           onDeleteGroup={handleDeleteGroup}
           onMoveStoryToGroup={handleMoveStoryToGroup}
+          assignees={assignees}
         />
       )}
     </main>
@@ -724,6 +730,7 @@ export default function App() {
                       onAddTask={handleAddTask}
                       onUpdateTask={handleKanbanUpdate}
                       onDeleteTask={handleKanbanDelete}
+                      assignees={assignees}
                     />
                   )}
                 </main>

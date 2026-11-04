@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
-import type { Status, Task } from "../lib/types";
+import type { AssigneeOption, Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
+import { AssigneeLabel } from "./AssigneeLabel";
 import { IdBadge } from "./IdBadge";
 import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
@@ -44,6 +45,8 @@ export function DetailPanel<T extends DetailNode>({
   storyOptions,
   currentStoryId,
   onPickStory,
+  assignees,
+  onChangeAssignee,
 }: {
   title: string;
   node: T | null;
@@ -59,6 +62,8 @@ export function DetailPanel<T extends DetailNode>({
   storyOptions?: StoryOption[]; // 候補が無い間は表示だけ（プルダウンを出さない）
   currentStoryId?: string | null;
   onPickStory?: (storyId: string) => void; // ストーリー名のプルダウンで選んだ移動先
+  assignees?: AssigneeOption[]; // tasks only: 担当者 is shown when given
+  onChangeAssignee?: (node: T, assigneeId: string | null) => void; // null = 未割り当て
 }) {
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
   const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
@@ -107,6 +112,19 @@ export function DetailPanel<T extends DetailNode>({
               <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
             ) : (
               <Badge tone={node.status}>{STATUS_LABEL[node.status]}</Badge>
+            )}
+          </Field>
+        )}
+        {node?.level === "task" && assignees && (
+          <Field label="担当者">
+            {onChangeAssignee ? (
+              <AssigneePicker
+                assigneeId={node.assignee_id}
+                assignees={assignees}
+                onPick={(id) => id !== node.assignee_id && onChangeAssignee(node, id)}
+              />
+            ) : (
+              <AssigneeLabel assignee={assignees.find((a) => a.id === node.assignee_id) ?? null} />
             )}
           </Field>
         )}
@@ -202,6 +220,45 @@ function StoryPicker({
       placeholder={text ?? "-"}
       aria-label="ストーリーを変更"
     />
+  );
+}
+
+// The assignee that opens a small menu to pick 未割り当て or a candidate (same look as StatusPicker).
+function AssigneePicker({
+  assigneeId,
+  assignees,
+  onPick,
+}: {
+  assigneeId: string | null;
+  assignees: AssigneeOption[];
+  onPick: (assigneeId: string | null) => void;
+}) {
+  const current = assignees.find((a) => a.id === assigneeId) ?? null;
+  return (
+    <DropdownMenu
+      variant="ghost"
+      size="sm"
+      label="担当者を変更"
+      menuClassName="min-w-[160px]"
+      className="-mx-2.5"
+      trigger={
+        <>
+          <AssigneeLabel assignee={current} />
+          <span className="flex text-fg-muted">
+            <ChevronDownIcon size={12} />
+          </span>
+        </>
+      }
+    >
+      <DropdownMenuItem selected={assigneeId == null} onSelect={() => onPick(null)}>
+        <AssigneeLabel assignee={null} />
+      </DropdownMenuItem>
+      {assignees.map((a) => (
+        <DropdownMenuItem key={a.id} selected={a.id === assigneeId} onSelect={() => onPick(a.id)}>
+          <AssigneeLabel assignee={a} />
+        </DropdownMenuItem>
+      ))}
+    </DropdownMenu>
   );
 }
 

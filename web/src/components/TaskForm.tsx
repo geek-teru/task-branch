@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import type { AssigneeOption, Status, StoryInput } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER, assigneeFields } from "../lib/types";
+import { UNASSIGNED, assigneeSelectOptions } from "./AssigneeLabel";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
 import { Dialog } from "./ui/Dialog";
@@ -10,13 +11,15 @@ import { Textarea } from "./ui/Textarea";
 
 const fieldLabel = "mb-1.5 block text-xs text-fg-muted";
 
-// Modal form to create or edit a story or task (title / status / dates / description).
+// Modal form to create or edit a story or task (title / status / dates / description, and the
+// assignee when assignees is given).
 export function TaskForm({
   heading,
   noun = "ストーリー",
   submitLabel,
   initial,
   todoHint,
+  assignees,
   onSubmit,
   onCancel,
 }: {
@@ -25,6 +28,7 @@ export function TaskForm({
   submitLabel: string;
   initial: StoryInput;
   todoHint?: string; // shown under the status select while 未着手 is picked
+  assignees?: AssigneeOption[]; // tasks only: shows the 担当者 select with these candidates
   onSubmit: (values: StoryInput) => void;
   onCancel: () => void;
 }) {
@@ -33,6 +37,8 @@ export function TaskForm({
   const [start, setStart] = useState(initial.start_date ?? "");
   const [due, setDue] = useState(initial.due_date ?? "");
   const [description, setDescription] = useState(initial.description ?? "");
+  const initialAssignee = initial.assignee_id ?? UNASSIGNED;
+  const [assignee, setAssignee] = useState(initialAssignee);
   const trimmedTitle = title.trim();
 
   const handleSubmit = () => {
@@ -44,6 +50,8 @@ export function TaskForm({
       start_date: start || null,
       due_date: due || null,
       description: d ? d : null,
+      // Only a changed assignee is sent, so an untouched one (e.g. an AI's) stays as it is.
+      ...(assignees && assignee !== initialAssignee ? assigneeFields(assignee || null) : {}),
     });
   };
 
@@ -80,6 +88,18 @@ export function TaskForm({
         aria-label="ステータス"
       />
       {todoHint && status === "todo" && <div className="mt-1.5 text-[11px] text-fg-muted">{todoHint}</div>}
+
+      {assignees && (
+        <>
+          <label className={`${fieldLabel} mt-3.5`}>担当者</label>
+          <Select
+            value={assignee}
+            onChange={setAssignee}
+            options={assigneeSelectOptions(assignees)}
+            aria-label="担当者"
+          />
+        </>
+      )}
 
       <div className="mt-3.5 flex gap-3">
         <div className="flex-1">

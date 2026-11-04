@@ -64,6 +64,21 @@ export interface StoryInput {
   start_date: string | null;
   due_date: string | null;
   description: string | null;
+  // task only, and only when the assignee was changed (absent = left as is).
+  assignee_id?: string | null;
+  assignee_type?: AssigneeType | null;
+}
+
+// A user that can be picked as a task's assignee (for now only the project owner, i.e. the signed-in user).
+export interface AssigneeOption {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
+// Assigning a user makes the task a human's; clearing it leaves no assignee at all.
+export function assigneeFields(assigneeId: string | null): Pick<StoryInput, "assignee_id" | "assignee_type"> {
+  return { assignee_id: assigneeId, assignee_type: assigneeId ? "human" : null };
 }
 
 // A task enriched with derived fields from get_task_graph().
