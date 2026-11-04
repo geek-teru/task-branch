@@ -4,6 +4,7 @@ import { AVATAR_MAX_BYTES, AVATAR_TYPES, avatarUrl, getProfile, removeAvatar, sa
 import type { Profile } from "../../lib/types";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Avatar } from "../../components/Avatar";
 
 const DISPLAY_NAME_MAX = 50;
 
@@ -100,7 +101,7 @@ export function ProfileSettings({ session, onSaved }: { session: Session; onSave
     <div className="flex max-w-[480px] flex-col gap-6">
       <Field label="アイコン">
         <div className="flex items-center gap-4">
-          <AvatarPreview url={shownUrl} name={displayName.trim() || googleName} />
+          <Avatar url={shownUrl} name={displayName.trim() || googleName} className="size-20 text-2xl" />
           <div className="flex flex-col items-start gap-2">
             <div className="flex gap-2">
               <Button size="sm" onClick={() => fileRef.current?.click()} disabled={saving}>
@@ -157,25 +158,6 @@ export function ProfileSettings({ session, onSaved }: { session: Session; onSave
         {error && <span className="text-[13px] text-danger">{error}</span>}
       </div>
     </div>
-  );
-}
-
-// 80px circle. Google's images are read without a referrer (lh3.googleusercontent.com may answer 403);
-// a missing or broken image falls back to the initial.
-function AvatarPreview({ url, name }: { url: string | null; name: string }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [url]);
-  const first = [...name.trim()][0];
-  return (
-    <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-muted text-2xl font-medium text-fg">
-      {url && !failed ? (
-        <img src={url} alt="" referrerPolicy="no-referrer" className="size-full object-cover" onError={() => setFailed(true)} />
-      ) : first ? (
-        first.toUpperCase()
-      ) : (
-        "?"
-      )}
-    </span>
   );
 }
 

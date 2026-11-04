@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
 import { signOut, useSession } from "./lib/useSession";
+import { useProfile } from "./lib/useProfile";
 import {
   addRootStory,
   addTask,
@@ -85,6 +86,7 @@ export default function App() {
   const [graph, setGraph] = useState<{ projectId: string; graph: ProjectGraph } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const session = useSession();
+  const profile = useProfile(session);
   // Data is loaded only after sign-in; signed-out visitors are sent to /login below.
   const userId = session?.user.id;
 
@@ -524,10 +526,6 @@ export default function App() {
   const pickerProjects = (currentId: string | null | undefined) =>
     projects.filter((p) => p.is_active || p.id === currentId);
 
-  // Google sign-in fills full_name / name; fall back to the email.
-  const meta = session.user.user_metadata ?? {};
-  const userName: string = meta.full_name ?? meta.name ?? session.user.email ?? "";
-
   // The header's project switcher keeps the page and swaps the project; pages without one
   // (project list, story detail) go to that project's backlog.
   const headerProjectId = isGantt
@@ -604,7 +602,8 @@ export default function App() {
         onSelectProject={handleHeaderSelectProject}
         onSelectAllProjects={handleSelectAllProjects}
         pageTitle={isSettings ? "設定" : undefined}
-        userName={userName}
+        userName={profile.displayName}
+        userAvatarUrl={profile.avatarUrl}
         userEmail={session.user.email ?? null}
         onOpenSettings={() => navigate("/settings/profile")}
         onLogout={handleLogout}
@@ -735,7 +734,7 @@ export default function App() {
               path="/settings/profile"
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
-                  <SettingsPage tab="profile" session={session} />
+                  <SettingsPage tab="profile" session={session} onProfileSaved={profile.reload} />
                 </main>
               }
             />

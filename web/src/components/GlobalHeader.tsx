@@ -1,4 +1,5 @@
 import type { Project } from "../lib/types";
+import { Avatar } from "./Avatar";
 import { ChevronUpDownIcon, ServiceIcon } from "./Icons";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
@@ -14,6 +15,7 @@ export function GlobalHeader({
   onSelectAllProjects,
   pageTitle,
   userName,
+  userAvatarUrl,
   userEmail,
   onOpenSettings,
   onLogout,
@@ -30,6 +32,8 @@ export function GlobalHeader({
   // Set on pages that belong to no project (設定): the breadcrumb shows it instead of the switcher.
   pageTitle?: string;
   userName: string;
+  // Uploaded image or Google's; null shows the initial.
+  userAvatarUrl: string | null;
   userEmail: string | null;
   onOpenSettings: () => void;
   onLogout: () => void;
@@ -104,11 +108,7 @@ export function GlobalHeader({
         align="end"
         label="ユーザーメニュー"
         menuClassName="min-w-[220px]"
-        trigger={
-          <span className="flex size-7 items-center justify-center rounded-full border border-border bg-surface-muted text-xs font-medium text-fg">
-            {initial(userName)}
-          </span>
-        }
+        trigger={<Avatar url={userAvatarUrl} name={userName} className="size-7 text-xs" />}
       >
         <div className="px-3 py-2">
           <div className="truncate text-[13px] font-medium text-fg">{userName}</div>
@@ -120,10 +120,4 @@ export function GlobalHeader({
       </DropdownMenu>
     </header>
   );
-}
-
-// Fixed-width slot so checked and unchecked items line up.
-function initial(name: string): string {
-  const first = [...name.trim()][0];
-  return first ? first.toUpperCase() : "?";
 }
