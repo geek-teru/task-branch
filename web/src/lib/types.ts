@@ -37,6 +37,18 @@ export interface Task {
   closed_at: string | null; // set while closed (approved and taken off the board)
 }
 
+// The signed-in user's own profile (profiles). null fields fall back to the Google account's.
+export interface Profile {
+  user_id: string;
+  display_name: string | null; // null = Google full_name, then email
+  avatar_path: string | null; // path in the avatars bucket. null = Google avatar_url
+  created_at: string;
+  updated_at: string;
+}
+
+// Editable fields of a profile (saveProfile).
+export type ProfileInput = Pick<Profile, "display_name" | "avatar_path">;
+
 // Editable fields of a project, shared by the create/edit form and the API.
 export interface ProjectInput {
   name: string;
