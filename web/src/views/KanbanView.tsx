@@ -7,6 +7,7 @@ import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
+import { Avatar } from "../components/Avatar";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
 import { IconButton } from "../components/ui/Button";
@@ -253,6 +254,7 @@ export function KanbanView({
                   <TaskCard
                     key={t.id}
                     task={t}
+                    assignee={assignees.find((a) => a.id === t.assignee_id) ?? null}
                     dragging={drag?.task.id === t.id}
                     selected={selectedId === t.id}
                     onSelect={() => setSelectedId(t.id)}
@@ -431,6 +433,7 @@ function moveMessage({ task, status, targetStory }: { task: Task; status: Status
 // 上から ID / タイトル / 期限。ストーリー名はレーンの見出しにあるので出さない。
 function TaskCard({
   task,
+  assignee,
   dragging,
   selected,
   onSelect,
@@ -438,6 +441,8 @@ function TaskCard({
   onDragEnd,
 }: {
   task: Task;
+  // null = 未割り当て（アイコンを出さない）
+  assignee: AssigneeOption | null;
   dragging: boolean;
   selected: boolean;
   onSelect: () => void;
@@ -467,26 +472,23 @@ function TaskCard({
         <IdBadge id={task.id} />
       </div>
       {/* レーンのストーリー名と同じ大きさ。2行まで出し、3行目からは「…」で省略する。 */}
-      {/* 右下のアイコンに重ならないよう、タスク名と期限はアイコンの幅だけ右を空ける。 */}
-      <div className="mt-0.5 line-clamp-2 break-words pr-6 text-xs">{task.title}</div>
+      {/* 右下のアイコンに重ならないよう、担当者がいるときはタスク名と期限をアイコンの幅だけ右を空ける。 */}
+      <div className={cn("mt-0.5 line-clamp-2 break-words text-xs", assignee && "pr-6")}>{task.title}</div>
       {/* 期限は ID より弱い補助として出す。 */}
-      {task.due_date && <div className="mt-0.5 truncate pr-6 text-[11px] text-fg-muted/80">期限 {task.due_date}</div>}
-      <AssigneeAvatar />
+      {task.due_date && (
+        <div className={cn("mt-0.5 truncate text-[11px] text-fg-muted/80", assignee && "pr-6")}>期限 {task.due_date}</div>
+      )}
+      {assignee && <AssigneeAvatar assignee={assignee} />}
     </Card>
   );
 }
 
 // 担当者のアイコン（ヘッダーのユーザーアイコンと同じ形の小型版）。
-// 担当者のデータがまだ無いので、今は固定のサンプルを出す。
-const SAMPLE_ASSIGNEE = "Sample User";
-
-function AssigneeAvatar({ name = SAMPLE_ASSIGNEE }: { name?: string }) {
+// プロフィールの画像があれば画像、無ければ（読めなければ）表示名の頭文字を出す。
+function AssigneeAvatar({ assignee }: { assignee: AssigneeOption }) {
   return (
-    <span
-      className="absolute right-2 bottom-2 flex size-5 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-medium text-fg"
-      data-tooltip={name}
-    >
-      {name.slice(0, 1).toUpperCase()}
+    <span className="absolute right-2 bottom-2" data-tooltip={assignee.name}>
+      <Avatar url={assignee.avatarUrl} name={assignee.name} className="size-5 text-[10px]" />
     </span>
   );
 }
