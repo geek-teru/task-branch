@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { cn } from "../lib/cn";
 import { PageHeader } from "../components/ui/PageHeader";
+import { AgentSettings } from "./settings/AgentSettings";
 import { ProfileSettings } from "./settings/ProfileSettings";
 
 export type SettingsTab = "profile" | "agents";
@@ -11,8 +12,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "agents", label: "AI エージェント" },
 ];
 
-// /settings/:tab. The tabs are links in a left column (each tab has its own URL). The agents tab
-// comes in its own task, so it shows a placeholder for now.
+// /settings/:tab. The tabs are links in a left column (each tab has its own URL).
 export function SettingsPage({
   tab,
   session,
@@ -47,9 +47,7 @@ export function SettingsPage({
           {tab === "profile" ? (
             <ProfileSettings session={session} onSaved={onProfileSaved} />
           ) : (
-            <div className="rounded-md border border-dashed border-border-strong px-6 py-12 text-center text-[13px] text-fg-muted">
-              準備中
-            </div>
+            <AgentSettings />
           )}
         </section>
       </div>

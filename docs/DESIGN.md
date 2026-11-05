@@ -643,6 +643,7 @@ create policy avatars_insert on storage.objects
 - **プロジェクト選択** → **ボード**（メイン）
 - **バックログ**: プロジェクトのストーリーの一覧（Active / InActive）。並び順（`sort_order`）＝優先順位。ここから Active にして着手する。
 - カンバンには `status` が `in_progress` のストーリーを出す（§9 Q11）。ガントチャートはプロジェクトのストーリーとその配下のタスクを出す。
+- **設定**（`/settings`）: 左の項目ごとに URL を分ける。`/settings/profile` は表示名とアイコン、`/settings/agents` は MCP で接続中の AI エージェントの一覧と接続の解除（§7.1）。
 - ビュー切替:
   - **階層ツリー（マインドマップ）**: story → task を展開。React Flow で放射状/ツリー。
   - **ブランチ図（DAG）**: ストーリー配下のタスクを、依存で結んだ Git ブランチ状に表示。rank を軸に**前後関係は横（左→右）、並列（同 rank）は縦**（R4/R5）。担当（人 / AI）はアイコンで表す。
@@ -753,7 +754,7 @@ AI（Claude Code）は MCP の OAuth 2.1 認可（§7.2）で、人のアカウ�
 | アカウント | AI 専用のアカウントは作らない。人が Google でログインした自分のアカウントで同意する。AI はトークンの `client_id` で見分ける（`current_actor_type()`、§3.5） |
 | トークン   | Claude Code が持ち、自動で更新する（refresh_token）。AI の会話には出ない                                                                                    |
 | 署名鍵     | ES256。MCP サーバーは JWKS（`/auth/v1/.well-known/jwks.json` の公開鍵）で検証し、service_role キーも JWT secret も持たない                                   |
-| 止め方     | 人のセッションで `DELETE /auth/v1/user/oauth/grants?client_id=<client_id>` を呼び、同意を取り消す（一覧は同じパスの GET）                                     |
+| 止め方     | 設定画面の AI エージェント（`/settings/agents`）で「接続を解除」する。中身は人のセッションでの `revokeGrant`（`DELETE /auth/v1/user/oauth/grants`）。一覧は `listGrants`（同じパスの GET） |
 
 - 人と AI は同じ uid になる。所有者の判定（`current_owner_id()`）は人と同じ範囲になり、投稿者は `author_id` と `author_type` の組で見分ける（§3.5）。
 - service_role キーは MCP サーバーに持たせない（RLS を素通りするため）。
