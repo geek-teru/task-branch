@@ -14,8 +14,8 @@ export type AgentClientInfo = { name: string; redirectUri?: string };
 export type AgentProvider = {
   id: AgentProviderId;
   name: string;
-  // Tile color and the letters on it (see ProviderIcon).
-  icon: { color: string; label: string };
+  // The provider's image (under web/public), or a colored tile with letters when there is none (see ProviderIcon).
+  icon: { color: string; label: string; image?: string };
   match: (client: AgentClientInfo) => boolean;
 };
 
@@ -23,13 +23,13 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
   {
     id: "claude-code",
     name: "Claude Code",
-    icon: { color: "#d97757", label: "CC" },
+    icon: { color: "#d97757", label: "CC", image: "/agents/claude.png" },
     match: () => false, // client_name not confirmed yet
   },
   {
     id: "claude-ai",
     name: "claude.ai",
-    icon: { color: "#c15f3c", label: "C" },
+    icon: { color: "#d97757", label: "C", image: "/agents/claude.png" },
     // Confirmed 2026-11-05: client_name "Claude", redirect_uri https://claude.ai/api/mcp/auth_callback.
     match: (c) =>
       c.name === "Claude" &&

@@ -55,15 +55,27 @@ export function GoogleIcon({ size = 16 }: IconProps) {
   );
 }
 
-// AI agent provider: a colored tile with the provider's letters (no brand logos). Without a provider
-// (その他) it is a gray tile with a plug.
+// AI agent provider: the provider's image, or a colored tile with its letters when it has none.
+// Without a provider (その他) it is a gray tile with a plug.
 export function ProviderIcon({
   provider,
   size = 28,
 }: {
-  provider: { name: string; icon: { color: string; label: string } } | null;
+  provider: { name: string; icon: { color: string; label: string; image?: string } } | null;
   size?: number;
 }) {
+  if (provider?.icon.image) {
+    return (
+      <img
+        src={provider.icon.image}
+        alt=""
+        aria-hidden="true"
+        width={size}
+        height={size}
+        className="shrink-0 rounded-md"
+      />
+    );
+  }
   return (
     <span
       aria-hidden="true"
