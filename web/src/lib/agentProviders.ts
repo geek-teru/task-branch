@@ -24,7 +24,9 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
     id: "claude-code",
     name: "Claude Code",
     icon: { color: "#d97757", label: "CC", image: "/agents/claude.png" },
-    match: () => false, // client_name not confirmed yet
+    // Confirmed 2026-11-06: client_name "Claude Code (<MCP server name>)", redirect_uri http://localhost:<port>/callback.
+    match: (c) =>
+      c.name.startsWith("Claude Code (") && (c.redirectUri === undefined || c.redirectUri.startsWith("http://localhost:")),
   },
   {
     id: "claude-ai",
