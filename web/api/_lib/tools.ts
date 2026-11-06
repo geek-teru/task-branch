@@ -83,7 +83,7 @@ const PROJECT_COLUMNS = "id, name, description, url, repository_url";
 
 // get_task_context で返すタスク・親ストーリー・プロジェクトの列。親とプロジェクトは外部キーの列名で埋め込む。
 // supabase-js が select の文字列から型を推論するので、連結せず1つのリテラルにする。
-const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_type, start_date, due_date, metadata, created_at, updated_at, completed_at, closed_at,
+const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_type, assignee_client_id, start_date, due_date, metadata, created_at, updated_at, completed_at, closed_at,
   story:parent_id(id, title, description, status, context), project:project_id(id, name, description, url, repository_url)`;
 
 // get_next_task の候補の列。並べ替えに使う sort_order / created_at も取る。
@@ -157,7 +157,9 @@ type ListTaskRow = { parent_id: string; status: string };
 
 // get_story で返すストーリーの列と配下のタスクの列。
 const GET_STORY_COLUMNS = "id, project_id, level, title, description, context, status, activated_at, start_date, due_date";
-const STORY_TASK_COLUMNS = "id, title, description, status, assignee_type, start_date, due_date";
+const STORY_TASK_COLUMNS = "id, title, description, status, assignee_type, assignee_client_id, start_date, due_date";
+
+type StoryTaskRow = { assignee_client_id: string | null };
 
 // eq は等価条件（列 → 値）で、全部を満たす行だけ取る。
 async function selectAll<T>(db: SupabaseClient, table: string, columns: string, order: string, eq: Record<string, string> = {}) {
@@ -173,6 +175,12 @@ async function selectAll<T>(db: SupabaseClient, table: string, columns: string, 
 }
 
 export function registerTools(server: McpServer, db: SupabaseClient, clientId: string): void {
+  // 参照ツールのタスクに、呼び出したエージェント自身の担当かを足す。
+  const withAssignedToMe = <T extends { assignee_client_id: string | null }>(task: T) => ({
+    ...task,
+    assigned_to_me: task.assignee_client_id === clientId,
+  });
+
   server.registerTool(
     "list_projects",
     {
@@ -288,7 +296,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       description:
         "ストーリー1件のコンテキストと配下のタスクを返す。list_stories で一覧を見て、中身が要るストーリーだけこれで読む。" +
         "返り値は { story, project: { id, name }, tasks }。story は id / title / description / context / status / active（着手済みか）/ " +
-        "activated_at / start_date / due_date / progress（0〜1）。tasks は並び順で id / title / description / status / assignee_type / start_date / due_date。" +
+        "activated_at / start_date / due_date / progress（0〜1）。tasks は並び順で id / title / description / status / assignee_type / " +
+        "assignee_client_id（担当のエージェント）/ assigned_to_me（呼び出したエージェント自身の担当か）/ start_date / due_date。" +
         "コメントは含まない（get_task_context で取る）",
       inputSchema: { story_id: z.uuid().describe("ストーリーの id（タスクは不可）") },
     },
@@ -300,7 +309,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
 
       const { data: project, error: projectError } = await db.from("projects").select("id, name").eq("id", story.project_id).single();
       if (projectError) return restError(projectError);
-      const tasks = await selectAll(db, "tasks", STORY_TASK_COLUMNS, "sort_order", { parent_id: story_id, level: "task" });
+      const tasks = await selectAll<StoryTaskRow>(db, "tasks", STORY_TASK_COLUMNS, "sort_order", { parent_id: story_id, level: "task" });
       if (tasks.error) return restError(tasks.error);
       const { data: progress, error: progressError } = await db.rpc("get_progress", { project: story.project_id });
       if (progressError) return restError(progressError);
@@ -320,7 +329,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
           progress: Number(storyProgress ?? 0),
         },
         project,
-        tasks: tasks.rows,
+        tasks: tasks.rows.map(withAssignedToMe),
       });
     },
   );
@@ -649,7 +658,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       title: "タスクの文脈の取得",
       description:
         "タスクの中身と、親ストーリー（context はストーリーのドキュメントで、決定事項などの正の情報）、プロジェクト、" +
-        "コメント（過去の作業メモ・申し送り。list_task_comments と同じ形で古い順）をまとめて返す。作業を始める前に使う",
+        "コメント（過去の作業メモ・申し送り。list_task_comments と同じ形で古い順）をまとめて返す。作業を始める前に使う。" +
+        "task の assignee_client_id は担当のエージェント、assigned_to_me は呼び出したエージェント自身の担当か",
       inputSchema: { task_id: z.uuid().describe("タスクの id（ストーリーは不可）") },
     },
     async ({ task_id }) => {
@@ -666,7 +676,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       if (error) return restError(error);
 
       const { level: _level, story, project, ...rest } = task;
-      return json({ task: rest, story, project, comments: (comments as CommentRow[]).map(withEditable) });
+      return json({ task: withAssignedToMe(rest), story, project, comments: (comments as CommentRow[]).map(withEditable) });
     },
   );
 
@@ -678,7 +688,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
         "次に着手するタスクを1件返す。候補は進行中のストーリー配下で status が todo のタスク（カンバンに出ている範囲）のうち、" +
         "呼び出したエージェントの担当と、担当が未割り当て・AI（未指定）のもの。人の担当と別のエージェントの担当は返さない。" +
         "呼び出したエージェントの担当を優先し、その中の並びはプロジェクトの作成順 → ストーリーの並び → タスクの並びで、先頭を返す。状態は変えない。候補が無ければ task は null。" +
-        "タスク間の依存関係はまだ見ない",
+        "タスク間の依存関係はまだ見ない。task の assignee_client_id は担当のエージェント、assigned_to_me は呼び出したエージェント自身の担当か",
       inputSchema: {
         project_id: z.uuid().optional().describe("プロジェクトの id（list_projects で取る）。省略したら自分のすべてのプロジェクトから選ぶ"),
       },
@@ -709,9 +719,9 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       const next = rows[0];
       if (!next) return json({ task: null, message: "着手できるタスクがありません（進行中のストーリー配下に、未着手で人や別のエージェントの担当でないタスクがない）" });
 
-      const { story, project, sort_order: _sortOrder, assignee_client_id: _assigneeClientId, ...task } = next;
+      const { story, project, sort_order: _sortOrder, ...task } = next;
       const { created_at: _createdAt, ...projectFields } = project;
-      return json({ task, story: { id: story.id, title: story.title }, project: projectFields });
+      return json({ task: withAssignedToMe(task), story: { id: story.id, title: story.title }, project: projectFields });
     },
   );
 
