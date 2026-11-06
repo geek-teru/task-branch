@@ -75,7 +75,7 @@ const TASK_CONTEXT_COLUMNS = `id, level, title, description, status, assignee_ty
   story:parent_id(id, title, description, status, context), project:project_id(id, name, description, url, repository_url)`;
 
 // get_next_task の候補の列。並べ替えに使う sort_order / created_at も取る。
-const NEXT_TASK_COLUMNS = `id, title, description, status, assignee_type, start_date, due_date, sort_order,
+const NEXT_TASK_COLUMNS = `id, title, description, status, assignee_type, assignee_client_id, start_date, due_date, sort_order,
   story:parent_id!inner(id, title, status, sort_order), project:project_id(id, name, url, repository_url, created_at)`;
 
 type NextTaskRow = {
@@ -84,6 +84,7 @@ type NextTaskRow = {
   description: string | null;
   status: string;
   assignee_type: "human" | "ai" | null;
+  assignee_client_id: string | null;
   start_date: string | null;
   due_date: string | null;
   sort_order: number;
@@ -159,7 +160,7 @@ async function selectAll<T>(db: SupabaseClient, table: string, columns: string, 
   }
 }
 
-export function registerTools(server: McpServer, db: SupabaseClient): void {
+export function registerTools(server: McpServer, db: SupabaseClient, clientId: string): void {
   server.registerTool(
     "list_projects",
     {
@@ -652,8 +653,9 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
     {
       title: "次に着手するタスクの取得",
       description:
-        "次に着手するタスクを1件返す。候補は進行中のストーリー配下で status が todo、担当が人でないタスク（カンバンに出ている範囲）。" +
-        "並びはプロジェクトの作成順 → ストーリーの並び → タスクの並びで、先頭を返す。状態は変えない。候補が無ければ task は null。" +
+        "次に着手するタスクを1件返す。候補は進行中のストーリー配下で status が todo のタスク（カンバンに出ている範囲）のうち、" +
+        "呼び出したエージェントの担当と、担当が未割り当て・AI（未指定）のもの。人の担当と別のエージェントの担当は返さない。" +
+        "呼び出したエージェントの担当を優先し、その中の並びはプロジェクトの作成順 → ストーリーの並び → タスクの並びで、先頭を返す。状態は変えない。候補が無ければ task は null。" +
         "タスク間の依存関係はまだ見ない",
       inputSchema: {
         project_id: z.uuid().optional().describe("プロジェクトの id（list_projects で取る）。省略したら自分のすべてのプロジェクトから選ぶ"),
@@ -667,22 +669,25 @@ export function registerTools(server: McpServer, db: SupabaseClient): void {
         .eq("level", "task")
         .eq("status", "todo")
         .or("assignee_type.is.null,assignee_type.neq.human")
+        .or(`assignee_client_id.is.null,assignee_client_id.eq."${clientId}"`)
         .eq("story.status", "in_progress");
       if (project_id) query = query.eq("project_id", project_id);
       const { data, error } = await query;
       if (error) return restError(error);
 
-      // 埋め込んだ列では並べられないので、ここで並べる（カンバンと同じ並び）。
+      // 埋め込んだ列では並べられないので、ここで並べる（自分の担当を先に、その中はカンバンと同じ並び）。
+      const priority = (row: NextTaskRow) => (row.assignee_client_id === clientId ? 0 : 1);
       const rows = (data as unknown as NextTaskRow[]).sort(
         (a, b) =>
+          priority(a) - priority(b) ||
           a.project.created_at.localeCompare(b.project.created_at) ||
           a.story.sort_order - b.story.sort_order ||
           a.sort_order - b.sort_order,
       );
       const next = rows[0];
-      if (!next) return json({ task: null, message: "着手できるタスクがありません（進行中のストーリー配下に、未着手で人の担当でないタスクがない）" });
+      if (!next) return json({ task: null, message: "着手できるタスクがありません（進行中のストーリー配下に、未着手で人や別のエージェントの担当でないタスクがない）" });
 
-      const { story, project, sort_order: _sortOrder, ...task } = next;
+      const { story, project, sort_order: _sortOrder, assignee_client_id: _assigneeClientId, ...task } = next;
       const { created_at: _createdAt, ...projectFields } = project;
       return json({ task, story: { id: story.id, title: story.title }, project: projectFields });
     },

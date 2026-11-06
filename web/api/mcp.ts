@@ -11,7 +11,7 @@ export async function POST(req: Request): Promise<Response> {
   if (auth instanceof Response) return auth;
 
   const server = new McpServer({ name: "task-branch", version: pkg.version });
-  registerTools(server, createUserClient(auth.token));
+  registerTools(server, createUserClient(auth.token), auth.claims.client_id);
 
   // セッション ID を発行せず、SSE ではなく JSON で応答する。
   const transport = new WebStandardStreamableHTTPServerTransport({
