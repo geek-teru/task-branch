@@ -57,6 +57,9 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
   },
 ];
 
+// How a connected client is called on screen.
+export const agentClientLabel = (client: { id: string; name: string }) => client.name || client.id;
+
 // The provider a client belongs to, or null for その他.
 export function findAgentProvider(client: AgentClientInfo): AgentProvider | null {
   return AGENT_PROVIDERS.find((p) => p.match(client)) ?? null;

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import type { AssigneeOption, Status, Task } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER, assigneeKey } from "../lib/types";
+import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER, assigneeKey, assigneeOf } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AssigneeLabel } from "./AssigneeLabel";
 import { IdBadge } from "./IdBadge";
@@ -62,7 +62,7 @@ export function DetailPanel<T extends DetailNode>({
   storyOptions?: StoryOption[]; // 候補が無い間は表示だけ（プルダウンを出さない）
   currentStoryId?: string | null;
   onPickStory?: (storyId: string) => void; // ストーリー名のプルダウンで選んだ移動先
-  assignees?: AssigneeOption[]; // tasks only: 担当者 is shown when given
+  assignees?: Assignees; // tasks only: 担当者 is shown when given
   onChangeAssignee?: (node: T, assigneeId: string | null) => void; // null = 未割り当て
 }) {
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
@@ -120,11 +120,12 @@ export function DetailPanel<T extends DetailNode>({
             {onChangeAssignee ? (
               <AssigneePicker
                 assigneeId={assigneeKey(node)}
-                assignees={assignees}
+                current={assigneeOf(node, assignees)}
+                candidates={assignees.options}
                 onPick={(id) => id !== assigneeKey(node) && onChangeAssignee(node, id)}
               />
             ) : (
-              <AssigneeLabel assignee={assignees.find((a) => a.id === assigneeKey(node)) ?? null} />
+              <AssigneeLabel assignee={assigneeOf(node, assignees)} />
             )}
           </Field>
         )}
@@ -226,14 +227,15 @@ function StoryPicker({
 // The assignee that opens a small menu to pick 未割り当て or a candidate (same look as StatusPicker).
 function AssigneePicker({
   assigneeId,
-  assignees,
+  current,
+  candidates,
   onPick,
 }: {
   assigneeId: string | null;
-  assignees: AssigneeOption[];
+  current: AssigneeOption | null;
+  candidates: AssigneeOption[];
   onPick: (assigneeId: string | null) => void;
 }) {
-  const current = assignees.find((a) => a.id === assigneeId) ?? null;
   return (
     <DropdownMenu
       variant="ghost"
@@ -253,7 +255,7 @@ function AssigneePicker({
       <DropdownMenuItem selected={assigneeId == null} onSelect={() => onPick(null)}>
         <AssigneeLabel assignee={null} />
       </DropdownMenuItem>
-      {assignees.map((a) => (
+      {candidates.map((a) => (
         <DropdownMenuItem key={a.id} selected={a.id === assigneeId} onSelect={() => onPick(a.id)}>
           <AssigneeLabel assignee={a} />
         </DropdownMenuItem>

@@ -1,5 +1,7 @@
 // Shared domain types. Every view is a projection over these — see DESIGN.md §5.4.
 
+import type { AgentProvider } from "./agentProviders";
+
 export type Level = "story" | "task";
 export type Status = "todo" | "in_progress" | "done" | "closed";
 export type AssigneeType = "human" | "ai";
@@ -29,6 +31,7 @@ export interface Task {
   activated_at: string | null; // story only: null = backlog, set = active
   assignee_type: AssigneeType | null; // task only
   assignee_id: string | null; // task only: the human assignee
+  assignee_client_id: string | null; // task only: the AI assignee (OAuth client_id). null = AI（未指定）
   context?: string | null; // story only: Markdown document. Not fetched by list queries
   metadata: Record<string, unknown>;
   created_at: string;
@@ -67,30 +70,63 @@ export interface StoryInput {
   // task only, and only when the assignee was changed (absent = left as is).
   assignee_id?: string | null;
   assignee_type?: AssigneeType | null;
+  assignee_client_id?: string | null;
 }
 
-// Who can be picked as a task's assignee: the project owner (the signed-in user), or the AI.
+// A task's assignee as shown on screen: the project owner (the signed-in user) or an AI agent.
 export interface AssigneeOption {
-  id: string; // a user id, or AI_ASSIGNEE_ID
+  id: string; // a user id, or an AI key (agentAssigneeId / AI_ASSIGNEE_ID)
   name: string;
   avatarUrl: string | null;
+  agent?: { provider: AgentProvider | null }; // AI only: shown with the provider's icon, as on /settings/agents
 }
 
-// The AI has no user row (assignee_id only points at users), so it is picked by this id instead.
+// Who can be picked as an assignee. agentsLoaded is false while the connected agents are unknown
+// (not read yet, or the read failed), when an agent missing from options may still be connected.
+export interface Assignees {
+  options: AssigneeOption[];
+  agentsLoaded: boolean;
+}
+
+type AssigneeFields = Pick<StoryInput, "assignee_id" | "assignee_type" | "assignee_client_id">;
+
+// An agent has no user row (assignee_id only points at users), so it is told apart by this key.
+const AGENT_KEY_PREFIX = "agent:";
+export const agentAssigneeId = (clientId: string) => `${AGENT_KEY_PREFIX}${clientId}`;
+
+// An AI assignee with no client_id: tasks assigned before agents could be picked.
 export const AI_ASSIGNEE_ID = "ai";
 
-export const AI_ASSIGNEE: AssigneeOption = { id: AI_ASSIGNEE_ID, name: "Claude", avatarUrl: "/agents/claude.png" };
+const AI_UNSPECIFIED: AssigneeOption = { id: AI_ASSIGNEE_ID, name: "AI（未指定）", avatarUrl: null, agent: { provider: null } };
 
 // The AssigneeOption id of a task's assignee, or null for 未割り当て.
-export function assigneeKey(t: Pick<StoryInput, "assignee_id" | "assignee_type">): string | null {
-  return t.assignee_id ?? (t.assignee_type === "ai" ? AI_ASSIGNEE_ID : null);
+export function assigneeKey(t: AssigneeFields): string | null {
+  if (t.assignee_id) return t.assignee_id;
+  if (t.assignee_type !== "ai") return null;
+  return t.assignee_client_id ? agentAssigneeId(t.assignee_client_id) : AI_ASSIGNEE_ID;
 }
 
-// Assigning a user makes the task a human's, picking the AI makes it the AI's, and clearing it leaves
-// no assignee at all.
-export function assigneeFields(assigneeId: string | null): Pick<StoryInput, "assignee_id" | "assignee_type"> {
-  if (assigneeId === AI_ASSIGNEE_ID) return { assignee_id: null, assignee_type: "ai" };
-  return { assignee_id: assigneeId, assignee_type: assigneeId ? "human" : null };
+// The assignee to show for a task. An agent that is no longer among the candidates stays the
+// assignee and is shown as 解除済みのエージェント, or just エージェント while that cannot be told.
+export function assigneeOf(t: AssigneeFields, assignees: Assignees): AssigneeOption | null {
+  const key = assigneeKey(t);
+  if (!key) return null;
+  const found = assignees.options.find((a) => a.id === key);
+  if (found) return found;
+  if (key === AI_ASSIGNEE_ID) return AI_UNSPECIFIED;
+  if (!key.startsWith(AGENT_KEY_PREFIX)) return null;
+  const name = assignees.agentsLoaded ? "解除済みのエージェント" : "エージェント";
+  return { id: key, name, avatarUrl: null, agent: { provider: null } };
+}
+
+// Assigning a user makes the task a human's, picking an agent makes it the AI's, and clearing it
+// leaves no assignee at all.
+export function assigneeFields(assigneeId: string | null): AssigneeFields {
+  if (assigneeId === AI_ASSIGNEE_ID) return { assignee_id: null, assignee_type: "ai", assignee_client_id: null };
+  if (assigneeId?.startsWith(AGENT_KEY_PREFIX)) {
+    return { assignee_id: null, assignee_type: "ai", assignee_client_id: assigneeId.slice(AGENT_KEY_PREFIX.length) };
+  }
+  return { assignee_id: assigneeId, assignee_type: assigneeId ? "human" : null, assignee_client_id: null };
 }
 
 // A task enriched with derived fields from get_task_graph().

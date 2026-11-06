@@ -1,7 +1,7 @@
 // Gantt view: a project's stories and their tasks on a shared timeline.
 // Built from start_date/due_date on the story and task nodes.
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import type { AssigneeOption, GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
+import type { Assignees, GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, assigneeFields } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
@@ -80,6 +80,7 @@ function editInitial(node: GraphNode): StoryInput {
     description: node.description,
     assignee_id: node.assignee_id,
     assignee_type: node.assignee_type,
+    assignee_client_id: node.assignee_client_id,
   };
 }
 
@@ -229,7 +230,7 @@ export function GanttView({
   // Put a story into a group, or take it out of its group (null).
   onMoveStoryToGroup?: (storyId: string, groupId: string | null) => void;
   // Candidates for a task's 担当者 (the form and the detail panel).
-  assignees?: AssigneeOption[];
+  assignees?: Assignees;
 }) {
   const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
