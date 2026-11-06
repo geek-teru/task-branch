@@ -843,7 +843,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `get_story`           | `story_id`               | `{ story, project, tasks }`。ストーリー1件（`context`・進捗込み）と配下のタスク。コメントは含まない（下記「ストーリーの中身のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status` / `active`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `activated_at` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
-| `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
+| `create_plan`         | `project_id`, `stories`（`tasks[]` の `assignee` は任意） | `{ project_id, stories }`。ストーリーと配下のタスクを一括で登録する。`external_id` が既存の行と一致したら作らず、担当も書き換えない（`assignee` の値は下記「タスクの更新のツール」） |
+| `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date` / `assignee`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。呼び出したエージェントの担当を優先する。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
@@ -911,11 +912,13 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 **タスクの更新のツール**
 
-`update_task` は、作業の結果や仕様の決定に合わせて、タスクの名前・説明・期間を書き換える。DB の変更は持たず、RLS の下で `tasks`（`level = 'task'` の行）を更新するだけ。
+`update_task` は、作業の結果や仕様の決定に合わせて、タスクの名前・説明・期間・担当者を書き換える。DB の変更は持たず、RLS の下で `tasks`（`level = 'task'` の行）を更新するだけ。
 
 - 渡した項目だけ書き換える。ひとつも無ければ `isError`。`title` は前後の空白を落として 1 文字以上。
 - `description` は置き換え。追記は、呼び出し側が `get_task_context` で今の説明を取り、末尾に足して渡す（ツールに追記の機能は持たせない）。
 - `status` は入力に含めない。状態は `start_task` / `complete_task` で変える。
+- `assignee`（`create_plan` の `tasks[]` も同じ）: `user` は `assignee_type = 'human'`、`assignee_id` に持ち主の id。`ai` は `assignee_type = 'ai'`、`assignee_client_id` に呼び出したトークンの `client_id`。`none` は3列とも null。
+- `ai` は呼び出したエージェントの担当になる。動的登録で環境ごとに `client_id` が変わるので、別の環境の同じエージェントでは `get_next_task` の候補から外れる。別のエージェントの指定は画面で行う（接続中のエージェントの一覧は画面のセッションでしか読めない）。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`（ストーリーには `update_story` を使うよう伝える）。`start_task` と同じ `findTask` で引く。
 
 **タスクの文脈のツール**
