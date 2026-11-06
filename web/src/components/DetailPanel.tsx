@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { AssigneeOption, Status, Task } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER, assigneeKey } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AssigneeLabel } from "./AssigneeLabel";
 import { IdBadge } from "./IdBadge";
@@ -119,12 +119,12 @@ export function DetailPanel<T extends DetailNode>({
           <Field label="担当者">
             {onChangeAssignee ? (
               <AssigneePicker
-                assigneeId={node.assignee_id}
+                assigneeId={assigneeKey(node)}
                 assignees={assignees}
-                onPick={(id) => id !== node.assignee_id && onChangeAssignee(node, id)}
+                onPick={(id) => id !== assigneeKey(node) && onChangeAssignee(node, id)}
               />
             ) : (
-              <AssigneeLabel assignee={assignees.find((a) => a.id === node.assignee_id) ?? null} />
+              <AssigneeLabel assignee={assignees.find((a) => a.id === assigneeKey(node)) ?? null} />
             )}
           </Field>
         )}

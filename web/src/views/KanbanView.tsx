@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { listProjectStories } from "../lib/api";
 import type { AssigneeOption, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
-import { BOARD_STATUSES, STATUS_LABEL, assigneeFields, isFinished } from "../lib/types";
+import { BOARD_STATUSES, STATUS_LABEL, assigneeFields, assigneeKey, isFinished } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -254,7 +254,7 @@ export function KanbanView({
                   <TaskCard
                     key={t.id}
                     task={t}
-                    assignee={assignees.find((a) => a.id === t.assignee_id) ?? null}
+                    assignee={assignees.find((a) => a.id === assigneeKey(t)) ?? null}
                     dragging={drag?.task.id === t.id}
                     selected={selectedId === t.id}
                     onSelect={() => setSelectedId(t.id)}
@@ -368,7 +368,7 @@ export function KanbanView({
           heading="タスクを変更"
           noun="タスク"
           submitLabel="保存"
-          initial={{ ...taskValues(editing), assignee_id: editing.assignee_id }}
+          initial={{ ...taskValues(editing), assignee_id: editing.assignee_id, assignee_type: editing.assignee_type }}
           assignees={assignees}
           onSubmit={(values) => {
             onUpdateTask(editing.id, values);

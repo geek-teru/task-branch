@@ -655,7 +655,7 @@ create policy avatars_insert on storage.objects
 - **色**: status（todo=水色 / in_progress=青 / done=緑 / closed=グレー）。
 - **level で形状/サイズ**: story=大, task=小（チェックボックス）。
 - **枠強調**: クリティカルパス上の task。
-- **アイコン**: task の担当（人 / AI）。
+- **アイコン**: task の担当（人 / AI）。人はプロフィールの画像、AI は Claude の画像（`assignee_type = 'ai'`、`assignee_id` は null）。
 - **バッジ**: 進捗率（親）、着手可能 / 前提待ち（依存から導出。表示方法は §9 Q10）。
 
 ### 5.3 レイアウト
