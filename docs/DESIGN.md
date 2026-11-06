@@ -885,7 +885,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 `get_story` は、`list_stories` で見つけたストーリー1件の中身（`context` と配下のタスク）を読むのに使う。DB の変更は持たず、RLS の下で読むだけ。
 
 - `story`: `id` / `title` / `description` / `context` / `status` / `active`（`activated_at` が null でないか）/ `activated_at` / `start_date` / `due_date` / `progress`（RPC `get_progress(project)` のそのストーリーの値。0〜1）。`project`: `id` / `name`。
-- `tasks[]`（`sort_order` 順）: `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`。`parent_id` と `level = 'task'` で、1000 行ずつ `range` で分けて全部取る。
+- `tasks[]`（`sort_order` 順）: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `assigned_to_me` / `start_date` / `due_date`。`assigned_to_me` は下記「タスクの文脈のツール」と同じ。`parent_id` と `level = 'task'` で、1000 行ずつ `range` で分けて全部取る。
 - コメントは含まない（タスクごとに `get_task_context` で取る）。
 - 見つからない（他人のものを含む）ストーリーは `isError`（「ストーリーが見つかりません」）、タスクの id は `isError`（「タスクの id です。ストーリーの id を指定してください」）。どちらも `update_story` と同じ文言。
 
@@ -925,7 +925,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 `get_task_context` は、AI が作業を始める前に読むものを1回で返す。
 
-- `task`: `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date` / `metadata` / `created_at` / `updated_at` / `completed_at` / `closed_at`。
+- `task`: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `assigned_to_me` / `start_date` / `due_date` / `metadata` / `created_at` / `updated_at` / `completed_at` / `closed_at`。
+- `assignee_client_id` は担当のエージェント（未指定なら null）。`assigned_to_me` は、それが呼び出したトークンの `client_id` と一致するとき `true`。動的登録で環境ごとに `client_id` が変わるので、別の環境の同じエージェントの担当は `false` になる。
 - `story`: 親ストーリーの `id` / `title` / `description` / `status` / `context`。`context` はストーリーのドキュメント（§3.2）で、決定事項などの正の情報。
 - `project`: `id` / `name` / `description` / `url` / `repository_url`。`url` / `repository_url` は未登録なら null。作業するリポジトリは `repository_url` から決める。
 - `comments`: `list_task_comments` と同じコメントの形の配列（古い順）。
@@ -939,7 +940,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - 候補は、進行中（`status = 'in_progress'`）のストーリー配下で、`status` が `todo`、`assignee_type` が `human` でない（null か `ai`）タスク。カンバンに出ているタスクのうち、人の担当を除いたもの。
 - 担当のエージェントで絞る。`assignee_client_id` が呼び出したトークンの `client_id` と一致するタスク（自分の担当）と、null のタスク（未割り当てと AI（未指定））が候補で、別の `client_id` のタスク（解除済みのエージェントを含む）は返さない。未割り当てを残すのは、担当を付けていない運用でも候補が空にならないようにするため。
 - 自分の担当を、プロジェクトをまたいで優先する。同じ優先度の中の並びはプロジェクトの作成順 → ストーリーの `sort_order` → タスクの `sort_order`（カンバンの並びと同じ）で、先頭を返す。`project_id` を渡したらそのプロジェクトだけから選ぶ。
-- `task` は `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`、`story` は `id` / `title`、`project` は `id` / `name` / `url` / `repository_url`（未登録なら null。取ったタスクからすぐリポジトリを決められるように）。中身を読むときは `get_task_context` を呼ぶ。
+- `task` は `id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `assigned_to_me` / `start_date` / `due_date`、`story` は `id` / `title`、`project` は `id` / `name` / `url` / `repository_url`（未登録なら null。取ったタスクからすぐリポジトリを決められるように）。中身を読むときは `get_task_context` を呼ぶ。
 - 候補が無いとき（見えないプロジェクトの id を含む）は `isError` にせず `{ task: null, message }` を返す。
 - 状態は変えない（着手は `start_task`）。タスク間の依存関係はまだ見ない（依存の設計後に足す）。
 - 親ストーリーの `status` で絞るため、ストーリーを `!inner` で埋め込んで1回の REST で取り、並べ替えは関数の中で行う（埋め込んだ列では並べられないため）。
