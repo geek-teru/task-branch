@@ -28,8 +28,10 @@ import {
   deleteStoryGroup,
   setStoryGroup,
 } from "./lib/api";
-import type { AssigneeOption, BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
-import { AI_ASSIGNEE } from "./lib/types";
+import type { Assignees, BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import { agentAssigneeId } from "./lib/types";
+import { agentClientLabel, findAgentProvider } from "./lib/agentProviders";
+import { useAgentGrants } from "./lib/useAgentGrants";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { ProjectSelect } from "./components/ProjectSelect";
@@ -90,10 +92,26 @@ export default function App() {
   const profile = useProfile(session);
   // Data is loaded only after sign-in; signed-out visitors are sent to /login below.
   const userId = session?.user.id;
-  // Candidates for a task's 担当者: the project owner (every project shown is the user's own) and the AI.
-  const assignees = useMemo<AssigneeOption[]>(
-    () => (userId ? [{ id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl }, AI_ASSIGNEE] : []),
-    [userId, profile.displayName, profile.avatarUrl]
+  // Read again on leaving the settings, where agents can be disconnected.
+  const grants = useAgentGrants(isConfigured ? userId : undefined, isSettings);
+  // Candidates for a task's 担当者: the project owner (every project shown is the user's own) and the
+  // connected agents.
+  const assignees = useMemo<Assignees>(
+    () => ({
+      options: userId
+        ? [
+            { id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl },
+            ...(grants ?? []).map((g) => ({
+              id: agentAssigneeId(g.client.id),
+              name: agentClientLabel(g.client),
+              avatarUrl: null,
+              agent: { provider: findAgentProvider({ name: g.client.name }) },
+            })),
+          ]
+        : [],
+      agentsLoaded: grants !== undefined,
+    }),
+    [userId, profile.displayName, profile.avatarUrl, grants]
   );
 
   useEffect(() => {

@@ -202,6 +202,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | activated_at  | timestamptz | null可                        | **story のみ**。null ＝ バックログ、日時あり ＝ 着手済み。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける                                                                                                     |
 | assignee_type | text        | null可                        | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9                                                                                                                                                                                                                                                                |
 | assignee_id   | uuid        | null可                        | **task のみ**。人が担当する場合の担当者（ユーザー）                                                                                                                                                                                                                                                                  |
+| assignee_client_id | text    | null可                        | **task のみ**。AI が担当する場合のエージェント（OAuth の `client_id`）。`assignee_type = 'ai'` のときだけ値を持てる。接続を解除しても担当を残すので FK は付けない。null は AI（未指定） |
 | sort_order    | int         | not null, default 0           | 同階層内 / カンバン列内の表示順                                                                                                                                                                                                                                                                                      |
 | start_date    | date        | null可                        | 開始予定日（**ガント/カレンダー用**。初期は未使用）                                                                                                                                                                                                                                                                  |
 | due_date      | date        | null可                        | 期限日（**ガント/カレンダー用**。初期は未使用）                                                                                                                                                                                                                                                                      |
@@ -655,7 +656,7 @@ create policy avatars_insert on storage.objects
 - **色**: status（todo=水色 / in_progress=青 / done=緑 / closed=グレー）。
 - **level で形状/サイズ**: story=大, task=小（チェックボックス）。
 - **枠強調**: クリティカルパス上の task。
-- **アイコン**: task の担当（人 / AI）。人はプロフィールの画像、AI は Claude の画像（`assignee_type = 'ai'`、`assignee_id` は null）。
+- **アイコン**: task の担当（人 / AI）。人はプロフィールの画像、AI は接続中のエージェントの名前とプロバイダのアイコン（`assignee_type = 'ai'`、`assignee_id` は null、`assignee_client_id` を `listGrants()` の一覧と突き合わせる。判定は設定画面と同じ `agentProviders.ts`）。候補は接続中のエージェントだけ。接続を解除したエージェントのタスクは担当を残して「解除済みのエージェント」、`client_id` の無いタスクは「AI（未指定）」、一覧を読めないあいだは「エージェント」と出す。動的登録をやり直すと別の `client_id` になるので、古い `client_id` のタスクは担当を選び直す。
 - **バッジ**: 進捗率（親）、着手可能 / 前提待ち（依存から導出。表示方法は §9 Q10）。
 
 ### 5.3 レイアウト

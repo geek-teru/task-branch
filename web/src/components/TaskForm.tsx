@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { AssigneeOption, Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER, assigneeFields, assigneeKey } from "../lib/types";
+import type { Assignees, Status, StoryInput } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER, assigneeFields, assigneeKey, assigneeOf } from "../lib/types";
 import { UNASSIGNED, assigneeSelectOptions } from "./AssigneeLabel";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
@@ -28,7 +28,7 @@ export function TaskForm({
   submitLabel: string;
   initial: StoryInput;
   todoHint?: string; // shown under the status select while 未着手 is picked
-  assignees?: AssigneeOption[]; // tasks only: shows the 担当者 select with these candidates
+  assignees?: Assignees; // tasks only: shows the 担当者 select with these candidates
   onSubmit: (values: StoryInput) => void;
   onCancel: () => void;
 }) {
@@ -95,7 +95,7 @@ export function TaskForm({
           <Select
             value={assignee}
             onChange={setAssignee}
-            options={assigneeSelectOptions(assignees)}
+            options={assigneeSelectOptions(assignees.options, assigneeOf(initial, assignees))}
             aria-label="担当者"
           />
         </>

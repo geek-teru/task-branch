@@ -51,7 +51,7 @@ export async function deleteProject(id: string): Promise<void> {
 // List queries use this; fetch context explicitly where it is needed.
 const TASK_LIST_COLUMNS =
   "id, project_id, parent_id, level, title, description, status, sort_order, start_date, due_date, " +
-  "activated_at, assignee_type, assignee_id, metadata, created_at, updated_at, completed_at, closed_at";
+  "activated_at, assignee_type, assignee_id, assignee_client_id, metadata, created_at, updated_at, completed_at, closed_at";
 
 // Single normalized snapshot the views render (get_task_graph RPC).
 export async function getProjectGraph(projectId: string): Promise<ProjectGraph> {
@@ -59,7 +59,11 @@ export async function getProjectGraph(projectId: string): Promise<ProjectGraph> 
   if (error) throw error;
   const raw = (data ?? {}) as Partial<ProjectGraph>;
   // story_groups のマイグレーション適用前の DB は group_id / groups を返さないので、グループなしとして扱う。
-  const nodes = (raw.nodes ?? []).map((n) => ({ ...n, group_id: n.group_id ?? null }));
+  const nodes = (raw.nodes ?? []).map((n) => ({
+    ...n,
+    group_id: n.group_id ?? null,
+    assignee_client_id: n.assignee_client_id ?? null,
+  }));
   return { nodes, edges: raw.edges ?? [], groups: raw.groups ?? [] };
 }
 

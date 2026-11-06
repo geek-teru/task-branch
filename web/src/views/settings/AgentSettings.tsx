@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { OAuthGrant } from "@supabase/supabase-js";
-import { findAgentProvider } from "../../lib/agentProviders";
+import { agentClientLabel, findAgentProvider } from "../../lib/agentProviders";
 import { listGrants, revokeGrant } from "../../lib/oauth";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ProviderIcon } from "../../components/Icons";
 
 const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" });
-const clientLabel = (g: OAuthGrant) => g.client.name || g.client.id;
 
 // /settings/agents: the AI agents (OAuth clients) the user has consented to, with a way to revoke each.
 // Consent happens in another tab (the agent opens /oauth/consent), so the list reloads when the user
@@ -71,7 +70,7 @@ export function AgentSettings() {
               <li key={g.client.id} className="flex items-center gap-3 px-4 py-3">
                 <ProviderIcon provider={provider} />
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium text-fg">{clientLabel(g)}</span>
+                  <span className="truncate text-sm font-medium text-fg">{agentClientLabel(g.client)}</span>
                   <span className="text-xs text-fg-muted">
                     {provider ? provider.name : "その他"}・{fmtDateTime(g.granted_at)} に同意
                   </span>
@@ -86,7 +85,7 @@ export function AgentSettings() {
       )}
       {confirming && (
         <ConfirmDialog
-          message={`${clientLabel(confirming)} の接続を解除しますか？\n再び使うにはエージェント側からつなぎ直して同意します。\n発行済みのトークンは、解除後も最大 1 時間は使える場合があります。`}
+          message={`${agentClientLabel(confirming.client)} の接続を解除しますか？\n再び使うにはエージェント側からつなぎ直して同意します。\n発行済みのトークンは、解除後も最大 1 時間は使える場合があります。`}
           confirmLabel="接続を解除"
           danger
           onConfirm={() => handleRevoke(confirming)}
