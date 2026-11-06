@@ -31,12 +31,24 @@ const COMMENT_NOT_EDITABLE = "コメントが見つからないか、編集・�
 
 const externalId = z.string().trim().min(1).describe("呼び出し側で決める識別子。metadata.external_id に入れ、同じプロジェクトに同じ値があれば作らない");
 
+const assigneeInput = z.enum(["user", "ai", "none"]).describe("担当者。user はプロジェクトの持ち主、ai は呼び出したエージェント、none は未割り当て");
+
+// assignee の入力を tasks の担当の3列にする。
+function assigneeColumns(assignee: z.infer<typeof assigneeInput>, ownerId: string, clientId: string) {
+  return {
+    assignee_type: assignee === "user" ? "human" : assignee === "ai" ? "ai" : null,
+    assignee_id: assignee === "user" ? ownerId : null,
+    assignee_client_id: assignee === "ai" ? clientId : null,
+  };
+}
+
 const planTask = z.object({
   external_id: externalId.optional(),
   title: z.string().trim().min(1).describe("タスク名"),
   description: z.string().optional().describe("タスクの説明（仕様など）"),
   start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
   due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
+  assignee: assigneeInput.optional(),
 });
 
 const planStory = z.object({
@@ -128,7 +140,7 @@ async function updateStatus(
 const STORY_COLUMNS = "id, title, description, context, status, activated_at, start_date, due_date";
 
 // update_task で返すタスクの列。
-const TASK_COLUMNS = "id, title, description, status, start_date, due_date";
+const TASK_COLUMNS = "id, title, description, status, assignee_type, assignee_client_id, start_date, due_date";
 
 // find_items で返す件数の上限。超えたら truncated: true を付ける。
 const FIND_ITEMS_LIMIT = 20;
@@ -372,8 +384,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       title: "ストーリーとタスクの一括登録",
       description:
         "プロジェクトにストーリーとその配下のタスクをまとめて登録する。既存のストーリーにタスクを足すときは stories[].id を指定する。" +
-        "external_id が同じプロジェクトの既存の行と一致したら作らず、その id を created: false で返すので、失敗したら同じ入力で呼び直してよい。" +
-        "新規はすべて status todo で、既存の末尾に並ぶ",
+        "external_id が同じプロジェクトの既存の行と一致したら作らず（担当者も書き換えない）、その id を created: false で返すので、失敗したら同じ入力で呼び直してよい。" +
+        "新規はすべて status todo で、既存の末尾に並ぶ。tasks[].assignee を省略したら未割り当てになる",
       inputSchema: {
         project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）"),
         stories: z.array(planStory).min(1).describe("登録するストーリー（配下のタスクを含む）"),
@@ -390,7 +402,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       const duplicated = externalIds.filter((v, i) => externalIds.indexOf(v) !== i);
       if (duplicated.length > 0) return toolError(`external_id が入力の中で重複しています: ${[...new Set(duplicated)].join(", ")}`);
 
-      const { data: project, error: projectError } = await db.from("projects").select("id").eq("id", project_id).maybeSingle();
+      const { data: project, error: projectError } = await db.from("projects").select("id, owner_id").eq("id", project_id).maybeSingle();
       if (projectError) return restError(projectError);
       if (!project) return toolError(`プロジェクトが見つかりません: ${project_id}`);
 
@@ -491,6 +503,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
             description: t.description ?? null,
             start_date: t.start_date ?? null,
             due_date: t.due_date ?? null,
+            ...assigneeColumns(t.assignee ?? "none", project.owner_id, clientId),
             sort_order: next++,
             metadata: t.external_id ? { external_id: t.external_id } : {},
           });
@@ -568,8 +581,9 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
     {
       title: "タスクの更新",
       description:
-        "タスクの名前・説明・期間を更新し、更新後のタスクを返す。渡した項目だけ書き換える。" +
+        "タスクの名前・説明・期間・担当者を更新し、更新後のタスクを返す。渡した項目だけ書き換える。" +
         "description は置き換えなので、追記するときは get_task_context で今の説明を取り、末尾に足して渡す。" +
+        "assignee の ai は呼び出したエージェントの担当にする（別のエージェントは指定できない）。" +
         "状態は変えない（着手は start_task、完了は complete_task）",
       inputSchema: {
         task_id: z.uuid().describe("タスクの id（ストーリーは不可）"),
@@ -577,16 +591,24 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
         description: z.string().optional().describe("タスクの説明（Markdown。置き換え）"),
         start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
         due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
+        assignee: assigneeInput.optional(),
       },
     },
-    async ({ task_id, ...fields }) => {
-      const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-      if (Object.keys(patch).length === 0) {
-        return toolError("更新する項目がありません。title / description / start_date / due_date のどれかを渡してください");
+    async ({ task_id, assignee, ...fields }) => {
+      const patch: Record<string, unknown> = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      if (assignee === undefined && Object.keys(patch).length === 0) {
+        return toolError("更新する項目がありません。title / description / start_date / due_date / assignee のどれかを渡してください");
       }
 
       const found = await findTask(db, task_id, "update_story を使ってください");
       if ("error" in found) return found.error;
+
+      if (assignee !== undefined) {
+        const { data: task, error: ownerError } = await db.from("tasks").select("project:project_id(owner_id)").eq("id", task_id).single();
+        if (ownerError) return restError(ownerError);
+        const { owner_id } = task.project as unknown as { owner_id: string };
+        Object.assign(patch, assigneeColumns(assignee, owner_id, clientId));
+      }
 
       const { data, error } = await db.from("tasks").update(patch).eq("id", task_id).select(TASK_COLUMNS);
       if (error) return restError(error);
