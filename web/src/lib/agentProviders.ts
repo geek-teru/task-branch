@@ -5,7 +5,7 @@
 // real client are filled in; the rest stay false (shown as その他) until the verification lands in
 // docs/DESIGN.md §7.2.
 
-export type AgentProviderId = "claude-code" | "claude-ai" | "chatgpt" | "cursor" | "vscode";
+export type AgentProviderId = "claude-code" | "claude-ai" | "chatgpt" | "codex" | "cursor" | "vscode";
 
 // What we know about a client. The grant list only carries the name; the consent screen also knows
 // the redirect_uri, which it passes so a client can't pass itself off as a provider by name alone.
@@ -42,6 +42,15 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
     name: "ChatGPT",
     icon: { color: "#10a37f", label: "G" },
     match: () => false, // not verified yet
+  },
+  {
+    id: "codex",
+    name: "Codex",
+    icon: { color: "#1f1f1f", label: "Cx", image: "/agents/codex.png" },
+    // From the Codex source (rmcp-client), 2026-11-06: client_name "Codex", redirect_uri http://127.0.0.1:<port>/callback.
+    match: (c) =>
+      c.name === "Codex" &&
+      (c.redirectUri === undefined || /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):/.test(c.redirectUri)),
   },
   {
     id: "cursor",
