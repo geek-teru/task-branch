@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AssigneeOption, Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER, assigneeFields } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER, assigneeFields, assigneeKey } from "../lib/types";
 import { UNASSIGNED, assigneeSelectOptions } from "./AssigneeLabel";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
@@ -37,7 +37,7 @@ export function TaskForm({
   const [start, setStart] = useState(initial.start_date ?? "");
   const [due, setDue] = useState(initial.due_date ?? "");
   const [description, setDescription] = useState(initial.description ?? "");
-  const initialAssignee = initial.assignee_id ?? UNASSIGNED;
+  const initialAssignee = assigneeKey(initial) ?? UNASSIGNED;
   const [assignee, setAssignee] = useState(initialAssignee);
   const trimmedTitle = title.trim();
 

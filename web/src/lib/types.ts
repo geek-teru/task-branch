@@ -69,15 +69,27 @@ export interface StoryInput {
   assignee_type?: AssigneeType | null;
 }
 
-// A user that can be picked as a task's assignee (for now only the project owner, i.e. the signed-in user).
+// Who can be picked as a task's assignee: the project owner (the signed-in user), or the AI.
 export interface AssigneeOption {
-  id: string;
+  id: string; // a user id, or AI_ASSIGNEE_ID
   name: string;
   avatarUrl: string | null;
 }
 
-// Assigning a user makes the task a human's; clearing it leaves no assignee at all.
+// The AI has no user row (assignee_id only points at users), so it is picked by this id instead.
+export const AI_ASSIGNEE_ID = "ai";
+
+export const AI_ASSIGNEE: AssigneeOption = { id: AI_ASSIGNEE_ID, name: "Claude", avatarUrl: "/agents/claude.png" };
+
+// The AssigneeOption id of a task's assignee, or null for 未割り当て.
+export function assigneeKey(t: Pick<StoryInput, "assignee_id" | "assignee_type">): string | null {
+  return t.assignee_id ?? (t.assignee_type === "ai" ? AI_ASSIGNEE_ID : null);
+}
+
+// Assigning a user makes the task a human's, picking the AI makes it the AI's, and clearing it leaves
+// no assignee at all.
 export function assigneeFields(assigneeId: string | null): Pick<StoryInput, "assignee_id" | "assignee_type"> {
+  if (assigneeId === AI_ASSIGNEE_ID) return { assignee_id: null, assignee_type: "ai" };
   return { assignee_id: assigneeId, assignee_type: assigneeId ? "human" : null };
 }
 

@@ -79,6 +79,7 @@ function editInitial(node: GraphNode): StoryInput {
     due_date: node.due_date,
     description: node.description,
     assignee_id: node.assignee_id,
+    assignee_type: node.assignee_type,
   };
 }
 

@@ -29,6 +29,7 @@ import {
   setStoryGroup,
 } from "./lib/api";
 import type { AssigneeOption, BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import { AI_ASSIGNEE } from "./lib/types";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { ProjectSelect } from "./components/ProjectSelect";
@@ -89,9 +90,9 @@ export default function App() {
   const profile = useProfile(session);
   // Data is loaded only after sign-in; signed-out visitors are sent to /login below.
   const userId = session?.user.id;
-  // Candidates for a task's 担当者: only the project owner, and every project shown is the user's own.
+  // Candidates for a task's 担当者: the project owner (every project shown is the user's own) and the AI.
   const assignees = useMemo<AssigneeOption[]>(
-    () => (userId ? [{ id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl }] : []),
+    () => (userId ? [{ id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl }, AI_ASSIGNEE] : []),
     [userId, profile.displayName, profile.avatarUrl]
   );
 
