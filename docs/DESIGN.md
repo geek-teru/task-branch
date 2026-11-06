@@ -846,7 +846,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
-| `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
+| `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。呼び出したエージェントの担当を優先する。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
 | `start_task`          | `task_id`                | 更新後のタスク（`id` / `title` / `status` / `updated_at` / `completed_at` / `closed_at`）。`todo` を `in_progress` にする（下記「作業進行のツール」） |
 | `complete_task`       | `task_id`, `result`      | `{ task, comment }`。`done` にし、`result`（作業結果）を AI のコメントとして投稿する（下記「作業進行のツール」） |
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
@@ -934,7 +934,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 `get_next_task` は、AI が次に着手するタスクを1件選んで返す。
 
 - 候補は、進行中（`status = 'in_progress'`）のストーリー配下で、`status` が `todo`、`assignee_type` が `human` でない（null か `ai`）タスク。カンバンに出ているタスクのうち、人の担当を除いたもの。
-- 並びはプロジェクトの作成順 → ストーリーの `sort_order` → タスクの `sort_order`（カンバンの並びと同じ）で、先頭を返す。`project_id` を渡したらそのプロジェクトだけから選ぶ。
+- 担当のエージェントで絞る。`assignee_client_id` が呼び出したトークンの `client_id` と一致するタスク（自分の担当）と、null のタスク（未割り当てと AI（未指定））が候補で、別の `client_id` のタスク（解除済みのエージェントを含む）は返さない。未割り当てを残すのは、担当を付けていない運用でも候補が空にならないようにするため。
+- 自分の担当を、プロジェクトをまたいで優先する。同じ優先度の中の並びはプロジェクトの作成順 → ストーリーの `sort_order` → タスクの `sort_order`（カンバンの並びと同じ）で、先頭を返す。`project_id` を渡したらそのプロジェクトだけから選ぶ。
 - `task` は `id` / `title` / `description` / `status` / `assignee_type` / `start_date` / `due_date`、`story` は `id` / `title`、`project` は `id` / `name` / `url` / `repository_url`（未登録なら null。取ったタスクからすぐリポジトリを決められるように）。中身を読むときは `get_task_context` を呼ぶ。
 - 候補が無いとき（見えないプロジェクトの id を含む）は `isError` にせず `{ task: null, message }` を返す。
 - 状態は変えない（着手は `start_task`）。タスク間の依存関係はまだ見ない（依存の設計後に足す）。
