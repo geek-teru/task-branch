@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { listProjectStories } from "../lib/api";
 import type { AssigneeOption, Assignees, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
-import { BOARD_STATUSES, STATUS_LABEL, assigneeFields, assigneeOf, isFinished } from "../lib/types";
+import { BOARD_STATUSES, STATUS_LABEL, TASK_STATUSES, assigneeFields, assigneeOf, isFinished } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -367,6 +367,7 @@ export function KanbanView({
         <TaskForm
           heading="タスクを変更"
           noun="タスク"
+          statuses={TASK_STATUSES}
           submitLabel="保存"
           initial={{
             ...taskValues(editing),
@@ -387,6 +388,7 @@ export function KanbanView({
         <TaskForm
           heading={`タスクを追加（${adding.title}）`}
           noun="タスク"
+          statuses={TASK_STATUSES}
           submitLabel="追加"
           initial={{ title: "", status: "todo", start_date: null, due_date: null, description: null }}
           assignees={assignees}
@@ -513,6 +515,7 @@ function ResizeHandle({ onMouseDown }: { onMouseDown: (e: MouseEvent) => void })
 const STATUS_DOT: Record<Status, string> = {
   todo: "bg-status-todo-border",
   in_progress: "bg-status-in_progress-border",
+  in_review: "bg-status-in_review-border",
   done: "bg-status-done-border",
   closed: "bg-status-closed-border",
 };

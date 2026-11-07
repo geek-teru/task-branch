@@ -25,6 +25,9 @@
   --color-status-in_progress-bg: #ebf1f8;
   --color-status-in_progress-border: #3f78b5;
   --color-status-in_progress-fg: #24507e;
+  --color-status-in_review-bg: #f1eef8;
+  --color-status-in_review-border: #7a62b8;
+  --color-status-in_review-fg: #4c3a80;
   --color-status-done-bg: #ecf4ee;
   --color-status-done-border: #4a8a5c;
   --color-status-done-fg: #2a5e39;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Assignees, Status, StoryInput } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER, assigneeFields, assigneeKey, assigneeOf } from "../lib/types";
+import { STATUS_LABEL, STORY_STATUSES, assigneeFields, assigneeKey, assigneeOf } from "../lib/types";
 import { UNASSIGNED, assigneeSelectOptions } from "./AssigneeLabel";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
@@ -19,6 +19,7 @@ export function TaskForm({
   submitLabel,
   initial,
   todoHint,
+  statuses = STORY_STATUSES,
   assignees,
   onSubmit,
   onCancel,
@@ -28,6 +29,7 @@ export function TaskForm({
   submitLabel: string;
   initial: StoryInput;
   todoHint?: string; // shown under the status select while 未着手 is picked
+  statuses?: Status[]; // status choices; tasks pass TASK_STATUSES (in_review is task-only)
   assignees?: Assignees; // tasks only: shows the 担当者 select with these candidates
   onSubmit: (values: StoryInput) => void;
   onCancel: () => void;
@@ -84,7 +86,7 @@ export function TaskForm({
       <Select
         value={status}
         onChange={setStatus}
-        options={STATUS_ORDER.map((s) => ({ value: s, label: <Badge tone={s}>{STATUS_LABEL[s]}</Badge> }))}
+        options={statuses.map((s) => ({ value: s, label: <Badge tone={s}>{STATUS_LABEL[s]}</Badge> }))}
         aria-label="ステータス"
       />
       {todoHint && status === "todo" && <div className="mt-1.5 text-[11px] text-fg-muted">{todoHint}</div>}
