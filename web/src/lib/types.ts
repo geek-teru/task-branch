@@ -3,7 +3,7 @@
 import type { AgentProvider } from "./agentProviders";
 
 export type Level = "story" | "task";
-export type Status = "todo" | "in_progress" | "done" | "closed";
+export type Status = "todo" | "in_progress" | "in_review" | "done" | "closed";
 export type AssigneeType = "human" | "ai";
 
 export interface Project {
@@ -189,16 +189,22 @@ export interface KanbanLane {
 export const STATUS_LABEL: Record<Status, string> = {
   todo: "未着手",
   in_progress: "進行中",
+  in_review: "レビュー中",
   done: "完了",
   closed: "クローズ",
 };
 
-// Every status, in workflow order (status pickers and forms).
-export const STATUS_ORDER: Status[] = ["todo", "in_progress", "done", "closed"];
+// Every status, in workflow order (sorting).
+export const STATUS_ORDER: Status[] = ["todo", "in_progress", "in_review", "done", "closed"];
+
+// Choices in status pickers and forms. in_review is for tasks only (the DB check constraint
+// rejects it on stories): an in-review story would drop its kanban lane.
+export const TASK_STATUSES: Status[] = STATUS_ORDER;
+export const STORY_STATUSES: Status[] = STATUS_ORDER.filter((s) => s !== "in_review");
 
 // Kanban columns. The closed column is always shown (as a drop target); its cards are hidden
 // unless the toolbar toggle is on.
-export const BOARD_STATUSES: Status[] = ["todo", "in_progress", "done", "closed"];
+export const BOARD_STATUSES: Status[] = ["todo", "in_progress", "in_review", "done", "closed"];
 
 // done and closed both count as finished (same rule as get_progress).
 export const isFinished = (status: Status) => status === "done" || status === "closed";

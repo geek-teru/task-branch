@@ -653,7 +653,7 @@ create policy avatars_insert on storage.objects
 
 ### 5.2 表現
 
-- **色**: status（todo=水色 / in_progress=青 / done=緑 / closed=グレー）。
+- **色**: status（todo=水色 / in_progress=青 / in_review=紫 / done=緑 / closed=グレー）。
 - **level で形状/サイズ**: story=大, task=小（チェックボックス）。
 - **枠強調**: クリティカルパス上の task。
 - **アイコン**: task の担当（人 / AI）。人はプロフィールの画像、AI は接続中のエージェントの名前とプロバイダのアイコン（`assignee_type = 'ai'`、`assignee_id` は null、`assignee_client_id` を `listGrants()` の一覧と突き合わせる。判定は設定画面と同じ `agentProviders.ts`）。候補は接続中のエージェントだけ。接続を解除したエージェントのタスクは担当を残して「解除済みのエージェント」、`client_id` の無いタスクは「AI（未指定）」、一覧を読めないあいだは「エージェント」と出す。動的登録をやり直すと別の `client_id` になるので、古い `client_id` のタスクは担当を選び直す。
@@ -993,7 +993,7 @@ AI がタスクに着手し、終えたら作業結果を残す。DB の変更�
 | ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は未設計（§1.2）。期間は将来 `estimate`                         |
 | **カレンダー**     | 日付（期限 / 予定日）                    | `start_date` / `due_date` を用意済                                                                                  |
-| **カンバン**       | 列（status）とカード、列内の並び順       | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `done`。`closed` は列にしない） |
+| **カンバン**       | 列（status）とカード、列内の並び順       | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `in_review` / `done` / `closed`。`closed` の列のカードはトグルでのみ表示） |
 
 ### 8.2 拡張ポイントと方針
 

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, STATUS_ORDER, assigneeKey, assigneeOf } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AssigneeLabel } from "./AssigneeLabel";
 import { IdBadge } from "./IdBadge";
@@ -70,7 +70,8 @@ export function DetailPanel<T extends DetailNode>({
   const durationDays = start && end ? diffDays(start, end) + 1 : null;
   const canEdit = node != null;
   const canStart = canEdit && node != null && node.status === "todo";
-  const canComplete = canEdit && node != null && node.status === "in_progress";
+  // 進行中からも完了にできる（レビューが要らないタスクのため）。
+  const canComplete = canEdit && node != null && (node.status === "in_progress" || node.status === "in_review");
   const DASH = <span className="text-fg-muted">-</span>;
   // 左端のハンドルで幅を変える。右へドラッグすると狭くなる。
   const { width, startResize } = useResizableWidth("detailPanel.width", 320, 280, 800, { invert: true });
@@ -109,7 +110,11 @@ export function DetailPanel<T extends DetailNode>({
         {node && (
           <Field label="ステータス">
             {onChangeStatus ? (
-              <StatusPicker status={node.status} onPick={(s) => onChangeStatus(node, s)} />
+              <StatusPicker
+                status={node.status}
+                statuses={node.level === "task" ? TASK_STATUSES : STORY_STATUSES}
+                onPick={(s) => onChangeStatus(node, s)}
+              />
             ) : (
               <Badge tone={node.status}>{STATUS_LABEL[node.status]}</Badge>
             )}
@@ -265,7 +270,15 @@ function AssigneePicker({
 }
 
 // Badge that opens a small menu to pick any status.
-function StatusPicker({ status, onPick }: { status: Status; onPick: (status: Status) => void }) {
+function StatusPicker({
+  status,
+  statuses,
+  onPick,
+}: {
+  status: Status;
+  statuses: Status[];
+  onPick: (status: Status) => void;
+}) {
   return (
     <DropdownMenu
       variant="ghost"
@@ -282,7 +295,7 @@ function StatusPicker({ status, onPick }: { status: Status; onPick: (status: Sta
         </>
       }
     >
-      {STATUS_ORDER.map((s) => (
+      {statuses.map((s) => (
         <DropdownMenuItem key={s} selected={s === status} onSelect={() => s !== status && onPick(s)}>
           <Badge tone={s}>{STATUS_LABEL[s]}</Badge>
         </DropdownMenuItem>

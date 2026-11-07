@@ -9,6 +9,11 @@ export const STATUS_COLOR: Record<Status, { bg: string; border: string; fg: stri
     border: "var(--color-status-in_progress-border)",
     fg: "var(--color-status-in_progress-fg)",
   },
+  in_review: {
+    bg: "var(--color-status-in_review-bg)",
+    border: "var(--color-status-in_review-border)",
+    fg: "var(--color-status-in_review-fg)",
+  },
   done: { bg: "var(--color-status-done-bg)", border: "var(--color-status-done-border)", fg: "var(--color-status-done-fg)" },
   closed: { bg: "var(--color-status-closed-bg)", border: "var(--color-status-closed-border)", fg: "var(--color-status-closed-fg)" },
 };
@@ -20,6 +25,11 @@ export const STATUS_CLASS: Record<Status, { bg: string; border: string; text: st
     bg: "bg-status-in_progress-bg",
     border: "border-status-in_progress-border",
     text: "text-status-in_progress-fg",
+  },
+  in_review: {
+    bg: "bg-status-in_review-bg",
+    border: "border-status-in_review-border",
+    text: "text-status-in_review-fg",
   },
   done: { bg: "bg-status-done-bg", border: "border-status-done-border", text: "text-status-done-fg" },
   closed: { bg: "bg-status-closed-bg", border: "border-status-closed-border", text: "text-status-closed-fg" },
