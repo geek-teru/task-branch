@@ -792,7 +792,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `request_task_review` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -848,7 +848,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。呼び出したエージェントの担当を優先する。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
-| `start_task`          | `task_id`                | 更新後のタスク（`id` / `title` / `status` / `updated_at` / `completed_at` / `closed_at`）。`todo` を `in_progress` にする（下記「作業進行のツール」） |
+| `start_task`          | `task_id`                | 更新後のタスク（`id` / `title` / `status` / `updated_at` / `completed_at` / `closed_at`）。`todo` / `in_review` を `in_progress` にする（下記「作業進行のツール」） |
+| `request_task_review` | `task_id`, `result`      | `{ task, comment }`。`in_review` にし、`result`（作業結果）を AI のコメントとして投稿する（下記「作業進行のツール」） |
 | `complete_task`       | `task_id`, `result`      | `{ task, comment }`。`done` にし、`result`（作業結果）を AI のコメントとして投稿する（下記「作業進行のツール」） |
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
@@ -916,7 +917,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 - 渡した項目だけ書き換える。ひとつも無ければ `isError`。`title` は前後の空白を落として 1 文字以上。
 - `description` は置き換え。追記は、呼び出し側が `get_task_context` で今の説明を取り、末尾に足して渡す（ツールに追記の機能は持たせない）。
-- `status` は入力に含めない。状態は `start_task` / `complete_task` で変える。
+- `status` は入力に含めない。状態は `start_task` / `request_task_review` / `complete_task` で変える。
 - `assignee`（`create_plan` の `tasks[]` も同じ）: `user` は `assignee_type = 'human'`、`assignee_id` に持ち主の id。`ai` は `assignee_type = 'ai'`、`assignee_client_id` に呼び出したトークンの `client_id`。`none` は3列とも null。
 - `ai` は呼び出したエージェントの担当になる。動的登録で環境ごとに `client_id` が変わるので、別の環境の同じエージェントでは `get_next_task` の候補から外れる。別のエージェントの指定は画面で行う（接続中のエージェントの一覧は画面のセッションでしか読めない）。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`（ストーリーには `update_story` を使うよう伝える）。`start_task` と同じ `findTask` で引く。
@@ -947,12 +948,14 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 **作業進行のツール**
 
-AI がタスクに着手し、終えたら作業結果を残す。DB の変更は持たず、RLS の下で `tasks.status` を更新してコメントを投稿するだけ。
+AI がタスクに着手し、終えたら作業結果を残す。PR を作るタスクはレビュー中で止め、人がマージしたあとに完了にする。DB の変更は持たず、RLS の下で `tasks.status` を更新してコメントを投稿するだけ。
 
-- `start_task`: `todo` を `in_progress` にする。すでに `in_progress` なら何も変えずに返す（呼び直してよい）。`done` / `closed` は `isError`。
-- `complete_task`: `todo` / `in_progress` を `done` にし、`result`（前後の空白を落として 1 文字以上）を `add_task_comment` と同じく AI のコメントとして投稿する。`done` / `closed` は作業結果を二重に記録しないよう `isError`。`completed_at` はトリガ `touch_updated_at()` が入れる。
+- `start_task`: `todo` を `in_progress` にする。`in_review` もレビューの指摘の対応のため `in_progress` に戻せる。すでに `in_progress` なら何も変えずに返す（呼び直してよい）。`done` / `closed` は `isError`。
+- `request_task_review`: `todo` / `in_progress` を `in_review` にし、`result` を `complete_task` と同じく AI のコメントとして投稿する。PR を作ったときに使い、PR を作らないタスクは `complete_task` を使う。すでに `in_review` なら作業結果を二重に記録しないよう `isError`。`done` / `closed` も `isError`。
+- `complete_task`: `todo` / `in_progress` / `in_review` を `done` にし、`result`（前後の空白を落として 1 文字以上）を `add_task_comment` と同じく AI のコメントとして投稿する。`done` / `closed` は作業結果を二重に記録しないよう `isError`。`completed_at` はトリガ `touch_updated_at()` が入れる。
+- `in_review` はストーリーでは使わないので、`update_story` の `status` の選択肢には無い。`get_next_task` の候補は `todo` のままで、レビュー中のタスクは返さない。
 - 状態は、引いたときの状態のままのときだけ更新する（`status in (...)` を条件に付ける）。間に別の操作で変わっていたら 0 行になり、`isError` にする。
-- 状態を `done` にしたあとでコメントの投稿に失敗したら `isError` で返し、状態は `done` になったこと・`add_task_comment` で記録し直すことを伝える。
+- 状態を `in_review` / `done` にしたあとでコメントの投稿に失敗したら `isError` で返し、状態が変わったこと・`add_task_comment` で記録し直すことを伝える。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`。`get_task_context` と同じ扱い。
 
 **コメントのツール**

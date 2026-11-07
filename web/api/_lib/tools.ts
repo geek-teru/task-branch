@@ -104,10 +104,17 @@ type NextTaskRow = {
   project: { id: string; name: string; url: string | null; repository_url: string | null; created_at: string };
 };
 
-// start_task / complete_task で返すタスクの列。
+// start_task / request_task_review / complete_task で返すタスクの列。
 const TASK_STATUS_COLUMNS = "id, title, status, updated_at, completed_at, closed_at";
 
-type TaskStatusRow = { id: string; title: string; status: "todo" | "in_progress" | "done" | "closed"; updated_at: string; completed_at: string | null; closed_at: string | null };
+type TaskStatusRow = {
+  id: string;
+  title: string;
+  status: "todo" | "in_progress" | "in_review" | "done" | "closed";
+  updated_at: string;
+  completed_at: string | null;
+  closed_at: string | null;
+};
 
 // 状態を変える前にタスクを引く。見つからない（他人のものを含む）タスクとストーリーの id は get_task_context と同じく isError。
 async function findTask(
@@ -593,7 +600,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
         "タスクの名前・説明・期間・担当者を更新し、更新後のタスクを返す。渡した項目だけ書き換える。" +
         "description は置き換えなので、追記するときは get_task_context で今の説明を取り、末尾に足して渡す。" +
         "assignee の ai は呼び出したエージェントの担当にする（別のエージェントは指定できない）。" +
-        "状態は変えない（着手は start_task、完了は complete_task）",
+        "状態は変えない（着手は start_task、レビュー依頼は request_task_review、完了は complete_task）",
       inputSchema: {
         task_id: z.uuid().describe("タスクの id（ストーリーは不可）"),
         title: z.string().trim().min(1).optional().describe("タスク名"),
@@ -730,7 +737,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
     {
       title: "タスクの着手",
       description:
-        "タスクを進行中（in_progress）にして、更新後のタスクを返す。作業を始めるときに使う。" +
+        "タスクを進行中（in_progress）にして、更新後のタスクを返す。作業を始めるときと、" +
+        "レビュー中（in_review）のタスクをレビューの指摘の対応で進行中に戻すときに使う。" +
         "すでに進行中なら何も変えずに返すので、呼び直してよい。完了（done / closed）のタスクは着手できない",
       inputSchema: { task_id: z.uuid().describe("タスクの id（ストーリーは不可）") },
     },
@@ -738,11 +746,53 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       const found = await findTask(db, task_id);
       if ("error" in found) return found.error;
       if (found.task.status === "in_progress") return json(found.task);
-      if (found.task.status !== "todo") return toolError(`完了したタスクは着手できません（status: ${found.task.status}）: ${task_id}`);
+      if (found.task.status !== "todo" && found.task.status !== "in_review") {
+        return toolError(`完了したタスクは着手できません（status: ${found.task.status}）: ${task_id}`);
+      }
 
-      const updated = await updateStatus(db, task_id, ["todo"], "in_progress");
+      const updated = await updateStatus(db, task_id, ["todo", "in_review"], "in_progress");
       if ("error" in updated) return updated.error;
       return json(updated.task);
+    },
+  );
+
+  // 状態を変えたあとで作業結果をコメントとして投稿し、{ task, comment } を返す（request_task_review / complete_task）。
+  async function postResult(task: TaskStatusRow, result: string): Promise<CallToolResult> {
+    const { data, error } = await db.from("task_comments").insert({ task_id: task.id, body: result }).select(COMMENT_COLUMNS).single();
+    if (error) {
+      return toolError(
+        `タスクは ${task.status} になりましたが、作業結果のコメントを投稿できませんでした。add_task_comment で記録し直してください。` +
+          `Supabase のエラー: ${error.message}${error.code ? ` (${error.code})` : ""}`,
+      );
+    }
+    return json({ task, comment: withEditable(data as CommentRow) });
+  }
+
+  server.registerTool(
+    "request_task_review",
+    {
+      title: "タスクのレビュー依頼と作業結果の記録",
+      description:
+        "タスクをレビュー中（in_review）にし、作業結果を AI のコメントとして投稿する。返り値は { task, comment }。" +
+        "PR を作って人のレビュー・マージを待つときに使う（完了にするのは人がマージしたあと）。PR を作らないタスクは complete_task を使う。" +
+        "result には、やったこと・確認したこと・PR の URL・次に作業する人への申し送りを書く。" +
+        "すでにレビュー中のタスクは、作業結果を二重に記録しないよう isError になる。完了（done / closed）のタスクも isError",
+      inputSchema: {
+        task_id: z.uuid().describe("タスクの id（ストーリーは不可）"),
+        result: z.string().trim().min(1).describe("作業結果（Markdown）。コメントとして残る"),
+      },
+    },
+    async ({ task_id, result }) => {
+      const found = await findTask(db, task_id);
+      if ("error" in found) return found.error;
+      if (found.task.status === "in_review") return toolError(`タスクはすでにレビュー中です: ${task_id}`);
+      if (found.task.status === "done" || found.task.status === "closed") {
+        return toolError(`タスクはすでに完了しています（status: ${found.task.status}）: ${task_id}`);
+      }
+
+      const updated = await updateStatus(db, task_id, ["todo", "in_progress"], "in_review");
+      if ("error" in updated) return updated.error;
+      return postResult(updated.task, result);
     },
   );
 
@@ -752,6 +802,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       title: "タスクの完了と作業結果の記録",
       description:
         "タスクを完了（done）にし、作業結果を AI のコメントとして投稿する。返り値は { task, comment }。" +
+        "未着手・進行中・レビュー中（in_review）のタスクを完了にできる。" +
         "result には、やったこと・確認したこと・次に作業する人への申し送りを書く。" +
         "すでに完了（done / closed）のタスクは、作業結果を二重に記録しないよう isError になる",
       inputSchema: {
@@ -767,17 +818,9 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       }
 
       // completed_at はトリガ（touch_updated_at()）が done にしたときに入れる。
-      const updated = await updateStatus(db, task_id, ["todo", "in_progress"], "done");
+      const updated = await updateStatus(db, task_id, ["todo", "in_progress", "in_review"], "done");
       if ("error" in updated) return updated.error;
-
-      const { data, error } = await db.from("task_comments").insert({ task_id, body: result }).select(COMMENT_COLUMNS).single();
-      if (error) {
-        return toolError(
-          `タスクは done になりましたが、作業結果のコメントを投稿できませんでした。add_task_comment で記録し直してください。` +
-            `Supabase のエラー: ${error.message}${error.code ? ` (${error.code})` : ""}`,
-        );
-      }
-      return json({ task: updated.task, comment: withEditable(data as CommentRow) });
+      return postResult(updated.task, result);
     },
   );
 
