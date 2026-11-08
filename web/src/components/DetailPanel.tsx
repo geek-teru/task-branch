@@ -11,6 +11,7 @@ import { Badge } from "./ui/Badge";
 import { Button, IconButton } from "./ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "./ui/DropdownMenu";
 import { Select } from "./ui/Select";
+import { StatusPicker } from "./StatusPicker";
 
 // A story or task shown in the panel; progress is present for graph nodes only.
 export type DetailNode = Task & { progress?: number | null };
@@ -263,41 +264,6 @@ function AssigneePicker({
       {candidates.map((a) => (
         <DropdownMenuItem key={a.id} selected={a.id === assigneeId} onSelect={() => onPick(a.id)}>
           <AssigneeLabel assignee={a} />
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenu>
-  );
-}
-
-// Badge that opens a small menu to pick any status.
-function StatusPicker({
-  status,
-  statuses,
-  onPick,
-}: {
-  status: Status;
-  statuses: Status[];
-  onPick: (status: Status) => void;
-}) {
-  return (
-    <DropdownMenu
-      variant="ghost"
-      size="sm"
-      label="ステータスを変更"
-      menuClassName="min-w-[120px]"
-      className="-mx-2.5"
-      trigger={
-        <>
-          <Badge tone={status}>{STATUS_LABEL[status]}</Badge>
-          <span className="flex text-fg-muted">
-            <ChevronDownIcon size={12} />
-          </span>
-        </>
-      }
-    >
-      {statuses.map((s) => (
-        <DropdownMenuItem key={s} selected={s === status} onSelect={() => s !== status && onPick(s)}>
-          <Badge tone={s}>{STATUS_LABEL[s]}</Badge>
         </DropdownMenuItem>
       ))}
     </DropdownMenu>

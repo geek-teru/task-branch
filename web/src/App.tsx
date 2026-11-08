@@ -192,6 +192,20 @@ export default function App() {
     [backlogProjectId]
   );
 
+  // Change a story's status from the backlog list, then reload it.
+  const handleSetStoryStatus = useCallback(
+    async (storyId: string, status: Status) => {
+      if (!backlogProjectId) return;
+      try {
+        await updateTaskStatus(storyId, status);
+        setBacklog({ projectId: backlogProjectId, stories: await listBacklogStories(backlogProjectId) });
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [backlogProjectId]
+  );
+
   const [lanes, setLanes] = useState<KanbanLane[] | null>(null);
   useEffect(() => {
     if (!userId || !isKanban) return;
@@ -710,6 +724,7 @@ export default function App() {
                       projectSelect={projectSelect(backlogProjectId)}
                       onAddBacklog={handleAddBacklog}
                       onSetActive={handleSetStoryActive}
+                      onChangeStatus={handleSetStoryStatus}
                     />
                   )}
                 </main>
