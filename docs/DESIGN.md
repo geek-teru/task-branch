@@ -165,6 +165,7 @@ projects 1 ──< tasks(自己参照ツリー parent_id)
 projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
                  ├──< story_context_revisions (story のドキュメントの更新履歴)
                  ├──< task_comments (task へのコメント。本文は編集できる)
+                 ├──< task_events (操作履歴。トリガだけが書く)
                  └──> 担当者（人の場合。ユーザー）
 ```
 
@@ -280,6 +281,35 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 - UNIQUE(story_id, version)。
 - `tasks.context` を保存するたびに、トリガでその版を保存する（最新版も含む。人・AI どちらの更新でも漏れなく残す）。
 - 人か AI かは、リクエストの JWT の `client_id`（あれば AI）で判定する（`current_actor_type()`、§3.5）。認証が無い場合や psql からの更新は人として扱う。コメントの `author_type` / `author_id` も同じ関数を既定値にする。
+
+#### task_events
+
+操作履歴。タイムライン（操作を時系列で見る）とパフォーマンス（件数の集計）の土台。ストーリーもタスクも `tasks` の行なので `task_id` で指す。
+
+| カラム      | 型          | 制約                                            | 説明                                                                                         |
+| ----------- | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| id          | uuid        | PK, default gen_random_uuid()                   |                                                                                              |
+| project_id  | uuid        | FK→projects.id, not null, on delete cascade     | 属するプロジェクト                                                                           |
+| task_id     | uuid        | FK→tasks.id, not null, on delete cascade        | 対象のストーリー / タスク                                                                    |
+| level       | text        | not null, check in ('story','task')             | 記録した時点の level                                                                         |
+| event_type  | text        | not null                                        | `created` / `status_changed` / `activated` / `deactivated` / `commented` / `context_updated` |
+| from_status | text        | null可                                          | `status_changed` のときだけ                                                                  |
+| to_status   | text        | null可                                          | `status_changed` のときだけ                                                                  |
+| comment_id  | uuid        | FK→task_comments.id, null可, on delete set null | `commented` のときだけ                                                                       |
+| actor_type  | text        | null可, check in ('human','ai')                 | 操作者の種別。補完分で不明なものは null                                                      |
+| actor_id    | uuid        | null可                                          | 操作者（ユーザー）                                                                           |
+| occurred_at | timestamptz | not null, default now()                         | 操作した日時                                                                                 |
+
+- インデックス：(project_id, occurred_at desc)、(task_id, occurred_at desc)。
+- 記録はトリガ（security definer、`0024_task_events.sql`）だけで行い、画面・MCP は書かない（記録漏れを防ぐ）。
+    - `tasks` after insert → `created`（日時は `created_at`）
+    - `tasks` after update of status → `status_changed`（from / to を残す）
+    - `tasks` after update of activated_at（story のみ。null ↔ 非 null の変化だけ）→ `activated` / `deactivated`
+    - `task_comments` after insert → `commented`（操作者はコメントの `author_*`）
+    - `story_context_revisions` after insert → `context_updated`（操作者は `edited_by_*`）
+- 操作者は `current_actor_type()` / `current_actor_id()`（§3.5）。
+- コメントの編集・削除、タイトル・期間の変更は記録しない。
+- RLS は所有者の select だけ（§3.5）。insert / update / delete のポリシーは作らない。
 
 #### profiles
 
@@ -406,6 +436,7 @@ $$ language sql stable;
 | story_groups           | 所有者                                          | 所有者 | 所有者                              | 所有者     |
 | story_context_revisions | 所有者                                         | 所有者 | 不可                                | 不可       |
 | task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
+| task_events            | 不可（トリガだけ）                              | 所有者 | 不可                                | 不可       |
 | profiles               | 本人の人                                        | 本人   | 本人の人                            | 不可       |
 | storage.objects（avatars） | 本人の人（自分の uid のフォルダ）           | 本人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ） |
 
@@ -538,6 +569,22 @@ create policy task_comments_update on task_comments
 create policy task_comments_delete on task_comments
   for delete to authenticated
   using (author_id = auth.uid() and author_type = current_actor_type());
+```
+
+##### task_events
+
+所有者（プロジェクトの `owner_id = current_owner_id()`）だけが読める。insert / update / delete のポリシーは作らない。書き込みは記録トリガ（security definer）だけが行う。
+
+```sql
+alter table task_events enable row level security;
+
+create policy task_events_select on task_events
+  for select to authenticated
+  using (exists (
+    select 1 from projects p
+     where p.id = task_events.project_id
+       and p.owner_id = current_owner_id()
+  ));
 ```
 
 ##### profiles
