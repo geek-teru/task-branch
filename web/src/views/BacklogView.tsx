@@ -1,11 +1,12 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { BacklogStory } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import type { BacklogStory, Status } from "../lib/types";
+import { STATUS_ORDER, STORY_STATUSES } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
 import { EpicStateBadge } from "../components/EpicStateBadge";
+import { StatusPicker } from "../components/StatusPicker";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
 import { AddIcon } from "../components/Icons";
@@ -16,7 +17,6 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Toolbar } from "../components/ui/Toolbar";
 import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
-import { Badge } from "../components/ui/Badge";
 import { SortableTh } from "../components/ui/SortableTh";
 
 // 「InActive も表示」の状態。ブラウザごとに覚える（カンバンの「クローズしたタスクも表示」と同じ扱い）。
@@ -40,12 +40,15 @@ export function BacklogView({
   projectSelect,
   onAddBacklog,
   onSetActive,
+  onChangeStatus,
 }: {
   stories: BacklogStory[] | null;
   // The project picker, first in the toolbar.
   projectSelect?: ReactNode;
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
   onSetActive: (storyId: string, active: boolean) => void;
+  // Picked from the status column's menu; applied at once (no confirmation).
+  onChangeStatus: (storyId: string, status: Status) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [pendingState, setPendingState] = useState<{ story: BacklogStory; active: boolean } | null>(null);
@@ -126,8 +129,8 @@ export function BacklogView({
               <tbody>
                 {sorted.map((s) => {
                   const active = s.activated_at != null;
-                  // InActive はグレーアウト。opacity は tr ではなく状態以外のセルに付ける
-                  // （tr に付けると状態のメニューが行の重なりに閉じ込められ、下の行に隠れる）。
+                  // InActive はグレーアウト。opacity は tr ではなくステータス・状態以外のセルに付ける
+                  // （tr に付けるとメニューが行の重なりに閉じ込められ、下の行に隠れる）。
                   const dim = !active && "opacity-60";
                   return (
                     <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
@@ -149,8 +152,8 @@ export function BacklogView({
                       </td>
                       <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.start_date ?? "—"}</td>
                       <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.due_date ?? "—"}</td>
-                      <td className={cn("relative px-3 py-2", dim)}>
-                        <Badge tone={s.status}>{STATUS_LABEL[s.status]}</Badge>
+                      <td className="relative px-3 py-2">
+                        <StatusPicker status={s.status} statuses={STORY_STATUSES} onPick={(next) => onChangeStatus(s.id, next)} />
                         <ResizeHandle onMouseDown={status.startResize} side="left" />
                       </td>
                       <td className="relative px-3 py-2">
