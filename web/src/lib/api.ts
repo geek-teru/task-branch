@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent } from "./types";
+import type { ActivityBucket, ActivityCount, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -376,4 +376,27 @@ async function addChild(
     ...input,
     sort_order: nextOrder,
   });
+}
+
+// Counts of stories created / tasks created / tasks done per day or week (RPC project_activity_counts).
+export async function getActivityCounts(
+  projectId: string,
+  bucket: ActivityBucket,
+  fromDate: string,
+  toDate: string
+): Promise<ActivityCount[]> {
+  const { data, error } = await supabase.rpc("project_activity_counts", {
+    project: projectId,
+    bucket,
+    from_date: fromDate,
+    to_date: toDate,
+  });
+  if (error) throw error;
+  // bigint columns may come back as strings; normalise to numbers.
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    bucket_start: String(r.bucket_start),
+    stories_created: Number(r.stories_created),
+    tasks_created: Number(r.tasks_created),
+    tasks_done: Number(r.tasks_done),
+  }));
 }
