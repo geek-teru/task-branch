@@ -1,6 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useState } from "react";
 import { getActivityCounts } from "../lib/api";
 import type { ActivityBucket, ActivityCount } from "../lib/types";
 import { ActivityChart } from "../components/ActivityChart";
@@ -58,7 +57,11 @@ export function PerformanceView({
       .then((counts) => {
         if (!cancelled) setRows({ key, counts });
       })
-      .catch((e) => onError(String(e.message ?? e)));
+      .catch((e) => {
+        if (cancelled) return;
+        setRows({ key, counts: [] });
+        onError(String(e.message ?? e));
+      });
     return () => {
       cancelled = true;
     };
