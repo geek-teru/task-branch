@@ -1,17 +1,27 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { listProjectStories } from "../lib/api";
 import type { AssigneeOption, Assignees, KanbanLane, Project, Status, StoryInput, Task } from "../lib/types";
-import { BOARD_STATUSES, STATUS_LABEL, TASK_STATUSES, assigneeFields, assigneeOf, isFinished } from "../lib/types";
+import {
+  AI_ASSIGNEE_ID,
+  BOARD_STATUSES,
+  STATUS_LABEL,
+  TASK_STATUSES,
+  assigneeFields,
+  assigneeKey,
+  assigneeOf,
+  isFinished,
+} from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
-import { AssigneeIcon } from "../components/AssigneeLabel";
+import { AssigneeIcon, AssigneeLabel } from "../components/AssigneeLabel";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AddIcon } from "../components/Icons";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { Select, type SelectOption } from "../components/ui/Select";
 import { Switch } from "../components/ui/Switch";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Toolbar } from "../components/ui/Toolbar";
@@ -34,6 +44,11 @@ const AUTO_SCROLL_MAX_STEP = 18;
 
 // 「クローズしたタスクも表示」の状態。ブラウザごとに覚える（列幅と同じ扱い）。
 const SHOW_CLOSED_KEY = "kanban.showClosed";
+// 担当者フィルタの選択。同じくブラウザごとに覚える。
+const ASSIGNEE_FILTER_KEY = "kanban.assigneeFilter";
+// フィルタの値。「すべて」「未割り当て」は担当者の id と重ならない文字列にする。
+const FILTER_ALL = "__all__";
+const FILTER_UNASSIGNED = "__unassigned__";
 
 // One board per project: a swimlane per in-progress story, columns = task status.
 // The project filter (null = all projects) is owned by the caller (the app-wide selection, switched
@@ -81,6 +96,21 @@ export function KanbanView({
       localStorage.setItem(SHOW_CLOSED_KEY, on ? "1" : "0");
     } catch {
       // Ignore: the toggle still applies for this session.
+    }
+  };
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(() => {
+    try {
+      return localStorage.getItem(ASSIGNEE_FILTER_KEY) || FILTER_ALL;
+    } catch {
+      return FILTER_ALL;
+    }
+  });
+  const changeAssigneeFilter = (value: string) => {
+    setAssigneeFilter(value);
+    try {
+      localStorage.setItem(ASSIGNEE_FILTER_KEY, value);
+    } catch {
+      // Ignore: the filter still applies for this session.
     }
   };
   const [editing, setEditing] = useState<Task | null>(null);
@@ -144,6 +174,30 @@ export function KanbanView({
     }));
   }, [selectedProjectId, storySource]);
 
+  // 担当者フィルタの選択肢。表示中のタスクに AI（未指定）がいるときだけ、その項目を足す。
+  const assigneeFilterOptions = useMemo<SelectOption<string>[]>(() => {
+    const hasAiUnspecified = lanes.some(
+      (l) =>
+        visibleProjects.some((p) => p.id === l.story.project_id) &&
+        l.tasks.some((t) => assigneeKey(t) === AI_ASSIGNEE_ID),
+    );
+    const people = assignees.options.filter((a) => a.id !== AI_ASSIGNEE_ID);
+    const unspecified = assigneeOf({ assignee_id: null, assignee_type: "ai", assignee_client_id: null }, assignees);
+    return [
+      { value: FILTER_ALL, label: "すべて" },
+      { value: FILTER_UNASSIGNED, label: <AssigneeLabel assignee={null} /> },
+      ...people.map((a) => ({ value: a.id, label: <AssigneeLabel assignee={a} /> })),
+      ...(hasAiUnspecified && unspecified ? [{ value: unspecified.id, label: <AssigneeLabel assignee={unspecified} /> }] : []),
+    ];
+  }, [lanes, visibleProjects, assignees]);
+
+  // 保存した担当者が候補に無ければ「すべて」に戻す。エージェント一覧が未取得の間は戻さない。
+  const filterValid = assigneeFilterOptions.some((o) => o.value === assigneeFilter);
+  const effectiveFilter = filterValid || !assignees.agentsLoaded ? assigneeFilter : FILTER_ALL;
+  useEffect(() => {
+    if (effectiveFilter !== assigneeFilter) changeAssigneeFilter(effectiveFilter);
+  }, [effectiveFilter, assigneeFilter]);
+
   const stopAutoScroll = () => {
     if (!autoScroll.current) return;
     cancelAnimationFrame(autoScroll.current.raf);
@@ -187,9 +241,12 @@ export function KanbanView({
     setOver(null);
   };
 
-  // クローズ列は常に出すが、カードはトグルが入っているときだけ出す。
+  // クローズ列は常に出すが、カードはトグルが入っているときだけ出す。担当者フィルタはカードだけに掛ける。
+  const matchesAssignee = (t: Task) =>
+    effectiveFilter === FILTER_ALL ||
+    (effectiveFilter === FILTER_UNASSIGNED ? assigneeKey(t) === null : assigneeKey(t) === effectiveFilter);
   const cardsIn = (tasks: Task[], s: Status) =>
-    s === "closed" && !showClosed ? [] : tasks.filter((t) => t.status === s);
+    s === "closed" && !showClosed ? [] : tasks.filter((t) => t.status === s && matchesAssignee(t));
 
   const renderLane = ({ story, tasks }: KanbanLane) => {
     // クローズも完了として数える。トグルで隠していても数は変えない。
@@ -279,6 +336,16 @@ export function KanbanView({
         />
         <Toolbar>
           {projectSelect}
+          <div className={cn("flex items-center gap-1.5", effectiveFilter !== FILTER_ALL && "[&_button]:border-brand")}>
+            <span className="text-xs text-fg-muted">担当者</span>
+            <Select
+              value={effectiveFilter}
+              onChange={changeAssigneeFilter}
+              options={assigneeFilterOptions}
+              aria-label="担当者"
+              className="w-44"
+            />
+          </div>
           <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
         </Toolbar>
 
