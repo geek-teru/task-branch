@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { useResizableWidth } from "../lib/useResizableWidth";
-import { BacklogIcon, GanttIcon, KanbanIcon, ProjectIcon } from "./Icons";
+import { BacklogIcon, GanttIcon, KanbanIcon, ProjectIcon, TimelineIcon } from "./Icons";
 import { Button } from "./ui/Button";
 
-export type MenuKey = "projects" | "backlog" | "gantt" | "kanban";
+export type MenuKey = "projects" | "backlog" | "gantt" | "kanban" | "timeline";
 
 // icon: shown next to the label, and alone while the sidebar is collapsed.
 const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
@@ -12,6 +12,7 @@ const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
   { key: "backlog", label: "Backlog", icon: <BacklogIcon /> },
   { key: "gantt", label: "Gantt", icon: <GanttIcon /> },
   { key: "kanban", label: "Board", icon: <KanbanIcon /> },
+  { key: "timeline", label: "Timeline", icon: <TimelineIcon /> },
 ];
 
 const COLLAPSED_W = 52;

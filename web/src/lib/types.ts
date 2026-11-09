@@ -213,3 +213,21 @@ export const LEVEL_LABEL: Record<Level, string> = {
   story: "ストーリー",
   task: "タスク",
 };
+
+// task_events (操作履歴)。list_project_events RPC の1行。
+export type EventType = "created" | "status_changed" | "activated" | "deactivated" | "commented" | "context_updated";
+
+export interface TaskEvent {
+  id: string;
+  occurred_at: string;
+  event_type: EventType;
+  level: Level;
+  task_id: string;
+  task_title: string;
+  story_id: string | null;
+  story_title: string | null;
+  from_status: Status | null;
+  to_status: Status | null;
+  actor_type: AssigneeType | null; // null = 不明（過去分の補完）
+  comment_excerpt: string | null;
+}
