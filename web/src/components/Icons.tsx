@@ -138,6 +138,16 @@ export function GanttIcon(p: IconProps) {
   );
 }
 
+// Performance: rising bars.
+export function PerformanceIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M2 14h12" />
+      <path d="M4 14V9M8 14V5M12 14V2.5" strokeWidth="2" />
+    </Icon>
+  );
+}
+
 // Edit (変更 / 編集): a pencil.
 export function EditIcon(p: IconProps) {
   return (
