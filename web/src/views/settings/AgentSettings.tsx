@@ -3,6 +3,7 @@ import type { OAuthGrant } from "@supabase/supabase-js";
 import { agentClientLabel, findAgentProvider } from "../../lib/agentProviders";
 import { listGrants, revokeGrant } from "../../lib/oauth";
 import { Button } from "../../components/ui/Button";
+import { AddAgentDialog } from "./AddAgentDialog";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ProviderIcon } from "../../components/Icons";
 
@@ -16,6 +17,7 @@ export function AgentSettings() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<OAuthGrant | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(() => {
     listGrants()
@@ -54,13 +56,21 @@ export function AgentSettings() {
 
   return (
     <div className="flex max-w-[640px] flex-col gap-3">
-      <h3 className="m-0 text-[13px] font-medium text-fg">接続中のエージェント</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="m-0 text-[13px] font-medium text-fg">接続中のエージェント</h3>
+        <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
+          エージェントを追加
+        </Button>
+      </div>
       {error && <div className="text-[13px] text-danger">{error}</div>}
       {grants === undefined ? (
         <div className="text-[13px] text-fg-muted">読み込み中…</div>
       ) : grants.length === 0 ? (
         <div className="rounded-md border border-dashed border-border-strong px-6 py-10 text-center text-[13px] text-fg-muted">
-          まだ接続したエージェントはありません
+          <div>まだ接続したエージェントはありません</div>
+          <Button size="sm" className="mt-3" onClick={() => setAdding(true)}>
+            エージェントを追加
+          </Button>
         </div>
       ) : (
         <ul className="m-0 list-none divide-y divide-border rounded-md border border-border p-0">
@@ -83,6 +93,7 @@ export function AgentSettings() {
           })}
         </ul>
       )}
+      {adding && <AddAgentDialog onClose={() => setAdding(false)} />}
       {confirming && (
         <ConfirmDialog
           message={`${agentClientLabel(confirming.client)} の接続を解除しますか？\n再び使うにはエージェント側からつなぎ直して同意します。\n発行済みのトークンは、解除後も最大 1 時間は使える場合があります。`}

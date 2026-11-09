@@ -11,12 +11,28 @@ export type AgentProviderId = "claude-code" | "claude-ai" | "chatgpt" | "codex" 
 // the redirect_uri, which it passes so a client can't pass itself off as a provider by name alone.
 export type AgentClientInfo = { name: string; redirectUri?: string };
 
+// One line of the connection guide: a sentence, optionally with a snippet to copy and a link to open.
+export type AgentSetupStep = {
+  text: string;
+  copy?: string;
+  link?: { label: string; href: string };
+};
+
+// Providers without setup are not offered in the add-agent dialog.
+export type AgentSetup = (mcpUrl: string) => AgentSetupStep[];
+
+export const MCP_SERVER_NAME = "task-branch";
+
+// The MCP endpoint of the app being viewed (production, preview and local use the same code).
+export const mcpUrl = () => `${window.location.origin}/api/mcp`;
+
 export type AgentProvider = {
   id: AgentProviderId;
   name: string;
   // The provider's image (under web/public), or a colored tile with letters when there is none (see ProviderIcon).
   icon: { color: string; label: string; image?: string };
   match: (client: AgentClientInfo) => boolean;
+  setup?: AgentSetup;
 };
 
 export const AGENT_PROVIDERS: AgentProvider[] = [
@@ -27,6 +43,10 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
     // Confirmed 2026-11-06: client_name "Claude Code (<MCP server name>)", redirect_uri http://localhost:<port>/callback.
     match: (c) =>
       c.name.startsWith("Claude Code (") && (c.redirectUri === undefined || c.redirectUri.startsWith("http://localhost:")),
+    setup: (url) => [
+      { text: "ターミナルで次のコマンドを実行して MCP サーバーを追加します。", copy: `claude mcp add --transport http ${MCP_SERVER_NAME} ${url}` },
+      { text: `Claude Code で /mcp を開き、${MCP_SERVER_NAME} を選んで Authenticate を押します。ブラウザで同意画面が開きます。` },
+    ],
   },
   {
     id: "claude-ai",
@@ -36,6 +56,14 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
     match: (c) =>
       c.name === "Claude" &&
       (c.redirectUri === undefined || c.redirectUri === "https://claude.ai/api/mcp/auth_callback"),
+    setup: (url) => [
+      { text: "MCP の URL をコピーします。", copy: url },
+      {
+        text: "claude.ai の「設定 → コネクタ → カスタムコネクタを追加」を開き、名前に task-branch、URL にコピーした値を入れて追加します。",
+        link: { label: "claude.ai のコネクタ設定を開く", href: "https://claude.ai/settings/connectors" },
+      },
+      { text: "追加したコネクタの「接続」を押すと、ブラウザで同意画面が開きます。" },
+    ],
   },
   {
     id: "chatgpt",
@@ -51,6 +79,11 @@ export const AGENT_PROVIDERS: AgentProvider[] = [
     match: (c) =>
       c.name === "Codex" &&
       (c.redirectUri === undefined || /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):/.test(c.redirectUri)),
+    // The command shape is from the Codex docs and not yet run against a real Codex CLI.
+    setup: (url) => [
+      { text: "ターミナルで次のコマンドを実行して MCP サーバーを追加します。", copy: `codex mcp add ${MCP_SERVER_NAME} --url ${url}` },
+      { text: "続けてログインします。ブラウザで同意画面が開きます。", copy: `codex mcp login ${MCP_SERVER_NAME}` },
+    ],
   },
   {
     id: "cursor",
