@@ -138,6 +138,17 @@ export function GanttIcon(p: IconProps) {
   );
 }
 
+// Timeline: a vertical line with three dots and labels.
+export function TimelineIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M4 2v12" />
+      <path d="M4 4h.01M4 8h.01M4 12h.01" strokeWidth="2.5" />
+      <path d="M8 4h6M8 8h6M8 12h4" />
+    </Icon>
+  );
+}
+
 // Edit (変更 / 編集): a pencil.
 export function EditIcon(p: IconProps) {
   return (
