@@ -231,3 +231,13 @@ export interface TaskEvent {
   actor_type: AssigneeType | null; // null = 不明（過去分の補完）
   comment_excerpt: string | null;
 }
+
+// One bucket (day / week) of project_activity_counts.
+export interface ActivityCount {
+  bucket_start: string; // YYYY-MM-DD, the first day of the bucket (Asia/Tokyo)
+  stories_created: number;
+  tasks_created: number;
+  tasks_done: number;
+}
+
+export type ActivityBucket = "day" | "week";

@@ -46,6 +46,7 @@ import { TimelineView } from "./views/TimelineView";
 import { StoryDetailPage } from "./views/StoryDetailPage";
 import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
+import { PerformanceView } from "./views/PerformanceView";
 import { SettingsPage } from "./views/SettingsPage";
 
 // The project picked in the header / toolbar, remembered per browser.
@@ -80,6 +81,7 @@ export default function App() {
   const isGantt = pathname === "/gantt" || ganttMatch !== null;
   const isKanban = pathname === "/kanban";
   const isTimeline = pathname === "/timeline";
+  const isPerformance = pathname === "/performance";
   const storyMatch = useMatch("/stories/:storyId");
   const isBacklog = pathname === "/backlog" || storyMatch !== null;
   // Settings belong to no project: no side nav item is current, and the breadcrumb says 設定.
@@ -144,12 +146,14 @@ export default function App() {
   const kanbanProjectId = isKanban ? searchParams.get("project") ?? selectedId : null;
   // Timeline: ?project=, defaulting as the Gantt does.
   const timelineProjectId = isTimeline ? searchParams.get("project") ?? defaultProjectId : undefined;
+  // Performance: ?project=, defaulting as the Gantt does.
+  const performanceProjectId = isPerformance ? searchParams.get("project") ?? defaultProjectId : undefined;
 
   // A project named in the URL becomes the selection, so the next page opens on it too.
   const urlProjectId =
     ganttMatch?.params.projectId ??
     projectMatch?.params.projectId ??
-    (pathname === "/backlog" || isKanban || isTimeline ? searchParams.get("project") : null);
+    (pathname === "/backlog" || isKanban || isTimeline || isPerformance ? searchParams.get("project") : null);
   useEffect(() => {
     if (urlProjectId && projects.some((p) => p.id === urlProjectId)) selectProject(urlProjectId);
   }, [urlProjectId, projects, selectProject]);
@@ -529,6 +533,7 @@ export default function App() {
     else if (key === "kanban") navigate(selectedId ? `/kanban?project=${selectedId}` : "/kanban");
     else if (key === "backlog") navigate(selectedId ? `/backlog?project=${selectedId}` : "/backlog");
     else if (key === "timeline") navigate(selectedId ? `/timeline?project=${selectedId}` : "/timeline");
+    else if (key === "performance") navigate(selectedId ? `/performance?project=${selectedId}` : "/performance");
   }, [navigate, selectedId]);
 
   if (!isConfigured) {
@@ -579,12 +584,15 @@ export default function App() {
         ? kanbanProjectId
         : isTimeline
           ? timelineProjectId
+        : isPerformance
+          ? performanceProjectId
           : projectMatch?.params.projectId ?? selectedId;
   const handleHeaderSelectProject = (id: string) => {
     selectProject(id);
     if (isGantt) navigate(`/projects/${id}/gantt`);
     else if (isKanban) navigate(`/kanban?project=${id}`);
     else if (isTimeline) navigate(`/timeline?project=${id}`);
+    else if (isPerformance) navigate(`/performance?project=${id}`);
     else if (projectMatch) navigate(`/projects/${id}`);
     else navigate(`/backlog?project=${id}`);
   };
@@ -657,7 +665,7 @@ export default function App() {
       />
       <div className="flex min-h-0 flex-1">
         <Sidebar
-          active={isSettings ? null : isGantt ? "gantt" : isKanban ? "kanban" : isTimeline ? "timeline" : isBacklog ? "backlog" : "projects"}
+          active={isSettings ? null : isGantt ? "gantt" : isKanban ? "kanban" : isTimeline ? "timeline" : isPerformance ? "performance" : isBacklog ? "backlog" : "projects"}
           onNavigate={onNavigate}
         />
 
@@ -709,6 +717,26 @@ export default function App() {
                       onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
                       onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
                       onShowKanban={(projectId) => navigate(`/kanban?project=${projectId}`)}
+                    />
+                  )}
+                </main>
+              }
+            />
+            <Route
+              path="/performance"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {!projectsLoaded ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                  ) : projects.length === 0 ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+                  ) : !projects.some((p) => p.id === performanceProjectId) ? (
+                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                  ) : (
+                    <PerformanceView
+                      projectId={performanceProjectId!}
+                      projectSelect={projectSelect(performanceProjectId)}
+                      onError={setError}
                     />
                   )}
                 </main>
