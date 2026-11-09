@@ -64,18 +64,16 @@ export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; buc
               {SERIES.map((s, j) => {
                 const v = r[s.key];
                 const h = (v / yMax) * plotH;
+                const x = gx + pad + j * barW;
+                const w = Math.max(1, barW - 1);
                 return (
-                  <rect
-                    key={s.key}
-                    x={gx + pad + j * barW}
-                    y={y(v)}
-                    width={Math.max(1, barW - 1)}
-                    height={h}
-                    fill={s.color}
-                    rx={1}
-                  >
-                    <title>{`${bucket === "week" ? "週 " : ""}${md(r.bucket_start)}・${s.label}・${v} 件`}</title>
-                  </rect>
+                  <g key={s.key}>
+                    <rect x={x} y={y(v)} width={w} height={h} fill={s.color} rx={1} />
+                    {/* 0 件でもホバーできるよう、系列の縦いっぱいを覆う透明な当たり判定を置く */}
+                    <rect x={x} y={M.top} width={w} height={plotH} fill="transparent">
+                      <title>{`${bucket === "week" ? "週 " : ""}${md(r.bucket_start)}・${s.label}・${v} 件`}</title>
+                    </rect>
+                  </g>
                 );
               })}
               {i % labelEvery === 0 && (
