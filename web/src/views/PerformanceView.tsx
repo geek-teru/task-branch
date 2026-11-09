@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { getActivityCounts } from "../lib/api";
 import type { ActivityBucket, ActivityCount } from "../lib/types";
+import { ActivityChart } from "../components/ActivityChart";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -137,6 +138,8 @@ export function PerformanceView({
               <TotalCard label="タスク作成" value={totals.tasks} />
               <TotalCard label="タスク完了" value={totals.done} />
             </div>
+
+            <ActivityChart counts={counts} bucket={bucket} />
 
             <div className="overflow-hidden rounded-md border border-border bg-surface">
               <table className="w-full border-collapse text-[13px]">
