@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { ActivityBucket, ActivityCount, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent } from "./types";
+import type { ActivityBucket, ActivityCount, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType } from "./types";
 
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
@@ -90,10 +90,17 @@ export async function listBacklogStories(projectId: string): Promise<BacklogStor
 // Timeline page: one page of the project's events, newest first. `before` is the oldest occurred_at
 // already shown (cursor); pass nothing for the first page.
 export const TIMELINE_PAGE_SIZE = 50;
-export async function listProjectEvents(projectId: string, before?: string | null): Promise<TaskEvent[]> {
+// `story` limits to that story and its tasks; `types` limits to those event types (null = all).
+export async function listProjectEvents(
+  projectId: string,
+  before?: string | null,
+  filter: { story?: string | null; types?: EventType[] | null } = {},
+): Promise<TaskEvent[]> {
   const { data, error } = await supabase.rpc("list_project_events", {
     project: projectId,
     before: before ?? null,
+    story: filter.story ?? null,
+    types: filter.types ?? null,
     max_rows: TIMELINE_PAGE_SIZE,
   });
   if (error) throw error;
