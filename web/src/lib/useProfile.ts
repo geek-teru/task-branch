@@ -27,7 +27,7 @@ export function useProfile(session: Session | null | undefined): {
   }, [reload]);
 
   const meta = session?.user.user_metadata ?? {};
-  const displayName: string = profile?.display_name ?? meta.full_name ?? meta.name ?? session?.user.email ?? "";
+  const displayName: string = profile?.display_name ?? meta.full_name ?? meta.name ?? session?.user.email ?? (session?.user.is_anonymous ? "ゲスト" : "");
   const url = profile?.avatar_path ? avatarUrl(profile.avatar_path) : (meta.avatar_url ?? meta.picture ?? null);
 
   return { displayName, avatarUrl: url, reload };

@@ -1,6 +1,7 @@
 import type { Project } from "../lib/types";
 import { Avatar } from "./Avatar";
 import { ChevronUpDownIcon, ServiceIcon } from "./Icons";
+import { Badge } from "./ui/Badge";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
 export const HEADER_H = 48;
@@ -17,6 +18,7 @@ export function GlobalHeader({
   userName,
   userAvatarUrl,
   userEmail,
+  isGuest = false,
   onOpenSettings,
   onLogout,
 }: {
@@ -35,6 +37,8 @@ export function GlobalHeader({
   // Uploaded image or Google's; null shows the initial.
   userAvatarUrl: string | null;
   userEmail: string | null;
+  // Anonymous sign-in: shows a バッジ and no email.
+  isGuest?: boolean;
   onOpenSettings: () => void;
   onLogout: () => void;
 }) {
@@ -111,8 +115,11 @@ export function GlobalHeader({
         trigger={<Avatar url={userAvatarUrl} name={userName} className="size-7 text-xs" />}
       >
         <div className="px-3 py-2">
-          <div className="truncate text-[13px] font-medium text-fg">{userName}</div>
-          {userEmail && userEmail !== userName && <div className="truncate text-xs text-fg-muted">{userEmail}</div>}
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-fg">{userName}</span>
+            {isGuest && <Badge className="shrink-0">ゲスト</Badge>}
+          </div>
+          {!isGuest && userEmail && userEmail !== userName && <div className="truncate text-xs text-fg-muted">{userEmail}</div>}
         </div>
         <DropdownMenuItem onSelect={onOpenSettings}>設定</DropdownMenuItem>
         <DropdownMenuSeparator />
