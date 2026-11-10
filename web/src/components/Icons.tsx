@@ -65,6 +65,8 @@ export function ProviderIcon({
   size?: number;
 }) {
   if (provider?.icon.image) {
+    // The size is set in style too: Tailwind's preflight makes img height auto, so in a flex row
+    // (align-items: stretch) the width/height attributes alone let it stretch to the row's height.
     return (
       <img
         src={provider.icon.image}
@@ -73,6 +75,7 @@ export function ProviderIcon({
         width={size}
         height={size}
         className="shrink-0 rounded-md"
+        style={{ width: size, height: size }}
       />
     );
   }
