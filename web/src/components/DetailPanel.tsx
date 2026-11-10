@@ -24,6 +24,9 @@ export interface StoryOption {
 }
 
 const MS_DAY = 24 * 60 * 60 * 1000;
+
+// Comment authors are looked up in the assignees; without them, every author shows as unknown.
+const NO_ASSIGNEES: Assignees = { options: [], agentsLoaded: false };
 function parseDate(s: string): Date {
   return new Date(`${s}T00:00:00`);
 }
@@ -169,7 +172,7 @@ export function DetailPanel<T extends DetailNode>({
         <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
         <Field label="クローズ日時">{node?.closed_at ? fmtDateTime(node.closed_at) : DASH}</Field>
-        {node?.level === "task" && <TaskComments taskId={node.id} />}
+        {node?.level === "task" && <TaskComments taskId={node.id} assignees={assignees ?? NO_ASSIGNEES} />}
       </div>
 
       {node && ((canStart && onStart) || (canComplete && onComplete)) && (
