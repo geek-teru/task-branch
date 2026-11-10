@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { listBacklogStories, listProjectEvents, TIMELINE_PAGE_SIZE } from "../lib/api";
-import type { Assignees, BacklogStory, EventType, TaskEvent } from "../lib/types";
+import { getTaskNode, listBacklogStories, listProjectEvents, TIMELINE_PAGE_SIZE, updateTaskStatus } from "../lib/api";
+import type { Assignees, BacklogStory, EventType, Status, Task, TaskEvent } from "../lib/types";
+import { DetailPanel } from "../components/DetailPanel";
 import { TimelinePost } from "../components/TimelinePost";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Select } from "../components/ui/Select";
@@ -48,6 +49,18 @@ export function TimelineView({
   }, [typesParam]);
   const typesKey = types?.join(",") ?? "";
 
+  // The open story / task lives in ?task= so a reload keeps the panel. Saving a change re-reads the
+  // feed from the top (reloadKey) and the panel's own node.
+  const selectedId = searchParams.get("task");
+  const [node, setNode] = useState<Task | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const select = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("task", id);
+    else next.delete("task");
+    setSearchParams(next);
+  };
+
   const updateFilter = (patch: { story?: string | null; types?: EventType[] | null }) => {
     const next = new URLSearchParams(searchParams);
     if ("story" in patch) {
@@ -85,7 +98,31 @@ export function TimelineView({
     return () => {
       cancelled = true;
     };
-  }, [projectId, story, typesKey]);
+  }, [projectId, story, typesKey, reloadKey]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setNode(null);
+      return;
+    }
+    let cancelled = false;
+    getTaskNode(selectedId)
+      .then((row) => !cancelled && setNode(row))
+      .catch((e) => !cancelled && setError(String(e.message ?? e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, reloadKey]);
+
+  const changeStatus = async (t: Task, status: Status) => {
+    try {
+      await updateTaskStatus(t.id, status);
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+    }
+  };
+  const placeStory = node?.level === "task" ? events?.find((e) => e.task_id === node.id)?.story_title ?? null : null;
 
   const loadMore = useCallback(async () => {
     if (!events?.length) return;
@@ -119,7 +156,8 @@ export function TimelineView({
   }, [hasMore, loadingMore, loadMore]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
       <PageHeader title="タイムライン" meta={events && `${events.length} 件${hasMore ? "（続きあり）" : ""}`} />
       <Toolbar>
         {projectSelect}
@@ -166,7 +204,7 @@ export function TimelineView({
             <>
               <ul className="m-0 list-none overflow-hidden rounded-md border border-b-0 border-border bg-surface p-0">
                 {events.map((e) => (
-                  <TimelinePost key={e.id} event={e} projectName={projectName} assignees={assignees} />
+                  <TimelinePost key={e.id} event={e} projectName={projectName} assignees={assignees} selected={e.task_id === selectedId} onSelect={select} />
                 ))}
               </ul>
               <div ref={sentinel} aria-hidden="true" className="h-px" />
@@ -175,6 +213,23 @@ export function TimelineView({
           )}
         </div>
       </div>
+    </div>
+    {selectedId && node && (
+      <DetailPanel
+        title={node.title}
+        node={node}
+        start={node.start_date ? new Date(`${node.start_date}T00:00:00`) : null}
+        end={node.due_date ? new Date(`${node.due_date}T00:00:00`) : null}
+        place={node.level === "task" ? { story: placeStory } : undefined}
+        storyLink={node.level === "story" ? `/stories/${node.id}` : undefined}
+        onClose={() => select(null)}
+        onStart={node.level === "task" ? (t) => changeStatus(t, "in_progress") : undefined}
+        onComplete={(t) => changeStatus(t, "done")}
+        onChangeStatus={changeStatus}
+        commentsVersion={reloadKey}
+        assignees={node.level === "task" ? assignees : undefined}
+      />
+    )}
     </div>
   );
 }

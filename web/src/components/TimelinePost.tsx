@@ -105,7 +105,7 @@ function TargetPath({ e, projectName }: { e: TaskEvent; projectName: string }) {
   const storyTitle = e.level === "task" ? e.story_title : e.task_title;
   const story = storyTitle && (
     e.story_id ? (
-      <Link to={`/stories/${e.story_id}`} className="min-w-0 max-w-[40%] shrink truncate text-fg-muted hover:text-fg hover:underline">
+      <Link to={`/stories/${e.story_id}`} onClick={(ev) => ev.stopPropagation()} className="min-w-0 max-w-[40%] shrink truncate text-fg-muted hover:text-fg hover:underline">
         {storyTitle}
       </Link>
     ) : (
@@ -134,10 +134,29 @@ function TargetPath({ e, projectName }: { e: TaskEvent; projectName: string }) {
 
 // One event of the timeline as a post: the actor's icon on the left; on the right the name and
 // time, then where it happened, then what was done.
-export function TimelinePost({ event: e, projectName, assignees }: { event: TaskEvent; projectName: string; assignees: Assignees }) {
+export function TimelinePost({
+  event: e,
+  projectName,
+  assignees,
+  selected,
+  onSelect,
+}: {
+  event: TaskEvent;
+  projectName: string;
+  assignees: Assignees;
+  selected?: boolean;
+  onSelect?: (taskId: string) => void;
+}) {
   const actor = actorOf(e, assignees);
   return (
-    <li className="flex gap-3 border-b border-border px-4 py-3 hover:bg-surface-muted">
+    <li
+      onClick={onSelect ? () => onSelect(e.task_id) : undefined}
+      className={cn(
+        "flex gap-3 border-b border-border px-4 py-3",
+        onSelect && "cursor-pointer",
+        selected ? "bg-brand/10 shadow-[inset_2px_0_0_var(--color-brand)]" : "hover:bg-surface-muted",
+      )}
+    >
       <span className="flex shrink-0" data-tooltip={actor.name}>
         {actor.icon}
       </span>

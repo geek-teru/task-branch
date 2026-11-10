@@ -193,6 +193,18 @@ export async function getStory(storyId: string): Promise<Task | null> {
   return data;
 }
 
+// One story or task by id, for the detail panel opened from the timeline.
+export async function getTaskNode(id: string): Promise<Task | null> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_LIST_COLUMNS)
+    .eq("id", id)
+    .maybeSingle()
+    .overrideTypes<Task | null, { merge: false }>();
+  if (error) throw error;
+  return data;
+}
+
 // Rename a story / edit its one-line description and period. The context document has its own function.
 // Only the story's own dates change; its tasks are not shifted (same as the MCP update_story).
 export async function updateStoryInfo(
