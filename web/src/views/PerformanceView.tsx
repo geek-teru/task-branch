@@ -10,7 +10,7 @@ import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Toolbar } from "../components/ui/Toolbar";
 import { Widget } from "../components/ui/Widget";
 
-type Range = "4w" | "12w" | "custom";
+type Range = "1m" | "4w" | "12w" | "custom";
 
 const DAY_MS = 86_400_000;
 
@@ -23,10 +23,19 @@ function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-const isDate = (v: string | null): v is string => v != null && /^\d{4}-\d{2}-\d{2}$/.test(v);
+// The day after the same date one month earlier (11/10 → 10/11). A missing day clamps to month end (3/31 → 2/28 → 3/1).
+function monthAgoNextDay(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
+  const prev = new Date(Date.UTC(y, m - 2, Math.min(d, lastDay))).toISOString().slice(0, 10);
+  return addDays(prev, 1);
+}
+
+const isDate =(v: string | null): v is string => v != null && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 // ストーリー作成・タスク作成・タスク完了の件数を日 / 週ごとに集計して出す（RPC project_activity_counts）。
-// 粒度と期間は URL（?bucket= / ?from= / ?to=）に持つ。from / to が無ければ「直近 N 週」。
+// 粒度と期間は URL（?bucket= / ?weeks= / ?from= / ?to=）に持つ。from / to が無ければ ?weeks=4 / 12 で「直近 N 週」、
+// どれも無ければ「直近 1 か月」。
 export function PerformanceView({
   projectId,
   projectSelect,
@@ -41,13 +50,16 @@ export function PerformanceView({
   const fromParam = params.get("from");
   const toParam = params.get("to");
   const custom = isDate(fromParam) && isDate(toParam);
-  const weeksParam = params.get("weeks") === "4" ? 4 : 12;
-  const range: Range = custom ? "custom" : weeksParam === 4 ? "4w" : "12w";
+  const weeksParam = params.get("weeks");
+  const range: Range = custom ? "custom" : weeksParam === "4" ? "4w" : weeksParam === "12" ? "12w" : "1m";
 
   const today = jstDate(new Date());
-  const { from, to } = custom
-    ? { from: fromParam, to: toParam }
-    : { from: addDays(today, -weeksParam * 7 + 1), to: today };
+  const { from, to } =
+    range === "custom"
+      ? { from: fromParam!, to: toParam! }
+      : range === "1m"
+        ? { from: monthAgoNextDay(today), to: today }
+        : { from: addDays(today, -(range === "4w" ? 4 : 12) * 7 + 1), to: today };
 
   const [rows, setRows] = useState<{ key: string; counts: ActivityCount[] } | null>(null);
   const key = `${projectId}|${bucket}|${from}|${to}`;
@@ -79,7 +91,7 @@ export function PerformanceView({
 
   const onRange = (r: Range) => {
     if (r === "custom") update({ from, to, weeks: null });
-    else update({ from: null, to: null, weeks: r === "4w" ? "4" : null });
+    else update({ from: null, to: null, weeks: r === "4w" ? "4" : r === "12w" ? "12" : null });
   };
 
   const invalid = from > to;
@@ -119,6 +131,7 @@ export function PerformanceView({
           value={range}
           onChange={onRange}
           options={[
+            { value: "1m", label: "直近 1 か月" },
             { value: "4w", label: "直近 4 週" },
             { value: "12w", label: "直近 12 週" },
             { value: "custom", label: "任意" },
