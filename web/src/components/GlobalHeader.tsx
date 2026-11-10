@@ -20,6 +20,7 @@ export function GlobalHeader({
   userEmail,
   isGuest = false,
   onOpenSettings,
+  onLinkGoogle,
   onLogout,
 }: {
   projects: Project[];
@@ -40,6 +41,8 @@ export function GlobalHeader({
   // Anonymous sign-in: shows a バッジ and no email.
   isGuest?: boolean;
   onOpenSettings: () => void;
+  // Guests only: 「Google で本登録」 (same action as the banner's button).
+  onLinkGoogle?: () => void;
   onLogout: () => void;
 }) {
   const current = projects.find((p) => p.id === currentProjectId);
@@ -121,6 +124,7 @@ export function GlobalHeader({
           </div>
           {!isGuest && userEmail && userEmail !== userName && <div className="truncate text-xs text-fg-muted">{userEmail}</div>}
         </div>
+        {isGuest && onLinkGoogle && <DropdownMenuItem onSelect={onLinkGoogle}>Google で本登録</DropdownMenuItem>}
         <DropdownMenuItem onSelect={onOpenSettings}>設定</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogout}>ログアウト</DropdownMenuItem>

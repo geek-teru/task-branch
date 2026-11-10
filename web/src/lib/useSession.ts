@@ -40,6 +40,16 @@ export async function signInAsGuest(): Promise<{ error: Error | null; projectId:
   }
 }
 
+// Guest → regular user: link a Google identity to the current (anonymous) user. The user id stays
+// the same, so the guest's data is kept; on return is_anonymous is false. redirectTo must be in
+// Supabase's allowed redirect URLs, otherwise Supabase sends the user back to site_url.
+export function linkGoogle(redirectTo: string = window.location.href) {
+  return supabase.auth.linkIdentity({
+    provider: "google",
+    options: { redirectTo },
+  });
+}
+
 export function signOut() {
   return supabase.auth.signOut();
 }

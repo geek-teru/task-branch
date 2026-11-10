@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
-import { signOut, useSession } from "./lib/useSession";
+import { linkGoogle, signOut, useSession } from "./lib/useSession";
 import { useProfile } from "./lib/useProfile";
 import {
   addRootStory,
@@ -38,7 +38,7 @@ import { GlobalHeader } from "./components/GlobalHeader";
 import { GuestBanner } from "./components/GuestBanner";
 import { ProjectSelect } from "./components/ProjectSelect";
 import { CloseIcon } from "./components/Icons";
-import { IconButton } from "./components/ui/Button";
+import { Button, IconButton } from "./components/ui/Button";
 import { ProjectsListPage } from "./views/ProjectsListPage";
 import { ProjectDetailPage } from "./views/ProjectDetailPage";
 import { GanttView } from "./views/GanttView";
@@ -531,6 +531,12 @@ export default function App() {
     else navigate("/login");
   }, [navigate]);
 
+  // Guest → regular user. On success the browser leaves for Google; only an error comes back here.
+  const handleLinkGoogle = useCallback(async () => {
+    const { error } = await linkGoogle();
+    if (error) setError(`Google での本登録に失敗しました: ${error.message}`);
+  }, []);
+
   // The side nav opens each page on the selected project.
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
@@ -667,9 +673,19 @@ export default function App() {
         userEmail={session.user.email ?? null}
         isGuest={!!session.user.is_anonymous}
         onOpenSettings={() => navigate("/settings/profile")}
+        onLinkGoogle={handleLinkGoogle}
         onLogout={handleLogout}
       />
-      {session.user.is_anonymous && <GuestBanner createdAt={session.user.created_at} />}
+      {session.user.is_anonymous && (
+        <GuestBanner
+          createdAt={session.user.created_at}
+          action={
+            <Button variant="primary" size="sm" onClick={handleLinkGoogle}>
+              Google で本登録
+            </Button>
+          }
+        />
+      )}
       <div className="flex min-h-0 flex-1">
         <Sidebar
           active={isSettings ? null : isGantt ? "gantt" : isKanban ? "kanban" : isTimeline ? "timeline" : isPerformance ? "performance" : isBacklog ? "backlog" : "projects"}
