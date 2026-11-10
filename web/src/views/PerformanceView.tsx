@@ -35,7 +35,7 @@ const isDate =(v: string | null): v is string => v != null && /^\d{4}-\d{2}-\d{2
 
 // ストーリー作成・タスク作成・タスク完了の件数を日 / 週ごとに集計して出す（RPC project_activity_counts）。
 // 粒度と期間は URL（?bucket= / ?weeks= / ?from= / ?to=）に持つ。from / to が無ければ ?weeks=4 / 12 で「直近 N 週」、
-// どれも無ければ「直近 1 か月」。
+// どれも無ければ「直近 1 か月」。粒度は ?bucket=week で週、無ければ日。
 export function PerformanceView({
   projectId,
   projectSelect,
@@ -46,7 +46,7 @@ export function PerformanceView({
   onError: (message: string) => void;
 }) {
   const [params, setParams] = useSearchParams();
-  const bucket: ActivityBucket = params.get("bucket") === "day" ? "day" : "week";
+  const bucket: ActivityBucket = params.get("bucket") === "week" ? "week" : "day";
   const fromParam = params.get("from");
   const toParam = params.get("to");
   const custom = isDate(fromParam) && isDate(toParam);
@@ -120,7 +120,7 @@ export function PerformanceView({
         <SegmentedControl<ActivityBucket>
           label="粒度"
           value={bucket}
-          onChange={(b) => update({ bucket: b === "week" ? null : b })}
+          onChange={(b) => update({ bucket: b === "day" ? null : b })}
           options={[
             { value: "day", label: "日" },
             { value: "week", label: "週" },
