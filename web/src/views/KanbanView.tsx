@@ -5,6 +5,7 @@ import {
   AI_ASSIGNEE_ID,
   BOARD_STATUSES,
   STATUS_LABEL,
+  STORY_STATUSES,
   TASK_STATUSES,
   assigneeFields,
   assigneeKey,
@@ -137,19 +138,22 @@ export function KanbanView({
     return byProject;
   }, [lanes]);
 
-  // Looked up from the visible lanes so the panel reflects moves / edits; closes if the task is gone
-  // or its project is filtered out.
+  // Looked up from the visible lanes so the panel reflects moves / edits; closes if the task (or the
+  // story, when a lane heading is selected) is gone or its project is filtered out.
   const selected = useMemo(() => {
     if (!selectedId) return null;
     for (const p of visibleProjects)
       for (const lane of lanesByProject.get(p.id) ?? []) {
+        if (lane.story.id === selectedId) return { task: lane.story, lane };
         const task = lane.tasks.find((t) => t.id === selectedId);
         if (task) return { task, lane };
       }
     return null;
   }, [visibleProjects, lanesByProject, selectedId]);
+  const selectedIsStory = selected?.task.level === "story";
 
-  const selectedProjectId = selected?.task.project_id;
+  // 移動先の候補を読むのはタスクを選んだときだけ（ストーリーのパネルには移動先を出さない）。
+  const selectedProjectId = selected && !selectedIsStory ? selected.task.project_id : undefined;
   useEffect(() => {
     if (!selectedProjectId || storySource?.projectId === selectedProjectId) return;
     let cancelled = false;
@@ -253,13 +257,29 @@ export function KanbanView({
     const done = tasks.filter((t) => isFinished(t.status)).length;
     return (
       <div key={story.id} className="flex border-b border-border last:border-b-0">
-        <div className="relative box-border flex-none px-3 py-2.5" style={{ width: LABEL_W }}>
+        <div
+          onClick={() => setSelectedId(story.id)}
+          data-tooltip="ストーリーの詳細を開く"
+          className={cn(
+            "relative box-border flex-none cursor-pointer px-3 py-2.5 transition-colors",
+            selectedId === story.id ? "bg-brand/10 shadow-[inset_2px_0_0_var(--color-brand)]" : "hover:bg-surface-muted",
+          )}
+          style={{ width: LABEL_W }}
+        >
           {/* カードと同じく ID を名前の上に置く。名前はガントのストーリー行と同じ大きさ。 */}
           <div className="flex items-center gap-1.5 text-[11px] text-fg-muted">
             <div className="flex-1">
               <IdBadge id={story.id} />
             </div>
-            <IconButton label="タスクを追加" onClick={() => setAdding(story)} className="size-6!">
+            {/* ＋は見出しのクリック（詳細パネル）を起こさない */}
+            <IconButton
+              label="タスクを追加"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAdding(story);
+              }}
+              className="size-6!"
+            >
               <AddIcon size={12} />
             </IconButton>
           </div>
@@ -407,8 +427,9 @@ export function KanbanView({
           node={selected.task}
           start={toDate(selected.task.start_date)}
           end={toDate(selected.task.due_date)}
-          place={{ story: selected.lane.story.title }}
-          storyOptions={storyOptions}
+          place={selectedIsStory ? undefined : { story: selected.lane.story.title }}
+          storyLink={selectedIsStory ? `/stories/${selected.task.id}` : undefined}
+          storyOptions={selectedIsStory ? undefined : storyOptions}
           currentStoryId={selected.task.parent_id}
           onPickStory={(storyId) => {
             const target = storySource?.stories.find((story) => story.id === storyId);
@@ -416,33 +437,43 @@ export function KanbanView({
           }}
           onClose={() => setSelectedId(null)}
           onEdit={(t) => setEditing(t)}
-          onDelete={(t) => {
-            if (window.confirm(`タスク「${t.title}」を削除します。よろしいですか？`)) {
-              onDeleteTask(t.id);
-              setSelectedId(null);
-            }
-          }}
-          onStart={(t) => onChangeStatus(t.id, "in_progress")}
-          onComplete={(t) => onChangeStatus(t.id, "done")}
+          // ストーリーの削除はカンバンからは出さない
+          onDelete={
+            selectedIsStory
+              ? undefined
+              : (t) => {
+                  if (window.confirm(`タスク「${t.title}」を削除します。よろしいですか？`)) {
+                    onDeleteTask(t.id);
+                    setSelectedId(null);
+                  }
+                }
+          }
+          // ストーリーは進行中のレーンにしか出ないので「着手」は出ない。「完了」はカンバンから消えるため確認を通す。
+          onStart={selectedIsStory ? undefined : (t) => onChangeStatus(t.id, "in_progress")}
+          onComplete={selectedIsStory ? (t) => setPendingMove({ task: t, status: "done" }) : (t) => onChangeStatus(t.id, "done")}
           onChangeStatus={(t, status) => setPendingMove({ task: t, status })}
-          assignees={assignees}
+          assignees={selectedIsStory ? undefined : assignees}
           onChangeAssignee={(t, assigneeId) => onUpdateTask(t.id, { ...taskValues(t), ...assigneeFields(assigneeId) })}
         />
       )}
 
       {editing && (
         <TaskForm
-          heading="タスクを変更"
-          noun="タスク"
-          statuses={TASK_STATUSES}
+          heading={editing.level === "story" ? "ストーリーを変更" : "タスクを変更"}
+          noun={editing.level === "story" ? "ストーリー" : "タスク"}
+          statuses={editing.level === "story" ? STORY_STATUSES : TASK_STATUSES}
           submitLabel="保存"
-          initial={{
-            ...taskValues(editing),
-            assignee_id: editing.assignee_id,
-            assignee_type: editing.assignee_type,
-            assignee_client_id: editing.assignee_client_id,
-          }}
-          assignees={assignees}
+          initial={
+            editing.level === "story"
+              ? taskValues(editing)
+              : {
+                  ...taskValues(editing),
+                  assignee_id: editing.assignee_id,
+                  assignee_type: editing.assignee_type,
+                  assignee_client_id: editing.assignee_client_id,
+                }
+          }
+          assignees={editing.level === "story" ? undefined : assignees}
           onSubmit={(values) => {
             onUpdateTask(editing.id, values);
             setEditing(null);
@@ -476,6 +507,8 @@ export function KanbanView({
               onMoveTask(pendingMove.task.id, pendingMove.targetStory.id, pendingMove.status);
             } else {
               onChangeStatus(pendingMove.task.id, pendingMove.status);
+              // 進行中以外にしたストーリーはカンバンから消えるので、パネルも閉じる
+              if (pendingMove.task.level === "story" && pendingMove.status !== "in_progress") setSelectedId(null);
             }
             setPendingMove(null);
           }}
@@ -490,7 +523,11 @@ export function KanbanView({
 // 進行中でないストーリーへ移すときはカンバンから消えることを添える。
 function moveMessage({ task, status, targetStory }: { task: Task; status: Status; targetStory?: Task }): string {
   if (!targetStory) {
-    return `「${task.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。よろしいですか？`;
+    const warn =
+      task.level === "story" && status !== "in_progress"
+        ? `\nカンバンには進行中のストーリーだけが出るため、変更するとカンバンには出なくなります。`
+        : "";
+    return `「${task.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。${warn}\nよろしいですか？`;
   }
   const head =
     status === task.status
