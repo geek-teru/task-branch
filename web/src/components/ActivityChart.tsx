@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ActivityBucket, ActivityCount } from "../lib/types";
 
-type SeriesKey = "stories_created" | "tasks_created" | "tasks_done";
+export type SeriesKey = "stories_created" | "tasks_created" | "tasks_done";
 
-const SERIES: { key: SeriesKey; label: string; color: string }[] = [
+export const SERIES: { key: SeriesKey; label: string; color: string }[] = [
   { key: "stories_created", label: "ストーリー作成", color: "var(--color-chart-1)" },
   { key: "tasks_created", label: "タスク作成", color: "var(--color-chart-2)" },
   { key: "tasks_done", label: "タスク完了", color: "var(--color-chart-3)" },
@@ -55,6 +55,7 @@ function ChartTooltip({ active, payload, bucket, hidden }: TipProps) {
 }
 
 // 区間ごとに 3 系列を 1 本に積んだ棒グラフ（Recharts）。凡例を押すと系列を出し入れする。
+// 枠は持たない（ui/Widget の本文に置く）。
 export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; bucket: ActivityBucket }) {
   const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
 
@@ -79,7 +80,7 @@ export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; buc
   const interval = Math.max(0, Math.ceil(counts.length / 12) - 1);
 
   return (
-    <div className="rounded-md border border-border bg-surface px-4 py-3">
+    <div>
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
         {SERIES.map((s) => {
           const off = hidden.has(s.key);
