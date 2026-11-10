@@ -18,6 +18,8 @@ const TYPE_FILTERS: { key: string; label: string; types: EventType[] }[] = [
 ];
 const ALL_TYPES = TYPE_FILTERS.flatMap((f) => f.types);
 const ALL_STORIES = "all";
+const ALL_ACTORS = "all";
+type Actor = "human" | "ai";
 
 // Events of one project as a single-column feed, newest first. Read 50 at a time: when the end of
 // the feed scrolls into view, the oldest occurred_at shown is passed as the next cursor.
@@ -48,6 +50,8 @@ export function TimelineView({
     return picked.length > 0 && picked.length < ALL_TYPES.length ? picked : null;
   }, [typesParam]);
   const typesKey = types?.join(",") ?? "";
+  const actorParam = searchParams.get("actor");
+  const actor: Actor | null = actorParam === "human" || actorParam === "ai" ? actorParam : null;
 
   // The open story / task lives in ?task= so a reload keeps the panel. Saving a change re-reads the
   // feed from the top (reloadKey) and the panel's own node.
@@ -61,11 +65,15 @@ export function TimelineView({
     setSearchParams(next);
   };
 
-  const updateFilter = (patch: { story?: string | null; types?: EventType[] | null }) => {
+  const updateFilter = (patch: { story?: string | null; types?: EventType[] | null; actor?: Actor | null }) => {
     const next = new URLSearchParams(searchParams);
     if ("story" in patch) {
       if (patch.story) next.set("story", patch.story);
       else next.delete("story");
+    }
+    if ("actor" in patch) {
+      if (patch.actor) next.set("actor", patch.actor);
+      else next.delete("actor");
     }
     if ("types" in patch) {
       if (patch.types && patch.types.length > 0 && patch.types.length < ALL_TYPES.length) next.set("types", patch.types.join(","));
@@ -88,7 +96,7 @@ export function TimelineView({
     let cancelled = false;
     setEvents(null);
     setError(null);
-    listProjectEvents(projectId, null, { story, types: typesKey ? (typesKey.split(",") as EventType[]) : null })
+    listProjectEvents(projectId, null, { story, actor, types: typesKey ? (typesKey.split(",") as EventType[]) : null })
       .then((rows) => {
         if (cancelled) return;
         setEvents(rows);
@@ -98,7 +106,7 @@ export function TimelineView({
     return () => {
       cancelled = true;
     };
-  }, [projectId, story, typesKey, reloadKey]);
+  }, [projectId, story, actor, typesKey, reloadKey]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -130,6 +138,7 @@ export function TimelineView({
     try {
       const rows = await listProjectEvents(projectId, events[events.length - 1].occurred_at, {
         story,
+        actor,
         types: typesKey ? (typesKey.split(",") as EventType[]) : null,
       });
       setEvents((prev) => [...(prev ?? []), ...rows]);
@@ -140,7 +149,7 @@ export function TimelineView({
     } finally {
       setLoadingMore(false);
     }
-  }, [events, projectId, story, typesKey]);
+  }, [events, projectId, story, actor, typesKey]);
 
   // Infinite scroll: read the next page when the sentinel after the last post comes into view
   // (a little early, so the feed keeps going while scrolling).
@@ -169,6 +178,17 @@ export function TimelineView({
           options={[
             { value: ALL_STORIES, label: "すべてのストーリー" },
             ...stories.map((s) => ({ value: s.id, label: s.title })),
+          ]}
+        />
+        <Select
+          className="w-32"
+          aria-label="操作者で絞り込む"
+          value={actor ?? ALL_ACTORS}
+          onChange={(v) => updateFilter({ actor: v === "human" || v === "ai" ? v : null })}
+          options={[
+            { value: ALL_ACTORS, label: "すべての操作者" },
+            { value: "human", label: "人" },
+            { value: "ai", label: "AI" },
           ]}
         />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" role="group" aria-label="種別で絞り込む">
