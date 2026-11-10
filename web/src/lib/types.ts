@@ -119,6 +119,21 @@ export function assigneeOf(t: AssigneeFields, assignees: Assignees): AssigneeOpt
   return { id: key, name, avatarUrl: null, agent: { provider: null } };
 }
 
+// The author of a comment, picked from the assignees the same way as a task's assignee: a human
+// is the user with author_id, an AI is the agent with author_client_id (AI（未指定） when it was posted
+// before agents were recorded). AI comments carry the human's uid too, so author_type decides.
+// null = a human who is not among the assignees (not the signed-in user).
+export function commentAuthorOf(
+  c: Pick<TaskComment, "author_type" | "author_id" | "author_client_id">,
+  assignees: Assignees,
+): AssigneeOption | null {
+  if (c.author_type === "ai") {
+    return assigneeOf({ assignee_id: null, assignee_type: "ai", assignee_client_id: c.author_client_id }, assignees);
+  }
+  if (!c.author_id) return null;
+  return assignees.options.find((a) => a.id === c.author_id) ?? null;
+}
+
 // Assigning a user makes the task a human's, picking an agent makes it the AI's, and clearing it
 // leaves no assignee at all.
 export function assigneeFields(assigneeId: string | null): AssigneeFields {

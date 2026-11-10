@@ -1,19 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addTaskComment, deleteTaskComment, listTaskComments, updateTaskComment } from "../lib/api";
-import type { TaskComment } from "../lib/types";
+import type { Assignees, TaskComment } from "../lib/types";
+import { commentAuthorOf } from "../lib/types";
 import { useSession } from "../lib/useSession";
+import { AssigneeIcon } from "./AssigneeLabel";
+import { Avatar } from "./Avatar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CommentIcon, DeleteIcon, EditIcon } from "./Icons";
-import { Badge } from "./ui/Badge";
 import { Button, IconButton } from "./ui/Button";
 import { Textarea } from "./ui/Textarea";
 
 const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
 
+// The comment's author as an icon and name, like the task's 担当者. A human who cannot be looked up
+// (not the signed-in user) gets a "?" icon and ユーザー.
+function CommentAuthor({ comment, assignees }: { comment: TaskComment; assignees: Assignees }) {
+  const author = commentAuthorOf(comment, assignees);
+  const name = author?.name ?? "ユーザー";
+  return (
+    <span className="flex min-w-0 shrink-0 items-center gap-1.5 text-fg">
+      <span data-tooltip={name} className="flex">
+        {author ? <AssigneeIcon assignee={author} /> : <Avatar url={null} name="" className="size-5 text-[10px]" />}
+      </span>
+      <span className="max-w-28 truncate">{name}</span>
+    </span>
+  );
+}
+
 // Comment list + post form for a task, shown at the bottom of the detail panel.
 // Fetches on mount / task change and after posting, editing or deleting (no realtime subscription).
 // refreshKey: bump it to refetch after a comment was posted from outside (the kanban's status dialog).
-export function TaskComments({ taskId, refreshKey }: { taskId: string; refreshKey?: number }) {
+export function TaskComments({
+  taskId,
+  assignees,
+  refreshKey,
+}: {
+  taskId: string;
+  assignees: Assignees;
+  refreshKey?: number;
+}) {
   const session = useSession();
   const myId = session?.user.id ?? null;
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -117,10 +142,6 @@ export function TaskComments({ taskId, refreshKey }: { taskId: string; refreshKe
     }
   }
 
-  // AI comments carry the human's uid (the AI acts on the human's token), so check author_type first.
-  const authorLabel = (c: TaskComment) =>
-    c.author_type === "ai" ? "AI" : myId && c.author_id === myId ? "自分" : "人";
-
   return (
     <div className="mt-1 border-t border-border pt-3">
       <div className="mb-1 flex items-center gap-1.5 text-sm font-medium text-fg">
@@ -132,7 +153,7 @@ export function TaskComments({ taskId, refreshKey }: { taskId: string; refreshKe
         {comments.map((c) => (
           <div key={c.id} className="py-2.5">
             <div className="mb-1 flex items-center gap-2 text-[11px] text-fg-muted">
-              <Badge tone={c.author_type === "ai" ? "brand" : "neutral"}>{authorLabel(c)}</Badge>
+              <CommentAuthor comment={c} assignees={assignees} />
               <span className="min-w-0 flex-1">
                 {fmtDateTime(c.created_at)}
                 {c.updated_at !== c.created_at && "（編集済み）"}
