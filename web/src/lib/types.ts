@@ -231,7 +231,10 @@ export interface TaskEvent {
   from_status: Status | null;
   to_status: Status | null;
   actor_type: AssigneeType | null; // null = 不明（過去分の補完）
+  actor_id: string | null;
+  actor_client_id: string | null; // AI の操作のときのエージェント（OAuth の client_id）。null = 人 / 記録前
   comment_excerpt: string | null;
+  comment_body: string | null; // コメントの全文。コメントが消えていたら null
 }
 
 // One bucket (day / week) of project_activity_counts.

@@ -299,6 +299,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | comment_id  | uuid        | FK→task_comments.id, null可, on delete set null | `commented` のときだけ                                                                       |
 | actor_type  | text        | null可, check in ('human','ai')                 | 操作者の種別。補完分で不明なものは null                                                      |
 | actor_id    | uuid        | null可                                          | 操作者（ユーザー）                                                                           |
+| actor_client_id | text    | null可, default current_actor_client_id(), check (null or actor_type = 'ai') | AI の操作のとき、操作したエージェント（OAuth の client_id）。FK なし。人の操作と記録前の AI の操作は null（コメントのイベントだけ `task_comments.author_client_id` から補完済み） |
 | occurred_at | timestamptz | not null, default now()                         | 操作した日時                                                                                 |
 
 - インデックス：(project_id, occurred_at desc)、(task_id, occurred_at desc)。
@@ -306,7 +307,8 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
     - `tasks` after insert → `created`（日時は `created_at`）
     - `tasks` after update of status → `status_changed`（from / to を残す）
     - `tasks` after update of activated_at（story のみ。null ↔ 非 null の変化だけ）→ `activated` / `deactivated`
-    - `task_comments` after insert → `commented`（操作者はコメントの `author_*`）
+    - `task_comments` after insert → `commented`（操作者はコメントの `author_*`。エージェントも `author_client_id` から取る）
+    - それ以外のイベントの `actor_client_id` は既定値（JWT の `client_id`）で入る（`0030_task_events_actor_client.sql`）
     - `story_context_revisions` after insert → `context_updated`（操作者は `edited_by_*`）
 - 操作者は `current_actor_type()` / `current_actor_id()`（§3.5）。
 - コメントの編集・削除、タイトル・期間の変更は記録しない。
@@ -389,7 +391,7 @@ PostgREST は、リクエストの JWT の中身を `request.jwt.claims` にセ�
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `current_actor_type()` | `ai`（JWT に `client_id` がある）／ それ以外は `human`                                                            | `task_comments.author_type`・`story_context_revisions.edited_by_type` の既定値 |
 | `current_actor_id()`   | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null                                                          | `task_comments.author_id`・`story_context_revisions.edited_by_id` の既定値     |
-| `current_actor_client_id()` | JWT の `client_id`。無ければ null | `task_comments.author_client_id` の既定値 |
+| `current_actor_client_id()` | JWT の `client_id`。無ければ null | `task_comments.author_client_id`・`task_events.actor_client_id` の既定値 |
 | `current_owner_id()`   | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人も AI も本人になる           | `projects.owner_id` の既定値、ポリシー                                        |
 
 ```sql
@@ -662,7 +664,7 @@ create policy avatars_insert on storage.objects
 | `get_progress(project uuid)`    | 進捗集約 | story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 | `shift_story_dates(story uuid, days int)` | 日付移動 | ストーリーと配下のタスクの開始日・期限を同じ日数ずらす（null は null のまま）。1 トランザクションで更新し、ストーリー以外を渡すと例外。ガントのバー移動で使う |
 | `create_guest_sample_project()` | ゲスト | 匿名ユーザー（JWT の `is_anonymous` が true）だけが呼べる。ゲストの初回ログイン時にサンプルのプロジェクト（ストーリー 4・タスク 11）を作り、その id を返す。日付は呼び出した日を起点にずらす。すでにプロジェクトを持っていれば作らず最古のプロジェクトの id を返す（冪等）。security invoker、execute は authenticated のみ（`0029_guest_sample_project.sql`） |
-| `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を絞る。task_title / story_title / comment_excerpt（本文の先頭 80 文字、コメントが消えていたら null）込み。security invoker（`0026_task_events_rpc.sql`） |
+| `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int, actor text)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を、`actor`（`human` / `ai`。それ以外は例外）で actor_type を絞る。task_title / story_title / actor_id / actor_client_id / comment_excerpt（本文の先頭 80 文字）/ comment_body（本文の全文。コメントが消えていたらどちらも null）込み。security invoker（`0026_task_events_rpc.sql`、`0030_task_events_actor_client.sql`） |
 | `project_activity_counts(project uuid, bucket text, from_date date, to_date date)` | パフォーマンス | `bucket`（`day` / `week`＝月曜始まり、Asia/Tokyo）ごとに stories_created / tasks_created / tasks_done を返す。空の区間も 0。security invoker（`0026_task_events_rpc.sql`） |
 
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
