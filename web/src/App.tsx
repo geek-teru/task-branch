@@ -35,6 +35,7 @@ import { agentClientLabel, findAgentProvider } from "./lib/agentProviders";
 import { useAgentGrants } from "./lib/useAgentGrants";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
+import { GuestBanner } from "./components/GuestBanner";
 import { ProjectSelect } from "./components/ProjectSelect";
 import { CloseIcon } from "./components/Icons";
 import { IconButton } from "./components/ui/Button";
@@ -664,9 +665,11 @@ export default function App() {
         userName={profile.displayName}
         userAvatarUrl={profile.avatarUrl}
         userEmail={session.user.email ?? null}
+        isGuest={!!session.user.is_anonymous}
         onOpenSettings={() => navigate("/settings/profile")}
         onLogout={handleLogout}
       />
+      {session.user.is_anonymous && <GuestBanner createdAt={session.user.created_at} />}
       <div className="flex min-h-0 flex-1">
         <Sidebar
           active={isSettings ? null : isGantt ? "gantt" : isKanban ? "kanban" : isTimeline ? "timeline" : isPerformance ? "performance" : isBacklog ? "backlog" : "projects"}
