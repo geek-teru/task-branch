@@ -4,6 +4,30 @@
 import { supabase } from "./supabase";
 import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType } from "./types";
 
+// Guest limits (0031_guest_limits.sql) reject inserts with message 'guest_limit_exceeded'
+// and detail '<projects|stories|tasks|comments>:<limit>'. Turn that into a Japanese message.
+// Keep the wording in sync with guestLimitMessage in web/api/_lib/tools.ts (MCP).
+const GUEST_LIMIT_LABELS: Record<string, string> = {
+  projects: "プロジェクト",
+  stories: "ストーリー",
+  tasks: "タスク",
+  comments: "コメント",
+};
+
+export function guestLimitMessage(error: { message?: string; details?: string | null }): string | null {
+  if (error.message !== "guest_limit_exceeded") return null;
+  const [kind, limit] = (error.details ?? "").split(":");
+  const label = GUEST_LIMIT_LABELS[kind] ?? "データ";
+  const head = limit ? `ゲストでは${label}は ${limit} 件までです` : `ゲストでは${label}の件数に上限があります`;
+  return `${head}。Google で本登録すると制限がなくなります`;
+}
+
+// For inserts: replace a guest-limit error with the readable message; other errors pass through.
+function insertError(error: { message?: string; details?: string | null }): unknown {
+  const message = guestLimitMessage(error);
+  return message ? new Error(message) : error;
+}
+
 export async function listProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
@@ -22,7 +46,7 @@ export async function createGuestSampleProject(): Promise<string> {
 
 export async function createProject(input: ProjectInput): Promise<Project> {
   const { data, error } = await supabase.from("projects").insert(input).select().single();
-  if (error) throw error;
+  if (error) throw insertError(error);
   return data;
 }
 
@@ -144,7 +168,7 @@ export async function addRootStory(projectId: string, input: StoryInput, active 
     })
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw insertError(error);
   return data;
 }
 
@@ -256,7 +280,7 @@ export async function listTaskComments(taskId: string): Promise<TaskComment[]> {
 // author_type / author_id are left to the DB defaults (current_actor_type / current_actor_id).
 export async function addTaskComment(taskId: string, body: string): Promise<TaskComment> {
   const { data, error } = await supabase.from("task_comments").insert({ task_id: taskId, body }).select().single();
-  if (error) throw error;
+  if (error) throw insertError(error);
   return data as TaskComment;
 }
 
@@ -364,7 +388,7 @@ export async function moveTask(taskId: string, targetStoryId: string, status: St
 
 export async function createTask(input: Partial<Task> & { project_id: string; level: Task["level"]; title: string }): Promise<Task> {
   const { data, error } = await supabase.from("tasks").insert(input).select().single();
-  if (error) throw error;
+  if (error) throw insertError(error);
   return data;
 }
 
