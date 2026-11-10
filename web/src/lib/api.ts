@@ -13,6 +13,13 @@ export async function listProjects(): Promise<Project[]> {
   return data ?? [];
 }
 
+// Create the guest's sample project (idempotent) and return its id. Anonymous users only.
+export async function createGuestSampleProject(): Promise<string> {
+  const { data, error } = await supabase.rpc("create_guest_sample_project");
+  if (error) throw error;
+  return data as string;
+}
+
 export async function createProject(input: ProjectInput): Promise<Project> {
   const { data, error } = await supabase.from("projects").insert(input).select().single();
   if (error) throw error;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { createGuestSampleProject } from "./api";
 import { isConfigured, supabase } from "./supabase";
 
 // Current auth session. undefined while the first getSession() is pending, null when signed out.
@@ -25,6 +26,18 @@ export function signInWithGoogle(redirectTo: string = window.location.origin) {
     provider: "google",
     options: { redirectTo },
   });
+}
+
+// Anonymous sign-in, then the sample project. A failed sample setup does not undo the login:
+// the guest just lands on an empty project list (projectId = null).
+export async function signInAsGuest(): Promise<{ error: Error | null; projectId: string | null }> {
+  const { error } = await supabase.auth.signInAnonymously();
+  if (error) return { error, projectId: null };
+  try {
+    return { error: null, projectId: await createGuestSampleProject() };
+  } catch {
+    return { error: null, projectId: null };
+  }
 }
 
 export function signOut() {

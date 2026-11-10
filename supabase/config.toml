@@ -26,6 +26,8 @@ site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/oauth/consent"]
 jwt_expiry = 3600
 enable_signup = true
+# ゲストで試す（匿名サインイン）。ゲストごとに auth.users の行ができ、is_anonymous = true になる。
+enable_anonymous_sign_ins = true
 # JWT を ES256 の非対称鍵で署名する（MCP クライアントが JWKS で検証するため）。
 # 鍵は `make signing-key` で作る。秘密鍵なのでコミットしない。
 signing_keys_path = "./signing_keys.json"
