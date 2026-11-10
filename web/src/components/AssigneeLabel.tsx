@@ -3,9 +3,10 @@ import { Avatar } from "./Avatar";
 import { ProviderIcon } from "./Icons";
 
 // The assignee's icon: a user's picture, or an agent's provider icon as on /settings/agents.
-export function AssigneeIcon({ assignee }: { assignee: AssigneeOption }) {
-  if (assignee.agent) return <ProviderIcon provider={assignee.agent.provider} size={20} />;
-  return <Avatar url={assignee.avatarUrl} name={assignee.name} className="size-5 text-[10px]" />;
+// size: 20 (lists, forms) or 32 (the timeline's posts).
+export function AssigneeIcon({ assignee, size = 20 }: { assignee: AssigneeOption; size?: 20 | 32 }) {
+  if (assignee.agent) return <ProviderIcon provider={assignee.agent.provider} size={size} />;
+  return <Avatar url={assignee.avatarUrl} name={assignee.name} className={size === 32 ? "size-8 text-xs" : "size-5 text-[10px]"} />;
 }
 
 // The assignee's icon and name, as shown in the form's select and the detail panel.

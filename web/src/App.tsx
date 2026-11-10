@@ -781,7 +781,7 @@ export default function App() {
                   ) : !timelineProjectId || !projects.some((p) => p.id === timelineProjectId) ? (
                     <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
                   ) : (
-                    <TimelineView projectId={timelineProjectId} projectSelect={projectSelect(timelineProjectId)} />
+                    <TimelineView projectId={timelineProjectId} projectSelect={projectSelect(timelineProjectId)} assignees={assignees} />
                   )}
                 </main>
               }
