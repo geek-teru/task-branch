@@ -23,10 +23,12 @@ const ALL_STORIES = "all";
 // The project is picked in the global header or the toolbar's picker (/timeline?project=).
 export function TimelineView({
   projectId,
+  projectName,
   projectSelect,
   assignees,
 }: {
   projectId: string;
+  projectName: string;
   projectSelect?: ReactNode;
   assignees: Assignees;
 }) {
@@ -164,7 +166,7 @@ export function TimelineView({
             <>
               <ul className="m-0 list-none overflow-hidden rounded-md border border-b-0 border-border bg-surface p-0">
                 {events.map((e) => (
-                  <TimelinePost key={e.id} event={e} assignees={assignees} />
+                  <TimelinePost key={e.id} event={e} projectName={projectName} assignees={assignees} />
                 ))}
               </ul>
               <div ref={sentinel} aria-hidden="true" className="h-px" />

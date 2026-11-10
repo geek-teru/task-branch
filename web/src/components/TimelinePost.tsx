@@ -99,26 +99,42 @@ function CommentBody({ body }: { body: string | null }) {
   );
 }
 
-// The target of the event as a small card: 「ストーリー名 > タスク名」 and the task's short id.
-function TargetCard({ e }: { e: TaskEvent }) {
-  const title = e.level === "task" && e.story_title ? `${e.story_title} > ${e.task_title}` : e.task_title;
+// Where the event happened, as a breadcrumb under the name: 「プロジェクト > ストーリー > タスク」
+// (a story's event ends at the story). The story links to its page.
+function TargetPath({ e, projectName }: { e: TaskEvent; projectName: string }) {
+  const storyTitle = e.level === "task" ? e.story_title : e.task_title;
+  const story = storyTitle && (
+    e.story_id ? (
+      <Link to={`/stories/${e.story_id}`} className="min-w-0 max-w-[40%] shrink truncate text-fg-muted hover:text-fg hover:underline">
+        {storyTitle}
+      </Link>
+    ) : (
+      <span className="min-w-0 max-w-[40%] shrink truncate">{storyTitle}</span>
+    )
+  );
+  const sep = <span className="shrink-0">&gt;</span>;
+  const fullPath = [projectName, storyTitle, e.level === "task" ? e.task_title : null].filter(Boolean).join(" > ");
   return (
-    <div className="mt-2 flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface px-2.5 py-1.5 text-[13px]">
-      {e.story_id ? (
-        <Link to={`/stories/${e.story_id}`} className="min-w-0 truncate text-fg hover:underline">
-          {title}
-        </Link>
-      ) : (
-        <span className="min-w-0 truncate text-fg">{title}</span>
+    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-fg-muted" data-tooltip={fullPath}>
+      {projectName && <span className="min-w-0 max-w-[30%] shrink truncate">{projectName}</span>}
+      {projectName && story && sep}
+      {story}
+      {e.level === "task" && (
+        <>
+          {sep}
+          <span className="min-w-0 truncate">{e.task_title}</span>
+        </>
       )}
-      <IdBadge id={e.task_id} />
+      <span className="ml-1 shrink-0">
+        <IdBadge id={e.task_id} />
+      </span>
     </div>
   );
 }
 
-// One event of the timeline as a post: the actor's icon on the left; name, time, the action and
-// the target on the right.
-export function TimelinePost({ event: e, assignees }: { event: TaskEvent; assignees: Assignees }) {
+// One event of the timeline as a post: the actor's icon on the left; on the right the name and
+// time, then where it happened, then what was done.
+export function TimelinePost({ event: e, projectName, assignees }: { event: TaskEvent; projectName: string; assignees: Assignees }) {
   const actor = actorOf(e, assignees);
   return (
     <li className="flex gap-3 border-b border-border px-4 py-3 hover:bg-surface-muted">
@@ -133,10 +149,10 @@ export function TimelinePost({ event: e, assignees }: { event: TaskEvent; assign
             {relativeTime(e.occurred_at)}
           </time>
         </div>
-        <div className="mt-0.5 text-fg">
+        <TargetPath e={e} projectName={projectName} />
+        <div className="mt-1.5 text-fg">
           {e.event_type === "commented" ? <CommentBody body={e.comment_body ?? e.comment_excerpt ?? null} /> : <Action e={e} />}
         </div>
-        <TargetCard e={e} />
       </div>
     </li>
   );
