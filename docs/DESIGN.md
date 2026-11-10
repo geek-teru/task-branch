@@ -253,13 +253,14 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | task_id     | uuid        | FK→tasks.id, not null, on delete cascade  | 対象のタスク（level=task） |
 | author_type | text        | not null, default current_actor_type()    | `human` / `ai`             |
 | author_id   | uuid        | null可, default current_actor_id()        | 投稿者（ユーザー）         |
+| author_client_id | text   | null可, default current_actor_client_id(), check (null or author_type = 'ai') | AI の投稿のとき、投稿したエージェント（OAuth の client_id）。FK なし。記録前の AI の投稿は null |
 | body        | text        | not null, check (length(btrim(body)) > 0) | 本文（プレーンテキスト）   |
 | created_at  | timestamptz | not null, default now()                   |                            |
 | updated_at  | timestamptz | not null, default now()                   |                            |
 
 - インデックス：(task_id, created_at)。
 - 対象は `level = 'task'` のみ。ストーリーには付けられない（トリガ `check_task_comment()` で弾く）。
-- 編集・削除できるのは、書いた本人だけ（§3.5）。人と AI は別の投稿者として扱い、人も AI のコメントは編集・削除できない。変えられるのは本文だけで、`task_id` / `author_type` / `author_id` / `created_at` は変えさせない。更新時に `updated_at` を now() にする。
+- 編集・削除できるのは、書いた本人だけ（§3.5）。人と AI は別の投稿者として扱い、人も AI のコメントは編集・削除できない。変えられるのは本文だけで、`task_id` / `author_type` / `author_id` / `author_client_id` / `created_at` は変えさせない。更新時に `updated_at` を now() にする。
 - 削除は物理削除。編集履歴は持たない。
 - 本文はプレーンテキスト（Markdown は解釈しない）。
 - RLS は §3.5。
@@ -388,6 +389,7 @@ PostgREST は、リクエストの JWT の中身を `request.jwt.claims` にセ�
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `current_actor_type()` | `ai`（JWT に `client_id` がある）／ それ以外は `human`                                                            | `task_comments.author_type`・`story_context_revisions.edited_by_type` の既定値 |
 | `current_actor_id()`   | JWT の `sub`（`auth.uid()` と同じ）。JWT が無ければ null                                                          | `task_comments.author_id`・`story_context_revisions.edited_by_id` の既定値     |
+| `current_actor_client_id()` | JWT の `client_id`。無ければ null | `task_comments.author_client_id` の既定値 |
 | `current_owner_id()`   | 実効の所有者。JWT の `app_metadata.owner_id` があればそれ、無ければ `auth.uid()`。人も AI も本人になる           | `projects.owner_id` の既定値、ポリシー                                        |
 
 ```sql

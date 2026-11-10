@@ -18,9 +18,9 @@ function restError(error: { message: string; code?: string }): CallToolResult {
 }
 
 // author_id は人と AI が同じ uid で見分けに使えないので返さない。
-const COMMENT_COLUMNS = "id, author_type, body, created_at, updated_at";
+const COMMENT_COLUMNS = "id, author_type, author_client_id, body, created_at, updated_at";
 
-type CommentRow = { id: string; author_type: "human" | "ai"; body: string; created_at: string; updated_at: string };
+type CommentRow = { id: string; author_type: "human" | "ai"; author_client_id: string | null; body: string; created_at: string; updated_at: string };
 
 // MCP 経由の操作は常に ai なので、編集・削除できるのは AI のコメントだけ（RLS の task_comments_update / delete と同じ条件）。
 function withEditable(comment: CommentRow) {

@@ -161,6 +161,8 @@ export interface TaskComment {
   task_id: string;
   author_type: AssigneeType;
   author_id: string | null;
+  // AI の投稿のとき、投稿したエージェント（OAuth の client_id）。人の投稿と記録前の AI の投稿は null
+  author_client_id: string | null;
   body: string;
   created_at: string;
   updated_at: string;
