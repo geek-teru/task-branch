@@ -7,6 +7,7 @@ import { AssigneeIcon } from "./AssigneeLabel";
 import { Avatar } from "./Avatar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CommentIcon, DeleteIcon, EditIcon } from "./Icons";
+import { Markdown } from "./Markdown";
 import { Button, IconButton } from "./ui/Button";
 import { Textarea } from "./ui/Textarea";
 
@@ -197,7 +198,9 @@ export function TaskComments({
                 </div>
               </>
             ) : (
-              <div className="whitespace-pre-wrap break-words text-[13px] text-fg">{c.body}</div>
+              <div className="text-[13px]">
+                <Markdown>{c.body}</Markdown>
+              </div>
             )}
           </div>
         ))}
