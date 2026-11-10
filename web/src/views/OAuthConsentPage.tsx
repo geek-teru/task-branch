@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { OAuthAuthorizationDetails, Session } from "@supabase/supabase-js";
 import { AuthCard } from "../components/AuthCard";
-import { GoogleIcon } from "../components/Icons";
+import { GoogleIcon, ProviderIcon } from "../components/Icons";
 import { Button } from "../components/ui/Button";
+import { findAgentProvider } from "../lib/agentProviders";
 import { approveAuthorization, denyAuthorization, getAuthorizationDetails } from "../lib/oauth";
 import { signInWithGoogle } from "../lib/useSession";
 
@@ -76,6 +77,8 @@ export function OAuthConsentPage({ session }: { session: Session | null }) {
     body = <p className={lead}>読み込み中…</p>;
   } else {
     const clientName = details.client.name || details.client.id;
+    // Needs both client_name and redirect_uri to match, so a client can't pass itself off as a provider by name alone.
+    const provider = findAgentProvider({ name: details.client.name ?? "", redirectUri: details.redirect_uri });
     const scopes = details.scope ? details.scope.split(" ").filter(Boolean) : [];
     body = (
       <>
@@ -83,7 +86,13 @@ export function OAuthConsentPage({ session }: { session: Session | null }) {
           <span className="font-medium">{clientName}</span> があなたの task-branch のデータを読み書きすることを許可しますか？
         </p>
         <dl className="m-0 mb-6 divide-y divide-border rounded-md border border-border text-[13px]">
-          <InfoRow label="クライアント">{clientName}</InfoRow>
+          <InfoRow label="クライアント">
+            <span className="flex items-center gap-2">
+              {provider && <ProviderIcon provider={provider} size={20} />}
+              <span>{clientName}</span>
+              {provider && <span className="text-xs text-fg-muted">（{provider.name}）</span>}
+            </span>
+          </InfoRow>
           <InfoRow label="ログイン中">{session.user.email}</InfoRow>
           <InfoRow label="戻り先">{details.redirect_uri}</InfoRow>
           <InfoRow label="スコープ">
@@ -104,6 +113,7 @@ export function OAuthConsentPage({ session }: { session: Session | null }) {
             許可
           </Button>
         </div>
+        <p className="m-0 mt-3 text-center text-xs text-fg-muted">接続は設定 &gt; AI エージェントからいつでも解除できます</p>
       </>
     );
   }
