@@ -12,8 +12,27 @@ function toolError(text: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text }] };
 }
 
+// ゲストの件数上限（0031_guest_limits.sql）の拒否を日本語にする。message は 'guest_limit_exceeded'、
+// details は '<projects|stories|tasks|comments>:<上限>'。文言は web/src/lib/api.ts の guestLimitMessage と揃える。
+const GUEST_LIMIT_LABELS: Record<string, string> = {
+  projects: "プロジェクト",
+  stories: "ストーリー",
+  tasks: "タスク",
+  comments: "コメント",
+};
+
+function guestLimitMessage(error: { message?: string; details?: string | null }): string | null {
+  if (error.message !== "guest_limit_exceeded") return null;
+  const [kind, limit] = (error.details ?? "").split(":");
+  const label = GUEST_LIMIT_LABELS[kind] ?? "データ";
+  const head = limit ? `ゲストでは${label}は ${limit} 件までです` : `ゲストでは${label}の件数に上限があります`;
+  return `${head}。Google で本登録すると制限がなくなります`;
+}
+
 // REST のエラーは例外にせず、ツールの結果（isError）として AI に返す。
-function restError(error: { message: string; code?: string }): CallToolResult {
+function restError(error: { message: string; code?: string; details?: string | null }): CallToolResult {
+  const guest = guestLimitMessage(error);
+  if (guest) return toolError(`${guest} (guest_limit_exceeded: ${error.details})`);
   return toolError(`Supabase のエラー: ${error.message}${error.code ? ` (${error.code})` : ""}`);
 }
 
