@@ -19,6 +19,11 @@
   --color-danger: #c4352b;
 
   /* Status colors (DESIGN.md 5.2): same hues as before, lower saturation. */
+  /* グラフ用の系列色（status の色とは別） */
+  --color-chart-1: #7a62b8;
+  --color-chart-2: #3f78b5;
+  --color-chart-3: #3ecf8e;
+
   --color-status-todo-bg: #e8f3f7;
   --color-status-todo-border: #5aa5ba;
   --color-status-todo-fg: #1f5a69;
