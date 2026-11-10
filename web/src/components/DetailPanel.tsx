@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
@@ -43,6 +44,7 @@ export function DetailPanel<T extends DetailNode>({
   onComplete,
   onChangeStatus,
   place,
+  storyLink,
   storyOptions,
   currentStoryId,
   onPickStory,
@@ -60,6 +62,7 @@ export function DetailPanel<T extends DetailNode>({
   onComplete?: (node: T) => void;
   onChangeStatus?: (node: T, status: Status) => void; // status badge → menu
   place?: { story: string | null }; // the story the node sits in; omitted = not shown
+  storyLink?: string; // stories only: path of the story's own page (「ストーリー詳細を開く」)
   storyOptions?: StoryOption[]; // 候補が無い間は表示だけ（プルダウンを出さない）
   currentStoryId?: string | null;
   onPickStory?: (storyId: string) => void; // ストーリー名のプルダウンで選んだ移動先
@@ -133,6 +136,13 @@ export function DetailPanel<T extends DetailNode>({
             ) : (
               <AssigneeLabel assignee={assigneeOf(node, assignees)} />
             )}
+          </Field>
+        )}
+        {storyLink && (
+          <Field label="ストーリー詳細">
+            <Link to={storyLink} className="text-brand hover:underline">
+              ストーリー詳細を開く
+            </Link>
           </Field>
         )}
         <Field label="詳細">{node?.description ? <Markdown>{node.description}</Markdown> : DASH}</Field>
