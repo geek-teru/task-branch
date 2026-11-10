@@ -26,7 +26,10 @@ export function useProfile(session: Session | null | undefined): {
     reload();
   }, [reload]);
 
-  const meta = session?.user.user_metadata ?? {};
+  // A guest who linked Google may not get full_name / avatar_url in user_metadata; fall back to
+  // the Google identity's data.
+  const identity = session?.user.identities?.find((i) => i.provider === "google")?.identity_data ?? {};
+  const meta = { ...identity, ...(session?.user.user_metadata ?? {}) };
   const displayName: string = profile?.display_name ?? meta.full_name ?? meta.name ?? session?.user.email ?? (session?.user.is_anonymous ? "ゲスト" : "");
   const url = profile?.avatar_path ? avatarUrl(profile.avatar_path) : (meta.avatar_url ?? meta.picture ?? null);
 
