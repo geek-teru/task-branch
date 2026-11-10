@@ -10,10 +10,6 @@ export const SERIES: { key: SeriesKey; label: string; color: string }[] = [
   { key: "tasks_done", label: "タスク完了", color: "var(--color-chart-3)" },
 ];
 
-// 積み上げ棒は面が大きいので、系列色を薄くして塗る（凡例・ツールチップの色見本も合わせる）。
-// トークン自体は変えない（スパークラインの線は同じ色を濃いまま使う）。
-const BAR_OPACITY = 0.5;
-
 // M/D（先頭の 0 なし）。bucket_start は YYYY-MM-DD。
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
@@ -44,7 +40,7 @@ function ChartTooltip({ active, payload, bucket, hidden }: TipProps) {
       <div className="flex flex-col gap-1">
         {visible.map((s) => (
           <div key={s.key} className="flex items-center gap-2 text-fg-muted">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color, opacity: BAR_OPACITY }} />
+            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
             <span className="flex-1">{s.label}</span>
             <span className="tabular-nums text-fg">{row[s.key]}</span>
           </div>
@@ -98,7 +94,7 @@ export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; buc
                 off ? "text-fg-muted line-through opacity-60" : "text-fg-muted"
               }`}
             >
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color, opacity: BAR_OPACITY }} />
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
               {s.label}
             </button>
           );
@@ -131,7 +127,7 @@ export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; buc
               isAnimationActive={false}
             />
             {SERIES.filter((s) => !hidden.has(s.key)).map((s) => (
-              <Bar key={s.key} dataKey={s.key} stackId="a" fill={s.color} fillOpacity={BAR_OPACITY} isAnimationActive={false} />
+              <Bar key={s.key} dataKey={s.key} stackId="a" fill={s.color} isAnimationActive={false} />
             ))}
           </BarChart>
         </ResponsiveContainer>
