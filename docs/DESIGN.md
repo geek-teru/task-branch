@@ -449,6 +449,16 @@ $$ language sql stable;
 - 「本人」は `user_id = auth.uid()`（avatars はパスの先頭のフォルダが `auth.uid()`）。人と AI のどちらも含む。「本人の人」はそれに加えて `current_actor_type() = 'human'`（AI は書けない）。
 - 「不可」はポリシーを作らない。
 
+#### ゲストの件数上限
+
+匿名サインインのユーザー（ゲスト、`auth.users.is_anonymous = true`）には、作れる件数の上限をかける（`0031_guest_limits.sql`）。本登録（Google 連携）すると `is_anonymous` が false になり、上限の対象から自動で外れる。
+
+- 判定は JWT ではなくデータの持ち主（`projects.owner_id`）で行う。OAuth でつないだ AI（MCP）の作成も、持ち主がゲストなら同じ上限にかかる。
+- 上限は持ち主 1 人あたりの合計: プロジェクト 2・ストーリー 20・タスク 100・コメント 200。値は `guest_limit(kind)` の 1 か所で定義する。
+- `projects` / `tasks` / `task_comments` の before insert トリガ（`enforce_guest_limit()`、security definer）が数え、超えるときは `errcode = 'P0001'`・`message = 'guest_limit_exceeded'`・`detail = '<projects|stories|tasks|comments>:<上限>'` の例外にする。
+- `is_guest_owner(uuid)` と `enforce_guest_limit()` の execute は public / anon / authenticated から revoke（アプリからは呼ばない）。
+- 並行の作成で上限を少し超えることは許容する（ロックは取らない）。
+
 ポリシー定義:
 
 ##### projects
