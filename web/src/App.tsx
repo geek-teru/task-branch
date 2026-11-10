@@ -5,6 +5,7 @@ import { signOut, useSession } from "./lib/useSession";
 import { useProfile } from "./lib/useProfile";
 import {
   addRootStory,
+  addTaskComment,
   addTask,
   createProject,
   deleteProject,
@@ -224,12 +225,14 @@ export default function App() {
   }, [userId, isKanban]);
 
   // Move a card: update locally first so the drop feels instant, then persist and resync.
-  const handleKanbanStatus = useCallback(async (taskId: string, status: Status) => {
+  // comment: 確認ダイアログで書いたコメント。ステータスを変えられたときだけ、空でなければ投稿する（失敗してもステータスは戻さない）。
+  const handleKanbanStatus = useCallback(async (taskId: string, status: Status, comment?: string) => {
     setLanes((prev) =>
       prev?.map((l) => ({ ...l, tasks: l.tasks.map((t) => (t.id === taskId ? { ...t, status } : t)) })) ?? prev
     );
     try {
       await updateTaskStatus(taskId, status);
+      await postStatusComment(taskId, comment);
     } catch (e: any) {
       setError(String(e.message ?? e));
     }
@@ -241,9 +244,10 @@ export default function App() {
   }, []);
 
   // Kanban: add a story without a parent, already started (Active).
-  const handleKanbanMove = useCallback(async (taskId: string, storyId: string, status: Status) => {
+  const handleKanbanMove = useCallback(async (taskId: string, storyId: string, status: Status, comment?: string) => {
     try {
       await moveTask(taskId, storyId, status);
+      await postStatusComment(taskId, comment);
     } catch (e: any) {
       setError(String(e.message ?? e));
     }
@@ -849,4 +853,16 @@ export default function App() {
 
 function Shell({ children }: { children: ReactNode }) {
   return <div className="flex h-screen">{children}</div>;
+}
+
+// カンバンのステータス変更の確認ダイアログで書いたコメントを投稿する。空（trim 後）なら何もしない。
+// 失敗はステータス変更の失敗と区別できるよう、文言を添えて投げ直す。
+async function postStatusComment(taskId: string, comment: string | undefined): Promise<void> {
+  const body = comment?.trim();
+  if (!body) return;
+  try {
+    await addTaskComment(taskId, body);
+  } catch (e: any) {
+    throw new Error(`ステータスは変更しましたが、コメントを投稿できませんでした: ${e.message ?? e}`);
+  }
 }
