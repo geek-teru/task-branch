@@ -661,6 +661,7 @@ create policy avatars_insert on storage.objects
 | `get_critical_path(story uuid)` | CP 抽出  | ストーリー内のタスク依存 DAG の最長経路（ホップ数）のタスク列を返す（R6）                                        |
 | `get_progress(project uuid)`    | 進捗集約 | story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 | `shift_story_dates(story uuid, days int)` | 日付移動 | ストーリーと配下のタスクの開始日・期限を同じ日数ずらす（null は null のまま）。1 トランザクションで更新し、ストーリー以外を渡すと例外。ガントのバー移動で使う |
+| `create_guest_sample_project()` | ゲスト | 匿名ユーザー（JWT の `is_anonymous` が true）だけが呼べる。ゲストの初回ログイン時にサンプルのプロジェクト（ストーリー 4・タスク 11）を作り、その id を返す。日付は呼び出した日を起点にずらす。すでにプロジェクトを持っていれば作らず最古のプロジェクトの id を返す（冪等）。security invoker、execute は authenticated のみ（`0029_guest_sample_project.sql`） |
 | `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を絞る。task_title / story_title / comment_excerpt（本文の先頭 80 文字、コメントが消えていたら null）込み。security invoker（`0026_task_events_rpc.sql`） |
 | `project_activity_counts(project uuid, bucket text, from_date date, to_date date)` | パフォーマンス | `bucket`（`day` / `week`＝月曜始まり、Asia/Tokyo）ごとに stories_created / tasks_created / tasks_done を返す。空の区間も 0。security invoker（`0026_task_events_rpc.sql`） |
 
