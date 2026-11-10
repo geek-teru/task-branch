@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { addTaskComment, deleteTaskComment, listTaskComments, updateTaskComment } from "../lib/api";
 import type { TaskComment } from "../lib/types";
 import { useSession } from "../lib/useSession";
@@ -12,7 +12,8 @@ const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
 
 // Comment list + post form for a task, shown at the bottom of the detail panel.
 // Fetches on mount / task change and after posting, editing or deleting (no realtime subscription).
-export function TaskComments({ taskId }: { taskId: string }) {
+// refreshKey: bump it to refetch after a comment was posted from outside (the kanban's status dialog).
+export function TaskComments({ taskId, refreshKey }: { taskId: string; refreshKey?: number }) {
   const session = useSession();
   const myId = session?.user.id ?? null;
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -44,6 +45,14 @@ export function TaskComments({ taskId }: { taskId: string }) {
       cancelled = true;
     };
   }, [taskId]);
+
+  // Refetch only; the draft and the edit in progress are kept. The first run is covered by the effect above.
+  const lastRefreshKey = useRef(refreshKey);
+  useEffect(() => {
+    if (lastRefreshKey.current === refreshKey) return;
+    lastRefreshKey.current = refreshKey;
+    reload().catch((e) => setError(`コメントを取得できませんでした: ${e.message ?? e}`));
+  }, [refreshKey, reload]);
 
   const body = draft.trim();
   const canPost = body.length > 0 && !posting;
