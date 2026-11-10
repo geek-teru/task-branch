@@ -14,7 +14,7 @@ import {
 } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { StatusChangeDialog } from "../components/StatusChangeDialog";
 import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { AssigneeIcon, AssigneeLabel } from "../components/AssigneeLabel";
@@ -73,8 +73,9 @@ export function KanbanView({
   projectFilter: string | null;
   // The project picker, first in the toolbar.
   projectSelect?: ReactNode;
-  onChangeStatus: (taskId: string, status: Status) => void;
-  onMoveTask: (taskId: string, storyId: string, status: Status) => void;
+  // comment: 確認ダイアログで書いたコメント（任意）。呼び出し側が、ステータスを変えたあとに空でなければ投稿する。
+  onChangeStatus: (taskId: string, status: Status, comment?: string) => void | Promise<void>;
+  onMoveTask: (taskId: string, storyId: string, status: Status, comment?: string) => void | Promise<void>;
   onAddTask: (story: Task, values: StoryInput) => void;
   onUpdateTask: (id: string, values: StoryInput) => void;
   onDeleteTask: (id: string) => void;
@@ -118,6 +119,8 @@ export function KanbanView({
   const [adding, setAdding] = useState<Task | null>(null);
   // targetStory がある＝別ストーリーへの移動。無ければ同じストーリー内のステータス変更。
   const [pendingMove, setPendingMove] = useState<{ task: Task; status: Status; targetStory?: Task } | null>(null);
+  // 確認ダイアログからコメントを投稿したら増やし、開いている詳細パネルのコメント一覧を読み直させる。
+  const [commentsVersion, setCommentsVersion] = useState(0);
   const [drag, setDrag] = useState<{ task: Task; storyId: string } | null>(null);
   const [over, setOver] = useState<{ storyId: string; status: Status } | null>(null);
   // ストーリーの変更: 詳細パネルのストーリー名を押したときのプルダウンの中身。
@@ -449,9 +452,11 @@ export function KanbanView({
                 }
           }
           // ストーリーは進行中のレーンにしか出ないので「着手」は出ない。「完了」はカンバンから消えるため確認を通す。
-          onStart={selectedIsStory ? undefined : (t) => onChangeStatus(t.id, "in_progress")}
-          onComplete={selectedIsStory ? (t) => setPendingMove({ task: t, status: "done" }) : (t) => onChangeStatus(t.id, "done")}
+          // タスクの「着手」「完了」も、コメントを書けるよう確認ダイアログを通す。
+          onStart={selectedIsStory ? undefined : (t) => setPendingMove({ task: t, status: "in_progress" })}
+          onComplete={(t) => setPendingMove({ task: t, status: "done" })}
           onChangeStatus={(t, status) => setPendingMove({ task: t, status })}
+          commentsVersion={commentsVersion}
           assignees={selectedIsStory ? undefined : assignees}
           onChangeAssignee={(t, assigneeId) => onUpdateTask(t.id, { ...taskValues(t), ...assigneeFields(assigneeId) })}
         />
@@ -499,17 +504,19 @@ export function KanbanView({
       )}
 
       {pendingMove && (
-        <ConfirmDialog
+        <StatusChangeDialog
           message={moveMessage(pendingMove)}
           confirmLabel={pendingMove.targetStory ? "移動する" : undefined}
-          onConfirm={() => {
-            if (pendingMove.targetStory) {
-              onMoveTask(pendingMove.task.id, pendingMove.targetStory.id, pendingMove.status);
-            } else {
-              onChangeStatus(pendingMove.task.id, pendingMove.status);
-              // 進行中以外にしたストーリーはカンバンから消えるので、パネルも閉じる
-              if (pendingMove.task.level === "story" && pendingMove.status !== "in_progress") setSelectedId(null);
+          withComment={acceptsComment(pendingMove)}
+          onConfirm={(comment) => {
+            const done = pendingMove.targetStory
+              ? onMoveTask(pendingMove.task.id, pendingMove.targetStory.id, pendingMove.status, comment)
+              : onChangeStatus(pendingMove.task.id, pendingMove.status, comment);
+            // 進行中以外にしたストーリーはカンバンから消えるので、パネルも閉じる
+            if (!pendingMove.targetStory && pendingMove.task.level === "story" && pendingMove.status !== "in_progress") {
+              setSelectedId(null);
             }
+            if (comment.trim()) void Promise.resolve(done).then(() => setCommentsVersion((v) => v + 1));
             setPendingMove(null);
           }}
           onCancel={() => setPendingMove(null)}
@@ -517,6 +524,11 @@ export function KanbanView({
       )}
     </div>
   );
+}
+
+// コメント欄を出すのは、タスクを進行中・完了に変えるときだけ（ステータスが変わらない移動やストーリーには出さない）。
+function acceptsComment({ task, status }: { task: Task; status: Status }): boolean {
+  return task.level === "task" && status !== task.status && (status === "in_progress" || status === "done");
 }
 
 // 確認モーダルの文面。ステータスが変わらない移動ではその一文を省き、

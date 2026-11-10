@@ -1,91 +1,136 @@
+import { useState } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ActivityBucket, ActivityCount } from "../lib/types";
 
-const SERIES = [
-  { key: "stories_created", label: "ストーリー作成", color: "var(--color-status-in_review-border)" },
-  { key: "tasks_created", label: "タスク作成", color: "var(--color-status-in_progress-border)" },
-  { key: "tasks_done", label: "タスク完了", color: "var(--color-status-done-border)" },
-] as const;
+type SeriesKey = "stories_created" | "tasks_created" | "tasks_done";
 
-const W = 800;
-const H = 240;
-const M = { top: 12, right: 12, bottom: 28, left: 36 };
+const SERIES: { key: SeriesKey; label: string; color: string }[] = [
+  { key: "stories_created", label: "ストーリー作成", color: "var(--color-chart-1)" },
+  { key: "tasks_created", label: "タスク作成", color: "var(--color-chart-2)" },
+  { key: "tasks_done", label: "タスク完了", color: "var(--color-chart-3)" },
+];
 
 // M/D（先頭の 0 なし）。bucket_start は YYYY-MM-DD。
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
-// 目盛りは整数。最大値が小さいときは 1 刻み、大きいときは 4〜5 本に収まる刻み。
-function ticks(max: number): number[] {
-  const top = Math.max(max, 1);
-  const step = Math.ceil(top / 4);
-  const out: number[] = [];
-  for (let v = 0; v < top + step; v += step) {
-    out.push(v);
-    if (v >= top) break;
-  }
-  return out;
+// 区間の表示。日は「M/D」、週は「M/D〜M/D」（開始日から 6 日後まで）。
+function rangeLabel(start: string, bucket: ActivityBucket): string {
+  if (bucket === "day") return md(start);
+  const end = new Date(`${start}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 6);
+  return `${md(start)}〜${md(end.toISOString().slice(0, 10))}`;
 }
 
-// 区間ごとに 3 系列を並べた棒グラフ（ライブラリなしの SVG）。幅は viewBox で親に合わせて伸縮する。
+interface TipProps {
+  active?: boolean;
+  label?: string;
+  payload?: { dataKey: SeriesKey; value: number; payload: ActivityCount }[];
+  bucket: ActivityBucket;
+  hidden: Set<SeriesKey>;
+}
+
+function ChartTooltip({ active, payload, bucket, hidden }: TipProps) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  const visible = SERIES.filter((s) => !hidden.has(s.key));
+  const total = visible.reduce((sum, s) => sum + row[s.key], 0);
+  return (
+    <div className="rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-sm">
+      <div className="mb-1.5 font-medium text-fg">{rangeLabel(row.bucket_start, bucket)}</div>
+      <div className="flex flex-col gap-1">
+        {visible.map((s) => (
+          <div key={s.key} className="flex items-center gap-2 text-fg-muted">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+            <span className="flex-1">{s.label}</span>
+            <span className="tabular-nums text-fg">{row[s.key]}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex justify-between border-t border-border pt-1.5 text-fg-muted">
+        <span>合計</span>
+        <span className="tabular-nums font-medium text-fg">{total}</span>
+      </div>
+    </div>
+  );
+}
+
+// 区間ごとに 3 系列を 1 本に積んだ棒グラフ（Recharts）。凡例を押すと系列を出し入れする。
 export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; bucket: ActivityBucket }) {
-  const ts = ticks(Math.max(0, ...counts.flatMap((r) => SERIES.map((s) => r[s.key]))));
-  const yMax = ts[ts.length - 1];
-  const plotW = W - M.left - M.right;
-  const plotH = H - M.top - M.bottom;
-  const y = (v: number) => M.top + plotH - (v / yMax) * plotH;
-  const groupW = counts.length ? plotW / counts.length : plotW;
-  const pad = Math.min(8, groupW * 0.15);
-  const barW = Math.max(1, (groupW - pad * 2) / SERIES.length);
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
+
+  // 全部は消せない: 最後の 1 系列は押しても何も起きない。
+  const toggle = (key: SeriesKey) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else if (next.size < SERIES.length - 1) next.add(key);
+      return next;
+    });
+
+  const yMax = Math.max(
+    1,
+    ...counts.map((r) => SERIES.filter((s) => !hidden.has(s.key)).reduce((sum, s) => sum + r[s.key], 0)),
+  );
+  // 縦軸は 0 始まりの整数目盛り（最大 5 本程度）。
+  const step = Math.ceil(yMax / 4);
+  const top = Math.ceil(yMax / step) * step;
+  const yTicks = Array.from({ length: top / step + 1 }, (_, i) => i * step);
   // ラベルが重ならないよう、区間が多いときは間引く。
-  const labelEvery = Math.max(1, Math.ceil(counts.length / 12));
+  const interval = Math.max(0, Math.ceil(counts.length / 12) - 1);
 
   return (
     <div className="rounded-md border border-border bg-surface px-4 py-3">
-      <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-fg-muted">
-        {SERIES.map((s) => (
-          <span key={s.key} className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
-            {s.label}
-          </span>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label="件数の推移">
-        {ts.map((t) => (
-          <g key={t}>
-            <line x1={M.left} x2={W - M.right} y1={y(t)} y2={y(t)} stroke="var(--color-border)" />
-            <text x={M.left - 6} y={y(t)} textAnchor="end" dominantBaseline="middle" fontSize="11" fill="var(--color-fg-muted)">
-              {t}
-            </text>
-          </g>
-        ))}
-        {counts.map((r, i) => {
-          const gx = M.left + i * groupW;
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        {SERIES.map((s) => {
+          const off = hidden.has(s.key);
           return (
-            <g key={r.bucket_start}>
-              {SERIES.map((s, j) => {
-                const v = r[s.key];
-                const h = (v / yMax) * plotH;
-                const x = gx + pad + j * barW;
-                const w = Math.max(1, barW - 1);
-                return (
-                  <g key={s.key}>
-                    <rect x={x} y={y(v)} width={w} height={h} fill={s.color} rx={1} />
-                    {/* 0 件でもホバーできるよう、系列の縦いっぱいを覆う透明な当たり判定を置く */}
-                    <rect x={x} y={M.top} width={w} height={plotH} fill="transparent">
-                      <title>{`${bucket === "week" ? "週 " : ""}${md(r.bucket_start)}・${s.label}・${v} 件`}</title>
-                    </rect>
-                  </g>
-                );
-              })}
-              {i % labelEvery === 0 && (
-                <text x={gx + groupW / 2} y={H - M.bottom + 16} textAnchor="middle" fontSize="11" fill="var(--color-fg-muted)">
-                  {md(r.bucket_start)}
-                </text>
-              )}
-            </g>
+            <button
+              key={s.key}
+              type="button"
+              aria-pressed={!off}
+              onClick={() => toggle(s.key)}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-surface-muted ${
+                off ? "text-fg-muted line-through opacity-60" : "text-fg-muted"
+              }`}
+            >
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+              {s.label}
+            </button>
           );
         })}
-        <line x1={M.left} x2={W - M.right} y1={y(0)} y2={y(0)} stroke="var(--color-border-strong)" />
-      </svg>
+      </div>
+      <div role="img" aria-label="件数の推移" className="h-60 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={counts} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.6} />
+            <XAxis
+              dataKey="bucket_start"
+              tickFormatter={md}
+              interval={interval}
+              tickLine={false}
+              axisLine={{ stroke: "var(--color-border-strong)" }}
+              tick={{ fontSize: 11, fill: "var(--color-fg-muted)" }}
+            />
+            <YAxis
+              domain={[0, top]}
+              ticks={yTicks}
+              allowDecimals={false}
+              width={32}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11, fill: "var(--color-fg-muted)" }}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--color-surface-muted)" }}
+              content={<ChartTooltip bucket={bucket} hidden={hidden} />}
+              isAnimationActive={false}
+            />
+            {SERIES.filter((s) => !hidden.has(s.key)).map((s) => (
+              <Bar key={s.key} dataKey={s.key} stackId="a" fill={s.color} isAnimationActive={false} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -53,6 +53,7 @@ export function DetailPanel<T extends DetailNode>({
   onPickStory,
   assignees,
   onChangeAssignee,
+  commentsVersion,
 }: {
   title: string;
   node: T | null;
@@ -71,6 +72,7 @@ export function DetailPanel<T extends DetailNode>({
   onPickStory?: (storyId: string) => void; // ストーリー名のプルダウンで選んだ移動先
   assignees?: Assignees; // tasks only: 担当者 is shown when given
   onChangeAssignee?: (node: T, assigneeId: string | null) => void; // null = 未割り当て
+  commentsVersion?: number; // 変わったらコメント一覧を読み直す（パネルの外から投稿したとき）
 }) {
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
   const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
@@ -172,7 +174,9 @@ export function DetailPanel<T extends DetailNode>({
         <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
         <Field label="クローズ日時">{node?.closed_at ? fmtDateTime(node.closed_at) : DASH}</Field>
-        {node?.level === "task" && <TaskComments taskId={node.id} assignees={assignees ?? NO_ASSIGNEES} />}
+        {node?.level === "task" && (
+          <TaskComments taskId={node.id} assignees={assignees ?? NO_ASSIGNEES} refreshKey={commentsVersion} />
+        )}
       </div>
 
       {node && ((canStart && onStart) || (canComplete && onComplete)) && (
