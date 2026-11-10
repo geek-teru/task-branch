@@ -442,7 +442,7 @@ $$ language sql stable;
 | task_comments          | 所有者                                          | 所有者 | 書いた本人                          | 書いた本人 |
 | task_events            | 不可（トリガだけ）                              | 所有者 | 不可                                | 不可       |
 | profiles               | 本人の人                                        | 本人   | 本人の人                            | 不可       |
-| storage.objects（avatars） | 本人の人（自分の uid のフォルダ）           | 本人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ） |
+| storage.objects（avatars） | 本人の人（自分の uid のフォルダ。ゲスト不可） | 本人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ。ゲスト不可） | 本人の人（自分の uid のフォルダ） |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
 - 「書いた本人」は `author_id = auth.uid() and author_type = current_actor_type()`。人と AI は uid が同じなので、種別も合わせて別の投稿者として扱う（AI は人のコメントを、人は AI のコメントを編集・削除できない）。
@@ -458,6 +458,16 @@ $$ language sql stable;
 - `projects` / `tasks` / `task_comments` の before insert トリガ（`enforce_guest_limit()`、security definer）が数え、超えるときは `errcode = 'P0001'`・`message = 'guest_limit_exceeded'`・`detail = '<projects|stories|tasks|comments>:<上限>'` の例外にする。
 - `is_guest_owner(uuid)` と `enforce_guest_limit()` の execute は public / anon / authenticated から revoke（アプリからは呼ばない）。
 - 並行の作成で上限を少し超えることは許容する（ロックは取らない）。
+
+#### ゲストの自動削除
+
+作成から 7 日を過ぎたゲスト（`auth.users.is_anonymous = true`）を、データごと毎日自動で削除する（`0032_guest_cleanup.sql`）。本登録したユーザーは `is_anonymous` が false なので対象にならない。
+
+- `delete_expired_guests()`（security definer、消したユーザー数を返す）: 対象の `auth.users` を `for update` でロックして id を確定し、`projects` → `auth.users` の順に消す。`projects.owner_id` は auth.users へのカスケードが無いので先にプロジェクトを消す。配下の tasks / task_comments / story_groups / story_context_revisions / task_events は on delete cascade、profiles は cascade、tasks.assignee_id は set null。author_id / edited_by_id / actor_id には FK が無いので削除を妨げない。
+- 期限は `guest_retention()`（7 日）の 1 か所で定義する。画面のバナーの削除日（作成日 + 7 日）と揃える。
+- pg_cron のジョブ `delete-expired-guests` が毎日 18:00 UTC（JST 3:00）に実行する。実行結果は `cron.job_run_details` で見る。
+- `delete_expired_guests()` / `guest_retention()` の execute は public / anon / authenticated から revoke（RPC で呼ばせない）。
+- ゲストのアイコン画像は SQL から消せない（storage.objects は Storage API で消す）ため、avatars の insert / update ポリシーで JWT の `is_anonymous` が true のときは拒否し、ゲストにはアップロードさせない。
 
 ポリシー定義:
 
