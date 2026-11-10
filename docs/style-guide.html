@@ -25,6 +25,11 @@
     --color-accent: #3ecf8e;
     --color-danger: #c4352b;
 
+    /* グラフの系列の色（status の色とは別） */
+    --color-chart-1: #7a62b8;
+    --color-chart-2: #3f78b5;
+    --color-chart-3: #3ecf8e;
+
     --color-status-todo-bg: #e8f3f7;
     --color-status-todo-border: #5aa5ba;
     --color-status-todo-fg: #1f5a69;
@@ -166,6 +171,13 @@
   .app-card.interactive { cursor: pointer; }
   .app-card.interactive:hover { border-color: var(--color-border-strong); }
 
+  /* Widget: Card の上に見出しの帯（12px / 500 / fg-muted、下線 border）と本文（px-4 py-3） */
+  .widget { display: flex; flex-direction: column; min-width: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; }
+  .widget .w-head { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 16px; border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-fg-muted); }
+  .widget .w-title { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; font-weight: 500; }
+  .widget .w-body { padding: 12px 16px; }
+  .widget .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
   /* Dialog: 背景幕 bg-black/40・z-50。本体 w-[400px] rounded-md border shadow-lg */
   .backdrop { background: rgb(0 0 0 / 0.4); border-radius: 6px; padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: center; }
   .dialog { width: 400px; max-width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; box-shadow: var(--shadow-lg); }
@@ -291,6 +303,7 @@
         <li><a href="#parts-11">5.11 ツールチップ</a></li>
         <li><a href="#parts-12">5.12 サイドナビ</a></li>
         <li><a href="#parts-13">5.13 列幅のドラッグハンドル</a></li>
+        <li><a href="#parts-14">5.14 Widget</a></li>
       </ul>
     </li>
     <li><a href="#rules">6. 書き方の決まり</a>
@@ -888,6 +901,45 @@
   幅 7px・<code>cursor-col-resize</code>・境界をまたいで <code>-right-[3px]</code> に置く（見た目は透明。上は分かるよう着色）。
   ヘッダだけでなく<b>全行に置いて</b>、表のどこからでも掴めるようにする。変更した幅は localStorage に残す（<code>lib/useResizableWidth.ts</code>）。
 </p>
+
+<h3 id="parts-14">Widget（<code>ui/Widget.tsx</code>）</h3>
+<div class="demo">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+    <div class="widget">
+      <div class="w-head"><span class="w-title"><span class="swatch" style="background:var(--color-chart-1)"></span>ストーリー作成</span><span>期間内の合計</span></div>
+      <div class="w-body" style="display:flex;align-items:flex-end;gap:12px">
+        <span style="font-size:24px;font-weight:500;font-variant-numeric:tabular-nums">12</span>
+        <svg viewBox="0 0 100 32" preserveAspectRatio="none" style="flex:1;height:32px"><polyline fill="none" stroke="var(--color-chart-1)" stroke-width="1.5" vector-effect="non-scaling-stroke" points="0,28 20,20 40,24 60,10 80,14 100,4"/></svg>
+      </div>
+    </div>
+    <div class="widget">
+      <div class="w-head"><span class="w-title"><span class="swatch" style="background:var(--color-chart-2)"></span>タスク作成</span><span>期間内の合計</span></div>
+      <div class="w-body" style="display:flex;align-items:flex-end;gap:12px">
+        <span style="font-size:24px;font-weight:500;font-variant-numeric:tabular-nums">48</span>
+        <svg viewBox="0 0 100 32" preserveAspectRatio="none" style="flex:1;height:32px"><polyline fill="none" stroke="var(--color-chart-2)" stroke-width="1.5" vector-effect="non-scaling-stroke" points="0,20 20,26 40,12 60,16 80,6 100,10"/></svg>
+      </div>
+    </div>
+    <div class="widget">
+      <div class="w-head"><span class="w-title"><span class="swatch" style="background:var(--color-chart-3)"></span>タスク完了</span><span>期間内の合計</span></div>
+      <div class="w-body" style="display:flex;align-items:flex-end;gap:12px">
+        <span style="font-size:24px;font-weight:500;font-variant-numeric:tabular-nums">35</span>
+        <svg viewBox="0 0 100 32" preserveAspectRatio="none" style="flex:1;height:32px"><polyline fill="none" stroke="var(--color-chart-3)" stroke-width="1.5" vector-effect="non-scaling-stroke" points="0,30 20,24 40,22 60,14 80,12 100,6"/></svg>
+      </div>
+    </div>
+    <div class="widget" style="grid-column:1/-1">
+      <div class="w-head"><span class="w-title">件数の推移</span><span>8/19〜11/10 ・ 週ごと</span></div>
+      <div class="w-body" style="height:96px;display:flex;align-items:center;justify-content:center;color:var(--color-fg-muted);font-size:12px">（グラフ: <code>components/ActivityChart.tsx</code>）</div>
+    </div>
+  </div>
+</div>
+<p class="note">
+  ダッシュボードのパネル。<code>ui/Card</code> の上に見出しの帯（<code>text-xs font-medium text-fg-muted</code>、下線 <code>border</code>）と本文（<code>px-4 py-3</code>）。
+  見出しの右端（<code>aside</code>）には期間・粒度などの補助を置く。系列の色の印は 10px の角丸の四角で、色は <code>--color-chart-1</code>〜<code>3</code>。
+  表を端まで出すときは <code>bodyClassName="p-0"</code>。並べるときは <code>grid grid-cols-1 sm:grid-cols-3 gap-3</code>、全幅のパネルは <code>sm:col-span-3</code>（狭い幅では縦に並ぶ）。
+</p>
+<pre><code>&lt;Widget title="件数の推移" aside="8/19〜11/10 ・ 週ごと" className="sm:col-span-3"&gt;
+  &lt;ActivityChart counts={counts} bucket={bucket} /&gt;
+&lt;/Widget&gt;</code></pre>
 
 <h2 id="rules">6. 書き方の決まり</h2>
 <ul>

@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getActivityCounts } from "../lib/api";
 import type { ActivityBucket, ActivityCount } from "../lib/types";
-import { ActivityChart } from "../components/ActivityChart";
-import { Card } from "../components/ui/Card";
+import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
+import { ActivityChart, SERIES, type SeriesKey } from "../components/ActivityChart";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Toolbar } from "../components/ui/Toolbar";
+import { Widget } from "../components/ui/Widget";
 
 type Range = "4w" | "12w" | "custom";
 
@@ -87,14 +88,17 @@ export function PerformanceView({
     () =>
       (counts ?? []).reduce(
         (a, r) => ({
-          stories: a.stories + r.stories_created,
-          tasks: a.tasks + r.tasks_created,
-          done: a.done + r.tasks_done,
+          stories_created: a.stories_created + r.stories_created,
+          tasks_created: a.tasks_created + r.tasks_created,
+          tasks_done: a.tasks_done + r.tasks_done,
         }),
-        { stories: 0, tasks: 0, done: 0 }
+        { stories_created: 0, tasks_created: 0, tasks_done: 0 } as Record<SeriesKey, number>
       ),
     [counts]
   );
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const period = `${md(from)}〜${md(to)}`;
+  const bucketLabel = bucket === "week" ? "週ごと" : "日ごと";
 
   return (
     <div className="flex h-full flex-col">
@@ -135,16 +139,16 @@ export function PerformanceView({
         ) : !counts ? (
           <div className="text-[13px] text-fg-muted">読み込み中…</div>
         ) : (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <TotalCard label="ストーリー作成" value={totals.stories} />
-              <TotalCard label="タスク作成" value={totals.tasks} />
-              <TotalCard label="タスク完了" value={totals.done} />
-            </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {SERIES.map((s) => (
+              <StatWidget key={s.key} label={s.label} color={s.color} value={totals[s.key]} counts={counts} dataKey={s.key} />
+            ))}
 
-            <ActivityChart counts={counts} bucket={bucket} />
+            <Widget title="件数の推移" aside={`${period} ・ ${bucketLabel}`} className="sm:col-span-3">
+              <ActivityChart counts={counts} bucket={bucket} />
+            </Widget>
 
-            <div className="overflow-hidden rounded-md border border-border bg-surface">
+            <Widget title="区間ごとの件数" aside={`${counts.length} 区間`} className="sm:col-span-3" bodyClassName="overflow-hidden rounded-b-md">
               <table className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
@@ -165,7 +169,7 @@ export function PerformanceView({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Widget>
           </div>
         )}
       </div>
@@ -173,11 +177,43 @@ export function PerformanceView({
   );
 }
 
-function TotalCard({ label, value }: { label: string; value: number }) {
+// 数値パネル: 期間内の合計（text-2xl）と、区間ごとの推移の小さな線（スパークライン）。
+function StatWidget({
+  label,
+  color,
+  value,
+  counts,
+  dataKey,
+}: {
+  label: string;
+  color: string;
+  value: number;
+  counts: ActivityCount[];
+  dataKey: SeriesKey;
+}) {
   return (
-    <Card className="px-4 py-3">
-      <div className="text-xs text-fg-muted">{label}</div>
-      <div className="mt-1 text-2xl font-medium tabular-nums text-fg">{value}</div>
-    </Card>
+    <Widget
+      title={
+        <>
+          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color }} aria-hidden />
+          {label}
+        </>
+      }
+      aside="期間内の合計"
+    >
+      <div className="flex items-end gap-3">
+        <div className="text-2xl font-medium tabular-nums text-fg">{value}</div>
+        {counts.length > 1 && (
+          <div className="h-8 min-w-0 flex-1" aria-hidden>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={counts} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                <YAxis hide domain={[0, "dataMax"]} />
+                <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </Widget>
   );
 }
