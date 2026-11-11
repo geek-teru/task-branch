@@ -432,8 +432,9 @@ async function addChild(
 }
 
 // Counts of stories created / tasks created / tasks done per day or week (RPC project_activity_counts).
+// A null projectId adds up every project the user can see (RLS), like the Kanban's "all projects".
 export async function getActivityCounts(
-  projectId: string,
+  projectId: string | null,
   bucket: ActivityBucket,
   fromDate: string,
   toDate: string
