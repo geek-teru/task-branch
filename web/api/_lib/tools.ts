@@ -78,7 +78,10 @@ const planStory = z.object({
   context: z.string().optional().describe("ストーリーのコンテキスト（Markdown）"),
   start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
   due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
-  active: z.boolean().optional().describe("true なら着手済み（カンバンに出る）。既定は false（バックログ）"),
+  status: z
+    .enum(["planning", "todo"])
+    .optional()
+    .describe("新規のストーリーの状態。planning は計画中（バックログに置く着手前のもの）、todo は未着手。既定は todo"),
   tasks: z.array(planTask).optional().describe("ストーリー配下に作るタスク"),
 });
 
@@ -163,7 +166,7 @@ async function updateStatus(
 }
 
 // update_story で返すストーリーの列。
-const STORY_COLUMNS = "id, title, description, context, status, activated_at, start_date, due_date";
+const STORY_COLUMNS = "id, title, description, context, status, start_date, due_date";
 
 // update_task で返すタスクの列。
 const TASK_COLUMNS = "id, title, description, status, assignee_type, assignee_client_id, start_date, due_date";
@@ -178,11 +181,11 @@ type FindProjectRow = { id: string; name: string; created_at: string };
 type FindTaskRow = { id: string; project_id: string; parent_id: string | null; level: "story" | "task"; title: string; status: string; sort_order: number };
 
 // list_stories で返すストーリーの列と、タスク数を数えるためのタスクの列。
-type ListStoryRow = { id: string; title: string; description: string | null; status: string; activated_at: string | null; start_date: string | null; due_date: string | null };
+type ListStoryRow = { id: string; title: string; description: string | null; status: string; start_date: string | null; due_date: string | null };
 type ListTaskRow = { parent_id: string; status: string };
 
 // get_story で返すストーリーの列と配下のタスクの列。
-const GET_STORY_COLUMNS = "id, project_id, level, title, description, context, status, activated_at, start_date, due_date";
+const GET_STORY_COLUMNS = "id, project_id, level, title, description, context, status, start_date, due_date";
 const STORY_TASK_COLUMNS = "id, title, description, status, assignee_type, assignee_client_id, start_date, due_date";
 
 type StoryTaskRow = { assignee_client_id: string | null };
@@ -250,7 +253,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
     {
       title: "プロジェクトの全体の取得",
       description:
-        "プロジェクトと、配下のストーリー（context・activated_at・status・期間・progress 込み）とタスクを入れ子の JSON で返す" +
+        "プロジェクトと、配下のストーリー（context・status・期間・progress 込み）とタスクを入れ子の JSON で返す" +
         "（format task-branch/project、version 4。画面のエクスポートと同じ形）。プロジェクト全体の書き出し用。" +
         "大きいので、計画の現状把握は list_stories と get_story を使う。コメントは含まない（get_task_context で取る）",
       inputSchema: { project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）") },
@@ -260,7 +263,10 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       if (error) return restError(error);
       // 他人のプロジェクトや存在しない id は RLS で見えず、RPC が null を返す。
       if (data === null) return toolError(`プロジェクトが見つかりません: ${project_id}`);
-      return json(data);
+      // 着手前はストーリーのステータス（planning）で表すので、RPC が返す activated_at は MCP からは返さない。
+      const exported = data as { stories?: Record<string, unknown>[] };
+      for (const s of exported.stories ?? []) delete s.activated_at;
+      return json(exported);
     },
   );
 
@@ -270,7 +276,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       title: "ストーリーの一覧",
       description:
         "プロジェクトのストーリーを並び順で一覧にする。計画の現状把握はまずこれ。中身（context と配下タスク）は get_story で取る。" +
-        "返り値は { project: { id, name }, stories }。stories の各要素は id / title / description / status / active（着手済みか）/ " +
+        "返り値は { project: { id, name }, stories }。stories の各要素は id / title / description / " +
+        "status（planning 計画中 / todo 未着手 / in_progress 進行中 / done 完了 / closed クローズ）/ " +
         "start_date / due_date / progress（0〜1）/ task_count（配下タスク数）/ done_count（done と closed の数）",
       inputSchema: { project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）") },
     },
@@ -279,7 +286,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       if (projectError) return restError(projectError);
       if (!project) return toolError(`プロジェクトが見つかりません: ${project_id}`);
 
-      const stories = await selectAll<ListStoryRow>(db, "tasks", "id, title, description, status, activated_at, start_date, due_date", "sort_order", {
+      const stories = await selectAll<ListStoryRow>(db, "tasks", "id, title, description, status, start_date, due_date", "sort_order", {
         project_id,
         level: "story",
       });
@@ -305,7 +312,6 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
           title: s.title,
           description: s.description,
           status: s.status,
-          active: s.activated_at !== null,
           start_date: s.start_date,
           due_date: s.due_date,
           progress: progressById.get(s.id) ?? 0,
@@ -321,8 +327,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       title: "ストーリーの中身の取得",
       description:
         "ストーリー1件のコンテキストと配下のタスクを返す。list_stories で一覧を見て、中身が要るストーリーだけこれで読む。" +
-        "返り値は { story, project: { id, name }, tasks }。story は id / title / description / context / status / active（着手済みか）/ " +
-        "activated_at / start_date / due_date / progress（0〜1）。tasks は並び順で id / title / description / status / assignee_type / " +
+        "返り値は { story, project: { id, name }, tasks }。story は id / title / description / context / " +
+        "status（planning 計画中 / todo 未着手 / in_progress 進行中 / done 完了 / closed クローズ）/ start_date / due_date / progress（0〜1）。tasks は並び順で id / title / description / status / assignee_type / " +
         "assignee_client_id（担当のエージェント）/ assigned_to_me（呼び出したエージェント自身の担当か）/ start_date / due_date。" +
         "コメントは含まない（get_task_context で取る）",
       inputSchema: { story_id: z.uuid().describe("ストーリーの id（タスクは不可）") },
@@ -348,8 +354,6 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
           description: story.description,
           context: story.context,
           status: story.status,
-          active: story.activated_at !== null,
-          activated_at: story.activated_at,
           start_date: story.start_date,
           due_date: story.due_date,
           progress: Number(storyProgress ?? 0),
@@ -420,7 +424,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       description:
         "プロジェクトにストーリーとその配下のタスクをまとめて登録する。既存のストーリーにタスクを足すときは stories[].id を指定する。" +
         "external_id が同じプロジェクトの既存の行と一致したら作らず（担当者も書き換えない）、その id を created: false で返すので、失敗したら同じ入力で呼び直してよい。" +
-        "新規はすべて status todo で、既存の末尾に並ぶ。tasks[].assignee を省略したら未割り当てになる",
+        "新規のストーリーは stories[].status（planning 計画中 / todo 未着手。既定は todo）、新規のタスクは status todo で、既存の末尾に並ぶ。tasks[].assignee を省略したら未割り当てになる",
       inputSchema: {
         project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）"),
         stories: z.array(planStory).min(1).describe("登録するストーリー（配下のタスクを含む）"),
@@ -484,7 +488,6 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       if (newStories.length > 0) {
         const { last, error: lastError } = await lastSortOrder(db, "project_id", project_id, "story");
         if (lastError) return restError(lastError);
-        const now = new Date().toISOString();
         const { data, error } = await db
           .from("tasks")
           .insert(
@@ -496,7 +499,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
               context: s.context ?? null,
               start_date: s.start_date ?? null,
               due_date: s.due_date ?? null,
-              activated_at: s.active ? now : null,
+              status: s.status ?? "todo",
               sort_order: (last ?? 0) + 1 + i,
               metadata: s.external_id ? { external_id: s.external_id } : {},
             })),
@@ -571,9 +574,9 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
     {
       title: "ストーリーの更新",
       description:
-        "ストーリーの名前・説明・コンテキスト・期間・状態・着手（Active / InActive）を更新し、更新後のストーリーを返す。渡した項目だけ書き換える。" +
+        "ストーリーの名前・説明・コンテキスト・期間・状態を更新し、更新後のストーリーを返す。渡した項目だけ書き換える。" +
         "context を書き換えると、ストーリー詳細に AI が更新した版として履歴が残る。" +
-        "active は true で着手済み（Active。すでに着手済みなら activated_at は変えない）、false でバックログ（InActive）に戻す。" +
+        "status の planning（計画中）はストーリーだけの状態で、着手前のもの（バックログに置いておくもの）を表す。in_review はタスクだけなので渡せない。" +
         "期間を変えても配下のタスクの期間は変わらない",
       inputSchema: {
         story_id: z.uuid().describe("ストーリーの id（タスクは不可）"),
@@ -582,13 +585,15 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
         context: z.string().optional().describe("ストーリーのコンテキスト（Markdown。置き換え）"),
         start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
         due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
-        status: z.enum(["todo", "in_progress", "done", "closed"]).optional().describe("状態"),
-        active: z.boolean().optional().describe("true なら着手済み、false ならバックログ"),
+        status: z
+          .enum(["planning", "todo", "in_progress", "done", "closed"])
+          .optional()
+          .describe("状態（planning 計画中 / todo 未着手 / in_progress 進行中 / done 完了 / closed クローズ）"),
       },
     },
-    async ({ story_id, active, ...fields }) => {
-      if (active === undefined && Object.values(fields).every((v) => v === undefined)) {
-        return toolError("更新する項目がありません。title / description / context / start_date / due_date / status / active のどれかを渡してください");
+    async ({ story_id, ...fields }) => {
+      if (Object.values(fields).every((v) => v === undefined)) {
+        return toolError("更新する項目がありません。title / description / context / start_date / due_date / status のどれかを渡してください");
       }
 
       const { data: story, error: storyError } = await db.from("tasks").select(`${STORY_COLUMNS}, level`).eq("id", story_id).maybeSingle();
@@ -596,10 +601,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       if (!story) return toolError(`ストーリーが見つかりません: ${story_id}`);
       if (story.level === "task") return toolError(`タスクの id です。ストーリーの id を指定してください: ${story_id}`);
 
-      // 画面の setActive と同じく activated_at で表す。着手済みに true を渡しても着手日時は上書きしない。
       const patch: Record<string, unknown> = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-      if (active === false) patch.activated_at = null;
-      if (active === true && story.activated_at === null) patch.activated_at = new Date().toISOString();
       const { level: _level, ...current } = story;
       if (Object.keys(patch).length === 0) return json(current);
 

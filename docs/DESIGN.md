@@ -916,8 +916,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `list_stories`        | `project_id`             | `{ project, stories }`。ストーリーの一覧（進捗・タスク数込み）。`context` と配下のタスクは含まない（下記「ストーリーの一覧のツール」） |
 | `get_story`           | `story_id`               | `{ story, project, tasks }`。ストーリー1件（`context`・進捗込み）と配下のタスク。コメントは含まない（下記「ストーリーの中身のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
-| `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status` / `active`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `activated_at` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
-| `create_plan`         | `project_id`, `stories`（`tasks[]` の `assignee` は任意） | `{ project_id, stories }`。ストーリーと配下のタスクを一括で登録する。`external_id` が既存の行と一致したら作らず、担当も書き換えない（`assignee` の値は下記「タスクの更新のツール」） |
+| `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
+| `create_plan`         | `project_id`, `stories`（`stories[]` の `status`、`tasks[]` の `assignee` は任意） | `{ project_id, stories }`。ストーリーと配下のタスクを一括で登録する。新規のストーリーは `status`（`planning` / `todo`。既定 `todo`）、新規のタスクは `todo` で作る。`external_id` が既存の行と一致したら作らず、担当も書き換えない（`assignee` の値は下記「タスクの更新のツール」） |
 | `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date` / `assignee`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
@@ -941,8 +941,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 `export_project` は、プロジェクト全体の書き出し用に、プロジェクトを1回で返す（画面のエクスポートと同じ形）。全ストーリーの `context` と全タスクの説明を含んで大きいので、計画の現状把握は `list_stories` と `get_story` で行う（ツールの説明にもそう書く）。
 
-- RPC `export_project(project)`（画面のエクスポートと同じ）を呼び、返り値の JSON に手を加えずに返す。
-- `project`: `id` / `name` / `description` / `created_at`。`stories[]`: `id` / `title` / `description` / `context` / `activated_at` / `status` / `sort_order` / `start_date` / `due_date` / `progress` / `metadata` / `tasks[]`。`tasks[]`: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_id` / `sort_order` / `start_date` / `due_date` / `metadata`。
+- RPC `export_project(project)`（画面のエクスポートと同じ）を呼び、返り値の `stories[]` から `activated_at` だけを落として返す（着手前はステータスの `planning` で表し、MCP からは旧 Active / InActive を読ませない。RPC と画面のエクスポートはそのまま）。
+- `project`: `id` / `name` / `description` / `created_at`。`stories[]`: `id` / `title` / `description` / `context` / `status`（`planning` を含む） / `sort_order` / `start_date` / `due_date` / `progress` / `metadata` / `tasks[]`。`tasks[]`: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_id` / `sort_order` / `start_date` / `due_date` / `metadata`。
 - コメントは含まない（タスクごとに `get_task_context` で取る）。
 - 見つからない（他人のものを含む）プロジェクトは RLS で見えず RPC が `null` を返すので、`isError`（「プロジェクトが見つかりません」）にする。
 
@@ -950,7 +950,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 `list_stories` は、計画の現状把握の入口。`export_project` は全ストーリーの `context` と全タスクの説明を返すため大きくなりすぎるので、一覧はこちらで取り、中身は必要なストーリーだけ `get_story` で読む。DB の変更は持たず、RLS の下で読むだけ。
 
-- `project`: `id` / `name`。`stories[]`（`sort_order` 順）: `id` / `title` / `description` / `status` / `active`（`activated_at` が null でないか）/ `start_date` / `due_date` / `progress`（RPC `get_progress(project)` の値。0〜1）/ `task_count`（配下のタスク数）/ `done_count`（`done` と `closed` の数）。
+- `project`: `id` / `name`。`stories[]`（`sort_order` 順）: `id` / `title` / `description` / `status`（`planning` / `todo` / `in_progress` / `done` / `closed`）/ `start_date` / `due_date` / `progress`（RPC `get_progress(project)` の値。0〜1）/ `task_count`（配下のタスク数）/ `done_count`（`done` と `closed` の数）。
 - `context` と配下のタスクの中身は返さない。
 - `projects` を id で引き、見つからない（他人のものを含む）ときは `isError`（「プロジェクトが見つかりません」。`export_project` と同じ文言）。
 - ストーリーは `tasks` を `project_id` と `level = 'story'` で、タスク数は `level = 'task'` の `parent_id` / `status` を取って関数の中で数える。どちらも 1000 行ずつ `range` で分けて全部取る（`find_items` と同じ）。
@@ -959,7 +959,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 `get_story` は、`list_stories` で見つけたストーリー1件の中身（`context` と配下のタスク）を読むのに使う。DB の変更は持たず、RLS の下で読むだけ。
 
-- `story`: `id` / `title` / `description` / `context` / `status` / `active`（`activated_at` が null でないか）/ `activated_at` / `start_date` / `due_date` / `progress`（RPC `get_progress(project)` のそのストーリーの値。0〜1）。`project`: `id` / `name`。
+- `story`: `id` / `title` / `description` / `context` / `status`（`planning` を含む）/ `start_date` / `due_date` / `progress`（RPC `get_progress(project)` のそのストーリーの値。0〜1）。`project`: `id` / `name`。
 - `tasks[]`（`sort_order` 順）: `id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `assigned_to_me` / `start_date` / `due_date`。`assigned_to_me` は下記「タスクの文脈のツール」と同じ。`parent_id` と `level = 'task'` で、1000 行ずつ `range` で分けて全部取る。
 - コメントは含まない（タスクごとに `get_task_context` で取る）。
 - 見つからない（他人のものを含む）ストーリーは `isError`（「ストーリーが見つかりません」）、タスクの id は `isError`（「タスクの id です。ストーリーの id を指定してください」）。どちらも `update_story` と同じ文言。
@@ -980,9 +980,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 - 渡した項目だけ書き換える（`description` / `context` は置き換え）。ひとつも無ければ `isError`。`title` は前後の空白を落として 1 文字以上。
 - `context` を書き換えると、トリガが `story_context_revisions` に版を残す（編集者は AI。ストーリー詳細に「版 N・AI が更新」と出る）。コードでは何もしない。
-- `active`: `true` で `activated_at = now()`、`false` で `null`（画面の `setActive` と同じ）。すでに着手済みのときに `true` を渡しても `activated_at` は上書きしない。
+- `status`: `planning`（計画中）/ `todo` / `in_progress` / `done` / `closed`。`in_review` はタスクだけの状態なので受け付けない（入力エラー）。`activated_at`（旧 Active / InActive）は読まない・書かない。以前の `active` は廃止した。渡されても入力の検証で捨てて無視し、`active` だけのときは「更新する項目がありません」の `isError` になる（`create_plan` の `stories[].active` も同じく無視され、未着手で作られる）。
 - 期間（`start_date` / `due_date`）を変えても、配下のタスクの期間はずらさない（`shift_story_dates` は使わない）。
-- 書き換える値が無いとき（着手済みに `active: true` だけを渡したなど）は、更新せずに今のストーリーを返す。
 - 見つからない（他人のものを含む）ストーリーと、タスクの id は `isError`。
 
 **タスクの更新のツール**
