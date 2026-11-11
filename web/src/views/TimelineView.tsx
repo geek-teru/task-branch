@@ -153,7 +153,7 @@ export function TimelineView({
       </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
-        <div className="max-w-[600px]">
+        <div className="max-w-[960px]">
           {error && <div className="mb-3 text-[13px] text-danger">{error}</div>}
           {!events ? (
             !error && <div className="text-[13px] text-fg-muted">読み込み中…</div>
