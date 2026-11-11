@@ -25,6 +25,7 @@ const MS_DAY = 86_400_000;
 
 // バーの塗り。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
 const BAR_BG: Record<Status, string> = {
+  planning: "bg-status-planning-border",
   todo: "bg-status-todo-border",
   in_progress: "bg-status-in_progress-border",
   in_review: "bg-status-in_review-border",

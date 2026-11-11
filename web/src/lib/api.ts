@@ -141,9 +141,9 @@ export async function listProjectEvents(
   return (data ?? []) as TaskEvent[];
 }
 
-// Backlog page: add a backlog item, i.e. an inactive story (activated_at stays null).
+// Backlog page: add a backlog item, i.e. a planning story (activated_at stays null).
 export async function createBacklogStory(projectId: string, title: string, description: string | null): Promise<void> {
-  await addRootStory(projectId, { title, description, status: "todo", start_date: null, due_date: null });
+  await addRootStory(projectId, { title, description, status: "planning", start_date: null, due_date: null });
 }
 
 // Create a story, appended after the project's other stories.

@@ -629,6 +629,7 @@ function ResizeHandle({ onMouseDown }: { onMouseDown: (e: MouseEvent) => void })
 
 // 列の見出しの丸。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
 const STATUS_DOT: Record<Status, string> = {
+  planning: "bg-status-planning-border",
   todo: "bg-status-todo-border",
   in_progress: "bg-status-in_progress-border",
   in_review: "bg-status-in_review-border",

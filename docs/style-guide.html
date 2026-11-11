@@ -30,6 +30,9 @@
     --color-chart-2: #3f78b5;
     --color-chart-3: #3ecf8e;
 
+    --color-status-planning-bg: #f1f5f9;
+    --color-status-planning-border: #94a3b8;
+    --color-status-planning-fg: #475569;
     --color-status-todo-bg: #e8f3f7;
     --color-status-todo-border: #5aa5ba;
     --color-status-todo-fg: #1f5a69;
@@ -154,6 +157,7 @@
   .badge.brand { background: color-mix(in srgb, var(--color-accent) 10%, transparent); border-color: var(--color-accent); color: var(--color-brand); }
   .badge.todo { background: var(--color-status-todo-bg); border-color: var(--color-status-todo-border); color: var(--color-status-todo-fg); }
   .badge.in_progress { background: var(--color-status-in_progress-bg); border-color: var(--color-status-in_progress-border); color: var(--color-status-in_progress-fg); }
+  .badge.planning { background: var(--color-status-planning-bg); border-color: var(--color-status-planning-border); color: var(--color-status-planning-fg); }
   .badge.in_review { background: var(--color-status-in_review-bg); border-color: var(--color-status-in_review-border); color: var(--color-status-in_review-fg); }
   .badge.done { background: var(--color-status-done-bg); border-color: var(--color-status-done-border); color: var(--color-status-done-fg); }
   .badge.closed { background: var(--color-status-closed-bg); border-color: var(--color-status-closed-border); color: var(--color-status-closed-fg); }
@@ -348,6 +352,7 @@
 <table>
   <thead><tr><th>状態</th><th>見本</th><th>bg</th><th>border</th><th>fg</th></tr></thead>
   <tbody>
+    <tr><td>計画中 planning（ストーリーのみ）</td><td><span class="badge planning">計画中</span></td><td class="mono">#f1f5f9</td><td class="mono">#94a3b8</td><td class="mono">#475569</td></tr>
     <tr><td>未着手 todo</td><td><span class="badge todo">未着手</span></td><td class="mono">#e8f3f7</td><td class="mono">#5aa5ba</td><td class="mono">#1f5a69</td></tr>
     <tr><td>進行中 in_progress</td><td><span class="badge in_progress">進行中</span></td><td class="mono">#ebf1f8</td><td class="mono">#3f78b5</td><td class="mono">#24507e</td></tr>
     <tr><td>レビュー中 in_review（タスクのみ）</td><td><span class="badge in_review">レビュー中</span></td><td class="mono">#f1eef8</td><td class="mono">#7a62b8</td><td class="mono">#4c3a80</td></tr>
@@ -642,7 +647,7 @@
 <table>
   <thead><tr><th>バッジに出す情報</th><th>部品・tone</th><th>表記</th></tr></thead>
   <tbody>
-    <tr><td>状態（todo / in_progress / in_review / done / closed）</td><td><code>Badge tone={status}</code>（ステータスの色）</td><td>未着手 / 進行中 / レビュー中 / 完了 / クローズ</td></tr>
+    <tr><td>状態（planning / todo / in_progress / in_review / done / closed）</td><td><code>Badge tone={status}</code>（ステータスの色）</td><td>計画中 / 未着手 / 進行中 / レビュー中 / 完了 / クローズ</td></tr>
     <tr><td>Active / InActive（プロジェクト・ストーリー）</td><td>Active は <code>brand</code>、InActive は <code>neutral</code>。切り替えられる場所は <code>EpicStateBadge</code></td><td>Active / InActive</td></tr>
     <tr><td>ID</td><td><code>IdBadge</code>（等幅・neutral。クリックで uuid 全体をコピー）</td><td>uuid の先頭8桁</td></tr>
     <tr><td>コメントの作成者</td><td>AI は <code>brand</code>、自分・人は <code>neutral</code></td><td>AI / 自分 / 人</td></tr>
@@ -681,6 +686,7 @@
 
 <h3 id="parts-5">Badge / IdBadge（<code>ui/Badge.tsx</code>・<code>components/IdBadge.tsx</code>）</h3>
 <div class="demo row">
+  <span class="badge planning">計画中</span>
   <span class="badge todo">未着手</span>
   <span class="badge in_progress">進行中</span>
   <span class="badge in_review">レビュー中</span>
@@ -695,7 +701,7 @@
 </div>
 <p class="note">
   どれも <code>h-5</code>・<code>rounded</code>（4px）・<code>px-1.5</code>・11px / 400・1px の枠。<code>tone</code> は
-  <code>todo</code> / <code>in_progress</code> / <code>in_review</code> / <code>done</code> / <code>closed</code>（ステータスの色）、<code>brand</code>（地 accent 10%・枠 accent・文字 brand）、<code>neutral</code>（既定。地 <code>surface-muted</code>・枠 <code>border-strong</code>・文字 <code>fg-muted</code>）。
+  <code>planning</code> / <code>todo</code> / <code>in_progress</code> / <code>in_review</code> / <code>done</code> / <code>closed</code>（ステータスの色）、<code>brand</code>（地 accent 10%・枠 accent・文字 brand）、<code>neutral</code>（既定。地 <code>surface-muted</code>・枠 <code>border-strong</code>・文字 <code>fg-muted</code>）。
   <code>IdBadge</code> は同じ形の等幅（枠は <code>border</code>）で uuid の先頭8桁を出し、クリックで全体をコピーして 1.2 秒「コピーしました」（brand の見た目）にする。
 </p>
 <pre><code>&lt;Badge tone={task.status}&gt;{STATUS_LABEL[task.status]}&lt;/Badge&gt;

@@ -3,7 +3,7 @@
 import type { AgentProvider } from "./agentProviders";
 
 export type Level = "story" | "task";
-export type Status = "todo" | "in_progress" | "in_review" | "done" | "closed";
+export type Status = "planning" | "todo" | "in_progress" | "in_review" | "done" | "closed";
 export type AssigneeType = "human" | "ai";
 
 export interface Project {
@@ -204,6 +204,7 @@ export interface KanbanLane {
 }
 
 export const STATUS_LABEL: Record<Status, string> = {
+  planning: "計画中",
   todo: "未着手",
   in_progress: "進行中",
   in_review: "レビュー中",
@@ -212,11 +213,12 @@ export const STATUS_LABEL: Record<Status, string> = {
 };
 
 // Every status, in workflow order (sorting).
-export const STATUS_ORDER: Status[] = ["todo", "in_progress", "in_review", "done", "closed"];
+export const STATUS_ORDER: Status[] = ["planning", "todo", "in_progress", "in_review", "done", "closed"];
 
 // Choices in status pickers and forms. in_review is for tasks only (the DB check constraint
-// rejects it on stories): an in-review story would drop its kanban lane.
-export const TASK_STATUSES: Status[] = STATUS_ORDER;
+// rejects it on stories): an in-review story would drop its kanban lane. planning is for stories
+// only (a backlog item not yet scheduled), the counterpart of in_review.
+export const TASK_STATUSES: Status[] = STATUS_ORDER.filter((s) => s !== "planning");
 export const STORY_STATUSES: Status[] = STATUS_ORDER.filter((s) => s !== "in_review");
 
 // Kanban columns. The closed column is always shown (as a drop target); its cards are hidden
