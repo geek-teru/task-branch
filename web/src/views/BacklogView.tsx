@@ -25,7 +25,6 @@ const SHOW_INACTIVE_KEY = "backlog.showInactive";
 // 列見出しのクリックで並べ替える列（ID 以外）。
 const SORT_COLUMNS = {
   title: (s) => s.title,
-  description: (s) => s.description,
   start_date: (s) => s.start_date,
   due_date: (s) => s.due_date,
   status: (s) => STATUS_ORDER.indexOf(s.status),
@@ -33,7 +32,7 @@ const SORT_COLUMNS = {
 } satisfies Record<string, (s: BacklogStory) => SortValue>;
 
 // Stories of one project: active ones and inactive ones (バックログ). Inactive ones are hidden by default.
-// Only name / description / period / status / state are shown; the document (context) is not loaded here.
+// Only name / period / status / state are shown; the description and the document (context) are read on the detail page.
 // The project is picked in the global header or the toolbar's picker (/backlog?project=).
 export function BacklogView({
   stories,
@@ -52,8 +51,7 @@ export function BacklogView({
 }) {
   const [adding, setAdding] = useState(false);
   const [pendingState, setPendingState] = useState<{ story: BacklogStory; active: boolean } | null>(null);
-  // 名前・ステータス・状態はドラッグで幅を変えられる。説明は残り幅を使う。
-  const name = useResizableWidth("backlog.nameWidth", 320, 160, 720);
+  // ステータス・状態はドラッグで幅を変えられる。名前は残り幅を使う。
   const status = useResizableWidth("backlog.statusWidth", 112, 72, 240, { invert: true });
   const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
   const [showInactive, setShowInactive] = useState(() => {
@@ -106,16 +104,12 @@ export function BacklogView({
             Active のストーリーはありません。InActive は「InActive も表示」で出せます。
           </div>
         ) : (
-          // @container: the description column is dropped when the table is narrow.
-          <div className="@container overflow-hidden rounded-md border border-border bg-surface">
+          <div className="overflow-hidden rounded-md border border-border bg-surface">
             <table className="w-full table-fixed border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
                   <th className="w-24 px-3 py-2 font-medium">ID</th>
-                  <SortableTh label="名前" sortKey="title" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: name.width }}>
-                    <ResizeHandle onMouseDown={name.startResize} side="right" />
-                  </SortableTh>
-                  <SortableTh label="説明" sortKey="description" sort={sort} onSort={toggle} className="hidden px-3 py-2 @5xl:table-cell" />
+                  <SortableTh label="名前" sortKey="title" sort={sort} onSort={toggle} className="px-3 py-2" />
                   <SortableTh label="開始日" sortKey="start_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
                   <SortableTh label="期限" sortKey="due_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
                   <SortableTh label="ステータス" sortKey="status" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: status.width }}>
@@ -137,7 +131,7 @@ export function BacklogView({
                       <td className={cn("px-3 py-2", dim)}>
                         <IdBadge id={s.id} />
                       </td>
-                      <td className={cn("relative truncate px-3 py-2", dim)}>
+                      <td className={cn("truncate px-3 py-2", dim)}>
                         <Link
                           to={`/stories/${s.id}`}
                           data-tooltip="詳細を開く"
@@ -145,10 +139,6 @@ export function BacklogView({
                         >
                           {s.title}
                         </Link>
-                        <ResizeHandle onMouseDown={name.startResize} side="right" />
-                      </td>
-                      <td className={cn("hidden truncate px-3 py-2 @5xl:table-cell", s.description ? "text-fg-muted" : "text-fg-muted/60", dim)}>
-                        {s.description ?? "（説明なし）"}
                       </td>
                       <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.start_date ?? "—"}</td>
                       <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.due_date ?? "—"}</td>
