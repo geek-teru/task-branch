@@ -100,6 +100,7 @@ export function DropdownMenu({
   tooltip,
   children,
   className,
+  triggerClassName,
   menuClassName,
 }: {
   // What the button shows (text, icon, or both).
@@ -114,6 +115,8 @@ export function DropdownMenu({
   tooltip?: string;
   children: ReactNode;
   className?: string;
+  // Extra classes on the trigger button (e.g. max-w-full so a long label truncates in a narrow row).
+  triggerClassName?: string;
   menuClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -132,6 +135,7 @@ export function DropdownMenu({
         data-tooltip={tooltip}
         aria-haspopup="menu"
         aria-expanded={open}
+        className={triggerClassName}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);

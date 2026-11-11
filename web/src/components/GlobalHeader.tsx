@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import type { Project } from "../lib/types";
 import { Avatar } from "./Avatar";
-import { ChevronUpDownIcon, ServiceIcon } from "./Icons";
+import { ChevronUpDownIcon, GitHubIcon, GlobeIcon, ServiceIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
@@ -75,6 +76,7 @@ export function GlobalHeader({
             size="sm"
             label="プロジェクトを切り替える"
             className="min-w-0"
+            triggerClassName="max-w-full"
             menuClassName="max-h-[60vh] min-w-[240px] overflow-y-auto"
             trigger={
               <>
@@ -107,6 +109,16 @@ export function GlobalHeader({
             )}
           </DropdownMenu>
         )}
+        {!pageTitle && current?.repository_url && (
+          <HeaderLink href={current.repository_url} label="リポジトリを開く">
+            <GitHubIcon size={16} />
+          </HeaderLink>
+        )}
+        {!pageTitle && current?.url && (
+          <HeaderLink href={current.url} label="サイトを開く">
+            <GlobeIcon size={16} />
+          </HeaderLink>
+        )}
       </div>
 
       <DropdownMenu
@@ -130,5 +142,21 @@ export function GlobalHeader({
         <DropdownMenuItem onSelect={onLogout}>ログアウト</DropdownMenuItem>
       </DropdownMenu>
     </header>
+  );
+}
+
+// Icon-only link next to the project switcher; opens the project's repository or site in a new tab.
+function HeaderLink({ href, label, children }: { href: string; label: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      title={`${label}: ${href}`}
+      className="flex size-7 shrink-0 items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
+    >
+      {children}
+    </a>
   );
 }
