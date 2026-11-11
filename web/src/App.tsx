@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
-import { linkGoogle, signOut, useSession } from "./lib/useSession";
+import {
+  initialAuthRedirectError,
+  linkGoogle,
+  signOut,
+  switchToGoogleAccount,
+  useSession,
+  withoutAuthRedirectError,
+} from "./lib/useSession";
 import { useProfile } from "./lib/useProfile";
 import {
   addRootStory,
@@ -36,6 +43,7 @@ import { useAgentGrants } from "./lib/useAgentGrants";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { GuestBanner } from "./components/GuestBanner";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ProjectSelect } from "./components/ProjectSelect";
 import { CloseIcon } from "./components/Icons";
 import { Button, IconButton } from "./components/ui/Button";
@@ -537,6 +545,21 @@ export default function App() {
     if (error) setError(`Google での本登録に失敗しました: ${error.message}`);
   }, []);
 
+  // Back from Google with identity_already_exists: the account is already registered, so the link
+  // failed and the user is still the guest. Offer to switch to that account (no data merge).
+  const [identityConflict, setIdentityConflict] = useState(
+    () => initialAuthRedirectError === "identity_already_exists"
+  );
+  // Drop the error params from the URL once read, so a reload does not show the guidance again.
+  useEffect(() => {
+    if (initialAuthRedirectError) navigate(withoutAuthRedirectError(window.location.href), { replace: true });
+  }, [navigate]);
+  const handleSwitchToGoogleAccount = useCallback(async () => {
+    setIdentityConflict(false);
+    const { error } = await switchToGoogleAccount();
+    if (error) setError(`Google でのログインに失敗しました: ${error.message}`);
+  }, []);
+
   // The side nav opens each page on the selected project.
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
@@ -684,6 +707,16 @@ export default function App() {
               Google で本登録
             </Button>
           }
+        />
+      )}
+      {identityConflict && session.user.is_anonymous && (
+        <ConfirmDialog
+          message={
+            "この Google アカウントは登録済みです。ゲストのデータは引き継げません。\nそのアカウントでログインし直しますか？"
+          }
+          confirmLabel="ログインし直す"
+          onConfirm={handleSwitchToGoogleAccount}
+          onCancel={() => setIdentityConflict(false)}
         />
       )}
       <div className="flex min-h-0 flex-1">

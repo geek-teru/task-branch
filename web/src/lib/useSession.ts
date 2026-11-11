@@ -50,6 +50,46 @@ export function linkGoogle(redirectTo: string = window.location.href) {
   });
 }
 
+// Error params Supabase appends to the redirect URL (query for PKCE, hash for the implicit flow)
+// when an OAuth sign-in or linkIdentity fails. supabase-js reports it but leaves the URL as is.
+const AUTH_ERROR_PARAMS = ["error", "error_code", "error_description"];
+
+function hashParams(hash: string) {
+  return new URLSearchParams(hash.replace(/^#/, ""));
+}
+
+// error_code of a failed OAuth redirect in `href`, e.g. "identity_already_exists" when the Google
+// account a guest tried to link is already registered as another user. null when there is none.
+export function authRedirectErrorCode(href: string): string | null {
+  const url = new URL(href);
+  return url.searchParams.get("error_code") ?? hashParams(url.hash).get("error_code");
+}
+
+// `href` without the auth error params, as a path (pathname + search + hash) for the router.
+export function withoutAuthRedirectError(href: string): string {
+  const url = new URL(href);
+  const hash = hashParams(url.hash);
+  for (const key of AUTH_ERROR_PARAMS) {
+    url.searchParams.delete(key);
+    hash.delete(key);
+  }
+  const h = hash.toString();
+  return url.pathname + url.search + (h ? `#${h}` : "");
+}
+
+// Read once at load: the router may rewrite the URL (e.g. the redirect to /login) before the app
+// gets to show the guidance.
+export const initialAuthRedirectError: string | null =
+  typeof window === "undefined" ? null : authRedirectErrorCode(window.location.href);
+
+// The Google account is already someone's: the guest's data cannot move there (no merge; it is
+// deleted after 7 days). Sign out of the guest and sign in with that account instead.
+export async function switchToGoogleAccount() {
+  const { error } = await signOut();
+  if (error) return { error };
+  return signInWithGoogle();
+}
+
 export function signOut() {
   return supabase.auth.signOut();
 }
