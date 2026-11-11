@@ -3,6 +3,11 @@ import type { Status } from "./types";
 // Color values for inline styles. They point at the @theme tokens in index.css,
 // so they stay in sync with STATUS_CLASS while screens move to className.
 export const STATUS_COLOR: Record<Status, { bg: string; border: string; fg: string }> = {
+  planning: {
+    bg: "var(--color-status-planning-bg)",
+    border: "var(--color-status-planning-border)",
+    fg: "var(--color-status-planning-fg)",
+  },
   todo: { bg: "var(--color-status-todo-bg)", border: "var(--color-status-todo-border)", fg: "var(--color-status-todo-fg)" },
   in_progress: {
     bg: "var(--color-status-in_progress-bg)",
@@ -20,6 +25,11 @@ export const STATUS_COLOR: Record<Status, { bg: string; border: string; fg: stri
 
 // Tailwind class names per status. Written out in full so Tailwind can find them in the source.
 export const STATUS_CLASS: Record<Status, { bg: string; border: string; text: string }> = {
+  planning: {
+    bg: "bg-status-planning-bg",
+    border: "border-status-planning-border",
+    text: "text-status-planning-fg",
+  },
   todo: { bg: "bg-status-todo-bg", border: "border-status-todo-border", text: "text-status-todo-fg" },
   in_progress: {
     bg: "bg-status-in_progress-bg",

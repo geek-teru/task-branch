@@ -199,7 +199,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | title         | text        | not null                      | 名称                                                                                                                                                                                                                                                                                                                 |
 | description   | text        |                               | 短い説明（一覧やカードに出す 1〜2 行）                                                                                                                                                                                                                                                                               |
 | context       | text        | null可                        | **story のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `story_context_revisions` に残す（最新版も含む）                                                                                    |
-| status        | text        | not null, default 'todo'      | `todo` / `in_progress` / `in_review` / `done` / `closed`（作業の進み具合）。`in_review` は PR を出して人のレビューを待っている状態で、**task のみ**（ストーリーには入れない。CHECK `tasks_in_review_task_only`）。未完了として扱う。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える |
+| status        | text        | not null, default 'todo'      | `planning` / `todo` / `in_progress` / `in_review` / `done` / `closed`（作業の進み具合）。`planning`（計画中）はバックログに置いていて、まだ着手の予定に入れていない状態で、**story のみ**（タスクには入れない。CHECK `tasks_planning_story_only`）。バックログ画面から足したストーリーは `planning` で作る。未完了として扱う。`in_review` は PR を出して人のレビューを待っている状態で、**task のみ**（ストーリーには入れない。CHECK `tasks_in_review_task_only`）。未完了として扱う。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える |
 | activated_at  | timestamptz | null可                        | **story のみ**。null ＝ バックログ、日時あり ＝ 着手済み。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける                                                                                                     |
 | assignee_type | text        | null可                        | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9                                                                                                                                                                                                                                                                |
 | assignee_id   | uuid        | null可                        | **task のみ**。人が担当する場合の担当者（ユーザー）                                                                                                                                                                                                                                                                  |
@@ -727,7 +727,7 @@ create policy avatars_insert on storage.objects
 
 ### 5.2 表現
 
-- **色**: status（todo=水色 / in_progress=青 / in_review=紫 / done=緑 / closed=グレー）。
+- **色**: status（planning=薄いグレー / todo=水色 / in_progress=青 / in_review=紫 / done=緑 / closed=グレー）。
 - **level で形状/サイズ**: story=大, task=小（チェックボックス）。
 - **枠強調**: クリティカルパス上の task。
 - **アイコン**: task の担当（人 / AI）。人はプロフィールの画像、AI は接続中のエージェントの名前とプロバイダのアイコン（`assignee_type = 'ai'`、`assignee_id` は null、`assignee_client_id` を `listGrants()` の一覧と突き合わせる。判定は設定画面と同じ `agentProviders.ts`）。候補は接続中のエージェントだけ。接続を解除したエージェントのタスクは担当を残して「解除済みのエージェント」、`client_id` の無いタスクは「AI（未指定）」、一覧を読めないあいだは「エージェント」と出す。動的登録をやり直すと別の `client_id` になるので、古い `client_id` のタスクは担当を選び直す。
@@ -1027,7 +1027,7 @@ AI がタスクに着手し、終えたら作業結果を残す。PR を作る�
 - `start_task`: `todo` を `in_progress` にする。`in_review` もレビューの指摘の対応のため `in_progress` に戻せる。すでに `in_progress` なら何も変えずに返す（呼び直してよい）。`done` / `closed` は `isError`。
 - `request_task_review`: `todo` / `in_progress` を `in_review` にし、`result` を `complete_task` と同じく AI のコメントとして投稿する。PR を作ったときに使い、PR を作らないタスクは `complete_task` を使う。すでに `in_review` なら作業結果を二重に記録しないよう `isError`。`done` / `closed` も `isError`。
 - `complete_task`: `todo` / `in_progress` / `in_review` を `done` にし、`result`（前後の空白を落として 1 文字以上）を `add_task_comment` と同じく AI のコメントとして投稿する。`done` / `closed` は作業結果を二重に記録しないよう `isError`。`completed_at` はトリガ `touch_updated_at()` が入れる。
-- `in_review` はストーリーでは使わないので、`update_story` の `status` の選択肢には無い。`get_next_task` の候補は `todo` のままで、レビュー中のタスクは返さない。
+- `in_review` はストーリーでは使わないので、`update_story` の `status` の選択肢には無い。`planning` はストーリー専用（MCP ツールでの指定は「MCP ツールの計画中ステータスへの対応」で足す）。`get_next_task` の候補は `todo` のままで、レビュー中のタスクは返さない。
 - 状態は、引いたときの状態のままのときだけ更新する（`status in (...)` を条件に付ける）。間に別の操作で変わっていたら 0 行になり、`isError` にする。
 - 状態を `in_review` / `done` にしたあとでコメントの投稿に失敗したら `isError` で返し、状態が変わったこと・`add_task_comment` で記録し直すことを伝える。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`。`get_task_context` と同じ扱い。
@@ -1070,7 +1070,7 @@ AI がタスクに着手し、終えたら作業結果を残す。PR を作る�
 | ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | **ガントチャート** | 開始/終了日 または 開始日+期間、依存関係 | `start_date` / `due_date` を用意済（nullable）。依存は未設計（§1.2）。期間は将来 `estimate`                         |
 | **カレンダー**     | 日付（期限 / 予定日）                    | `start_date` / `due_date` を用意済                                                                                  |
-| **カンバン**       | 列（status）とカード、列内の並び順       | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `in_review` / `done` / `closed`。`closed` の列のカードはトグルでのみ表示） |
+| **カンバン**       | 列（status）とカード、列内の並び順       | `status`（既存）＋ `sort_order`（列内順）。列 = status 値（`todo` / `in_progress` / `in_review` / `done` / `closed`。`planning` はストーリー専用なので列に無い。`closed` の列のカードはトグルでのみ表示） |
 
 ### 8.2 拡張ポイントと方針
 
