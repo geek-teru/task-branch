@@ -1,13 +1,11 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { BacklogStory, Status } from "../lib/types";
-import { STATUS_ORDER, STORY_STATUSES } from "../lib/types";
+import { STATUS_ORDER, STORY_STATUSES, isFinished } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
-import { EpicStateBadge } from "../components/EpicStateBadge";
 import { StatusPicker } from "../components/StatusPicker";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
 import { AddIcon } from "../components/Icons";
 import { Button } from "../components/ui/Button";
@@ -19,8 +17,8 @@ import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
 import { SortableTh } from "../components/ui/SortableTh";
 
-// 「InActive も表示」の状態。ブラウザごとに覚える（カンバンの「クローズしたタスクも表示」と同じ扱い）。
-const SHOW_INACTIVE_KEY = "backlog.showInactive";
+// 「完了・クローズも表示」の状態。ブラウザごとに覚える（カンバンの「クローズしたタスクも表示」と同じ扱い）。
+const SHOW_FINISHED_KEY = "backlog.showFinished";
 
 // 列見出しのクリックで並べ替える列（ID 以外）。
 const SORT_COLUMNS = {
@@ -28,44 +26,39 @@ const SORT_COLUMNS = {
   start_date: (s) => s.start_date,
   due_date: (s) => s.due_date,
   status: (s) => STATUS_ORDER.indexOf(s.status),
-  state: (s) => (s.activated_at != null ? 0 : 1),
 } satisfies Record<string, (s: BacklogStory) => SortValue>;
 
-// Stories of one project: active ones and inactive ones (バックログ). Inactive ones are hidden by default.
-// Only name / period / status / state are shown; the description and the document (context) are read on the detail page.
+// Stories of one project, from planning (バックログ) to closed. Done / closed ones are hidden by default.
+// Only name / period / status are shown; the description and the document (context) are read on the detail page.
 // The project is picked in the global header or the toolbar's picker (/backlog?project=).
 export function BacklogView({
   stories,
   projectSelect,
   onAddBacklog,
-  onSetActive,
   onChangeStatus,
 }: {
   stories: BacklogStory[] | null;
   // The project picker, first in the toolbar.
   projectSelect?: ReactNode;
   onAddBacklog: (title: string, description: string | null) => Promise<void>;
-  onSetActive: (storyId: string, active: boolean) => void;
   // Picked from the status column's menu; applied at once (no confirmation).
   onChangeStatus: (storyId: string, status: Status) => void;
 }) {
   const [adding, setAdding] = useState(false);
-  const [pendingState, setPendingState] = useState<{ story: BacklogStory; active: boolean } | null>(null);
-  // ステータス・状態はドラッグで幅を変えられる。名前は残り幅を使う。
+  // ステータスはドラッグで幅を変えられる。名前は残り幅を使う。
   const status = useResizableWidth("backlog.statusWidth", 112, 72, 240, { invert: true });
-  const state = useResizableWidth("backlog.stateWidth", 96, 72, 240, { invert: true });
-  const [showInactive, setShowInactive] = useState(() => {
+  const [showFinished, setShowFinished] = useState(() => {
     try {
-      return localStorage.getItem(SHOW_INACTIVE_KEY) === "1";
+      return localStorage.getItem(SHOW_FINISHED_KEY) === "1";
     } catch {
       // Storage can be unavailable (private mode); fall back to hidden.
       return false;
     }
   });
-  const toggleShowInactive = (on: boolean) => {
-    setShowInactive(on);
+  const toggleShowFinished = (on: boolean) => {
+    setShowFinished(on);
     try {
-      localStorage.setItem(SHOW_INACTIVE_KEY, on ? "1" : "0");
+      localStorage.setItem(SHOW_FINISHED_KEY, on ? "1" : "0");
     } catch {
       // Ignore: the toggle still applies for this session.
     }
@@ -73,9 +66,9 @@ export function BacklogView({
 
   const visible = useMemo(() => {
     if (!stories) return null;
-    if (showInactive) return stories;
-    return stories.filter((s) => s.activated_at != null);
-  }, [stories, showInactive]);
+    if (showFinished) return stories;
+    return stories.filter((s) => !isFinished(s.status));
+  }, [stories, showFinished]);
   const { sorted, sort, toggle } = useTableSort(visible ?? [], SORT_COLUMNS);
 
   return (
@@ -91,7 +84,7 @@ export function BacklogView({
       />
       <Toolbar>
         {projectSelect}
-        <Switch checked={showInactive} onChange={toggleShowInactive} label="InActive も表示" />
+        <Switch checked={showFinished} onChange={toggleShowFinished} label="完了・クローズも表示" />
       </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
@@ -101,7 +94,7 @@ export function BacklogView({
           <div className="text-[13px] text-fg-muted">ストーリーがありません。「New Story」から登録してください。</div>
         ) : visible.length === 0 ? (
           <div className="text-[13px] text-fg-muted">
-            Active のストーリーはありません。InActive は「InActive も表示」で出せます。
+            完了・クローズ以外のストーリーはありません。完了・クローズは「完了・クローズも表示」で出せます。
           </div>
         ) : (
           <div className="overflow-hidden rounded-md border border-border bg-surface">
@@ -115,17 +108,13 @@ export function BacklogView({
                   <SortableTh label="ステータス" sortKey="status" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: status.width }}>
                     <ResizeHandle onMouseDown={status.startResize} side="left" />
                   </SortableTh>
-                  <SortableTh label="状態" sortKey="state" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: state.width }}>
-                    <ResizeHandle onMouseDown={state.startResize} side="left" />
-                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((s) => {
-                  const active = s.activated_at != null;
-                  // InActive はグレーアウト。opacity は tr ではなくステータス・状態以外のセルに付ける
+                  // 完了・クローズはグレーアウト。opacity は tr ではなくステータス以外のセルに付ける
                   // （tr に付けるとメニューが行の重なりに閉じ込められ、下の行に隠れる）。
-                  const dim = !active && "opacity-60";
+                  const dim = isFinished(s.status) && "opacity-60";
                   return (
                     <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
                       <td className={cn("px-3 py-2", dim)}>
@@ -146,10 +135,6 @@ export function BacklogView({
                         <StatusPicker status={s.status} statuses={STORY_STATUSES} onPick={(next) => onChangeStatus(s.id, next)} />
                         <ResizeHandle onMouseDown={status.startResize} side="left" />
                       </td>
-                      <td className="relative px-3 py-2">
-                        <EpicStateBadge active={active} onPick={(next) => setPendingState({ story: s, active: next })} />
-                        <ResizeHandle onMouseDown={state.startResize} side="left" />
-                      </td>
                     </tr>
                   );
                 })}
@@ -158,21 +143,6 @@ export function BacklogView({
           </div>
         )}
       </div>
-
-      {pendingState && (
-        <ConfirmDialog
-          message={
-            pendingState.active
-              ? `「${pendingState.story.title}」を Active にします。ストーリーとして着手した扱いになります。よろしいですか？`
-              : `「${pendingState.story.title}」を InActive にします。バックログに戻ります。よろしいですか？`
-          }
-          onConfirm={() => {
-            onSetActive(pendingState.story.id, pendingState.active);
-            setPendingState(null);
-          }}
-          onCancel={() => setPendingState(null)}
-        />
-      )}
 
       {adding && (
         <BacklogForm
@@ -201,7 +171,7 @@ function ResizeHandle({ onMouseDown, side }: { onMouseDown: (e: MouseEvent) => v
   );
 }
 
-// Name (required) and description. A new backlog item starts inactive; its context is written on the detail page.
+// Name (required) and description. A new backlog item starts as planning (計画中); its context is written on the detail page.
 function BacklogForm({
   onSubmit,
   onCancel,

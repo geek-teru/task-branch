@@ -28,7 +28,6 @@ export interface Task {
   sort_order: number;
   start_date: string | null; // extensibility: gantt / calendar
   due_date: string | null;
-  activated_at: string | null; // story only: null = backlog, set = active
   assignee_type: AssigneeType | null; // task only
   assignee_id: string | null; // task only: the human assignee
   assignee_client_id: string | null; // task only: the AI assignee (OAuth client_id). null = AI（未指定）
@@ -160,7 +159,7 @@ export interface StoryGroup {
 // A row of the backlog page (stories of a project, without the context document).
 export type BacklogStory = Pick<
   Task,
-  "id" | "title" | "description" | "status" | "activated_at" | "sort_order" | "start_date" | "due_date"
+  "id" | "title" | "description" | "status" | "sort_order" | "start_date" | "due_date"
 >;
 
 // Latest saved version of a story's context document (story_context_revisions).

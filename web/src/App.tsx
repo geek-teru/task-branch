@@ -21,7 +21,6 @@ import {
   getKanbanLanes,
   listBacklogStories,
   createBacklogStory,
-  setActive,
   getProjectGraph,
   listProjects,
   moveTask,
@@ -186,7 +185,7 @@ export default function App() {
     };
   }, [userId, backlogProjectId]);
 
-  // Add a backlog item (inactive story without a parent) to the selected project, then reload the list.
+  // Add a backlog item (planning story without a parent) to the selected project, then reload the list.
   const handleAddBacklog = useCallback(
     async (title: string, description: string | null) => {
       if (!backlogProjectId) return;
@@ -196,20 +195,6 @@ export default function App() {
       } catch (e: any) {
         setError(String(e.message ?? e));
         throw e;
-      }
-    },
-    [backlogProjectId]
-  );
-
-  // Activate / shelve a story from the backlog list, then reload it.
-  const handleSetStoryActive = useCallback(
-    async (storyId: string, active: boolean) => {
-      if (!backlogProjectId) return;
-      try {
-        await setActive(storyId, active);
-        setBacklog({ projectId: backlogProjectId, stories: await listBacklogStories(backlogProjectId) });
-      } catch (e: any) {
-        setError(String(e.message ?? e));
       }
     },
     [backlogProjectId]
@@ -821,7 +806,6 @@ export default function App() {
                       stories={backlog && backlog.projectId === backlogProjectId ? backlog.stories : null}
                       projectSelect={projectSelect(backlogProjectId)}
                       onAddBacklog={handleAddBacklog}
-                      onSetActive={handleSetStoryActive}
                       onChangeStatus={handleSetStoryStatus}
                     />
                   )}

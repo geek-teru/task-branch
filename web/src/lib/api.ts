@@ -82,7 +82,7 @@ export async function deleteProject(id: string): Promise<void> {
 // List queries use this; fetch context explicitly where it is needed.
 const TASK_LIST_COLUMNS =
   "id, project_id, parent_id, level, title, description, status, sort_order, start_date, due_date, " +
-  "activated_at, assignee_type, assignee_id, assignee_client_id, metadata, created_at, updated_at, completed_at, closed_at";
+  "assignee_type, assignee_id, assignee_client_id, metadata, created_at, updated_at, completed_at, closed_at";
 
 // Single normalized snapshot the views render (get_task_graph RPC).
 export async function getProjectGraph(projectId: string): Promise<ProjectGraph> {
@@ -106,11 +106,11 @@ export async function exportProject(projectId: string): Promise<unknown> {
   return data;
 }
 
-// Backlog page: stories of a project (active and inactive), without the context document.
+// Backlog page: stories of a project (every status), without the context document.
 export async function listBacklogStories(projectId: string): Promise<BacklogStory[]> {
   const { data, error } = await supabase
     .from("tasks")
-    .select("id, title, description, status, activated_at, sort_order, start_date, due_date")
+    .select("id, title, description, status, sort_order, start_date, due_date")
     .eq("project_id", projectId)
     .eq("level", "story")
     .order("sort_order", { ascending: true });
@@ -141,14 +141,14 @@ export async function listProjectEvents(
   return (data ?? []) as TaskEvent[];
 }
 
-// Backlog page: add a backlog item, i.e. a planning story (activated_at stays null).
+// Backlog page: add a backlog item, i.e. a story in 計画中 (planning).
 export async function createBacklogStory(projectId: string, title: string, description: string | null): Promise<void> {
   await addRootStory(projectId, { title, description, status: "planning", start_date: null, due_date: null });
 }
 
-// Create a story, appended after the project's other stories.
-// activated_at is set to now only when active is true (the kanban adds stories as started).
-export async function addRootStory(projectId: string, input: StoryInput, active = false): Promise<Task> {
+// Create a story, appended after the project's other stories. activated_at is not written (the
+// status tells whether it has started); the column is kept only for the old timeline events.
+export async function addRootStory(projectId: string, input: StoryInput): Promise<Task> {
   const { data: last, error: lastError } = await supabase
     .from("tasks")
     .select("sort_order")
@@ -164,7 +164,6 @@ export async function addRootStory(projectId: string, input: StoryInput, active 
       project_id: projectId,
       level: "story",
       sort_order: (last?.[0]?.sort_order ?? 0) + 1,
-      activated_at: active ? new Date().toISOString() : null,
     })
     .select()
     .single();
@@ -236,15 +235,6 @@ export async function updateStoryInfo(
   info: { title: string; description: string | null; start_date: string | null; due_date: string | null },
 ): Promise<void> {
   const { error } = await supabase.from("tasks").update(info).eq("id", storyId);
-  if (error) throw error;
-}
-
-// Activate a story (activated_at = now) or shelve it back to the backlog (null).
-export async function setActive(id: string, active: boolean): Promise<void> {
-  const { error } = await supabase
-    .from("tasks")
-    .update({ activated_at: active ? new Date().toISOString() : null })
-    .eq("id", id);
   if (error) throw error;
 }
 

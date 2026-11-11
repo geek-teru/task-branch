@@ -4,7 +4,6 @@ import {
   getLatestContextRevision,
   getStory,
   listStoryTasks,
-  setActive,
   updateStoryContext,
   updateStoryInfo,
 } from "../lib/api";
@@ -13,8 +12,6 @@ import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
 import { IdBadge } from "../components/IdBadge";
-import { EpicStateBadge } from "../components/EpicStateBadge";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Markdown } from "../components/Markdown";
 import { EditIcon } from "../components/Icons";
 import { Badge } from "../components/ui/Badge";
@@ -34,7 +31,7 @@ const SORT_COLUMNS = {
   period: (t) => (t.start_date || t.due_date ? [t.start_date, t.due_date] : null),
 } satisfies Record<string, (t: Task) => SortValue>;
 
-// Story detail: name / description, Active / InActive, the context document and the story's tasks.
+// Story detail: name / description, status, the context document and the story's tasks.
 // Loads its own data through the api layer (the story's context is only needed here).
 export function StoryDetailPage({
   storyId,
@@ -54,7 +51,6 @@ export function StoryDetailPage({
   const [draft, setDraft] = useState<string | null>(null); // non-null while editing
   const [saving, setSaving] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
-  const [pendingState, setPendingState] = useState<boolean | null>(null);
   const { sorted: sortedTasks, sort, toggle } = useTableSort(tasks, SORT_COLUMNS);
 
   const load = useCallback(async () => {
@@ -79,7 +75,6 @@ export function StoryDetailPage({
   if (story === null) return <div className="p-6 text-[13px] text-fg-muted">ストーリーが見つかりません。</div>;
 
   const project = projects.find((p) => p.id === story.project_id);
-  const active = story.activated_at != null;
   const editing = draft !== null;
   const dirty = editing && draft !== (story.context ?? "");
 
@@ -100,16 +95,6 @@ export function StoryDetailPage({
   const cancel = () => {
     if (dirty && !window.confirm("編集中の内容を破棄します。よろしいですか？")) return;
     setDraft(null);
-  };
-
-  const changeState = async (next: boolean) => {
-    try {
-      await setActive(story.id, next);
-      setPendingState(null);
-      await load();
-    } catch (err: any) {
-      onError(String(err.message ?? err));
-    }
   };
 
   // 名前・説明・期間の変更。コンテキストの編集とは別。
@@ -135,7 +120,6 @@ export function StoryDetailPage({
         meta={
           <>
             <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
-            <EpicStateBadge active={active} onPick={(next) => setPendingState(next)} />
             <span className="text-[11px]">{period(story)}</span>
             <IdBadge id={story.id} />
           </>
@@ -235,18 +219,6 @@ export function StoryDetailPage({
           )}
         </Card>
       </div>
-
-      {pendingState !== null && (
-        <ConfirmDialog
-          message={
-            pendingState
-              ? `「${story.title}」を Active にします。ストーリーとして着手した扱いになります。よろしいですか？`
-              : `「${story.title}」を InActive にします。バックログに戻ります。よろしいですか？`
-          }
-          onConfirm={() => changeState(pendingState)}
-          onCancel={() => setPendingState(null)}
-        />
-      )}
 
       {editingInfo && (
         <StoryInfoForm
