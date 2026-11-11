@@ -479,10 +479,9 @@
     <tr><td>OAuth 同意 - 各プロパティ値</td></tr>
     <tr><td class="sub-cat" rowspan="1">プロパティ名</td><td>OAuth 同意 - 各プロパティ名</td><td class="mono" rowspan="1">12px</td><td rowspan="1">400</td></tr>
     <tr><td class="sub-cat" rowspan="1">スコープ名</td><td>OAuth 同意 - スコープ名</td><td class="mono" rowspan="1">12px（等幅）</td><td rowspan="1">400</td></tr>
-    <tr><td class="cat" rowspan="10">共通部品<br><span class="sub">どの画面でも使う</span></td><td class="sub-cat" rowspan="2">ボタン</td><td>共通部品 - Button（sm / md）</td><td class="mono" rowspan="1">13px / 14px</td><td rowspan="1">500</td></tr>
+    <tr><td class="cat" rowspan="9">共通部品<br><span class="sub">どの画面でも使う</span></td><td class="sub-cat" rowspan="2">ボタン</td><td>共通部品 - Button（sm / md）</td><td class="mono" rowspan="1">13px / 14px</td><td rowspan="1">500</td></tr>
     <tr><td>ガント - 行のボタン</td><td class="mono" rowspan="1">11px</td><td rowspan="1">500</td></tr>
-    <tr><td class="sub-cat" rowspan="2">メニュー項目</td><td>共通部品 - DropdownMenu の項目</td><td class="mono" rowspan="2">13px</td><td rowspan="2">400</td></tr>
-    <tr><td>共通部品 - 状態の選択メニュー（Active / InActive）</td></tr>
+    <tr><td class="sub-cat" rowspan="1">メニュー項目</td><td>共通部品 - DropdownMenu の項目</td><td class="mono" rowspan="1">13px</td><td rowspan="1">400</td></tr>
     <tr><td class="sub-cat" rowspan="2">入力欄</td><td>共通部品 - Input・Select</td><td class="mono" rowspan="1">13px</td><td rowspan="1">400</td></tr>
     <tr><td>ストーリー詳細 - コンテキストの入力欄</td><td class="mono" rowspan="1">13px（等幅）</td><td rowspan="1">400</td></tr>
     <tr><td class="sub-cat" rowspan="2">バッジ</td><td>共通部品 - Badge（ステータス・状態）</td><td class="mono" rowspan="1">11px</td><td rowspan="1">400</td></tr>
@@ -648,7 +647,7 @@
   <thead><tr><th>バッジに出す情報</th><th>部品・tone</th><th>表記</th></tr></thead>
   <tbody>
     <tr><td>状態（planning / todo / in_progress / in_review / done / closed）</td><td><code>Badge tone={status}</code>（ステータスの色）</td><td>計画中 / 未着手 / 進行中 / レビュー中 / 完了 / クローズ</td></tr>
-    <tr><td>Active / InActive（プロジェクト・ストーリー）</td><td>Active は <code>brand</code>、InActive は <code>neutral</code>。切り替えられる場所は <code>EpicStateBadge</code></td><td>Active / InActive</td></tr>
+    <tr><td>Active / InActive（プロジェクト）</td><td>Active は <code>brand</code>、InActive は <code>neutral</code>。ストーリーには使わない（着手前はステータスの「計画中」で表す）</td><td>Active / InActive</td></tr>
     <tr><td>ID</td><td><code>IdBadge</code>（等幅・neutral。クリックで uuid 全体をコピー）</td><td>uuid の先頭8桁</td></tr>
     <tr><td>コメントの作成者</td><td>AI は <code>brand</code>、自分・人は <code>neutral</code></td><td>AI / 自分 / 人</td></tr>
   </tbody>
@@ -816,11 +815,11 @@
 <table>
   <thead><tr><th>決まり</th><th>内容</th></tr></thead>
   <tbody>
-    <tr><td>部品の使い分け</td><td>操作を並べるもの（…メニュー、ユーザーメニュー）と、バッジを押して値を変えるもの（ステータス、Active / InActive）は <code>DropdownMenu</code>。フォームとツールバーの選択欄は <code>Select</code>（閉じた状態は Input と同じ見た目・h-8）</td></tr>
+    <tr><td>部品の使い分け</td><td>操作を並べるもの（…メニュー、ユーザーメニュー）と、バッジを押して値を変えるもの（ステータス）は <code>DropdownMenu</code>。フォームとツールバーの選択欄は <code>Select</code>（閉じた状態は Input と同じ見た目・h-8）</td></tr>
     <tr><td>開いたリスト</td><td>白地・枠 <code>border-border</code>・角丸 <code>rounded-md</code>・<code>shadow-md</code>・上下 4px・最小幅 160px・最大高さ 320px（超えたらスクロール）。<code>position: fixed</code> で出すので、表や詳細パネルの中でも切れない。下に入らないときは上に開く</td></tr>
     <tr><td>項目</td><td>13px / 400・<code>px-3 py-1.5</code>。hover とキーボードで選んでいる項目は背景 <code>bg-surface-muted</code>。破壊的な操作は <code>danger</code>（文字だけ赤）。区切りは 1px の <code>bg-border</code></td></tr>
-    <tr><td>選択中の値</td><td>1つを選ぶリスト（Select、ステータス、Active / InActive、プロジェクトの切替）は、選択中の項目の左に緑のチェック（<code>CheckIcon</code>）を出す。チェックの無い項目も同じ幅を空けて、文字の頭をそろえる。太字にはしない</td></tr>
-    <tr><td>値の出し方</td><td>ステータスと Active / InActive は、閉じた状態も選択肢もバッジで出す</td></tr>
+    <tr><td>選択中の値</td><td>1つを選ぶリスト（Select、ステータス、プロジェクトの切替）は、選択中の項目の左に緑のチェック（<code>CheckIcon</code>）を出す。チェックの無い項目も同じ幅を空けて、文字の頭をそろえる。太字にはしない</td></tr>
+    <tr><td>値の出し方</td><td>ステータスは、閉じた状態も選択肢もバッジで出す</td></tr>
     <tr><td>開くしるし</td><td>リストが開くものは右に <code>ChevronDownIcon</code>（12px・<code>text-fg-muted</code>）。ヘッダーのプロジェクトの切替だけは、切り替える意味で <code>ChevronUpDownIcon</code>。…メニューはアイコン（<code>MoreIcon</code>）だけで、しるしは付けない。文字の ▾ ⇅ は使わない</td></tr>
     <tr><td>閉じ方・キーボード</td><td>外側のクリックと Escape で閉じる（ダイアログの中の Select では、Escape はリストだけを閉じる）。Select は ↑ ↓ Home End で動き、Enter / Space で選ぶ</td></tr>
   </tbody>

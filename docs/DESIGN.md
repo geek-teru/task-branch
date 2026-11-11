@@ -75,7 +75,7 @@ AI（Claude Code の `planning` スキル）が今後のタスクを洗い出し
 | 粒度                       | 1つのコンテキスト。1〜2週間（1スプリント）で完了させる                                                                                                       | 数時間                                                                                                        |
 | 役割                       | 課題・問題点・改善点などの**コンテキスト（要件）**を持ち、タスクを洗い出す元になる                                                                           | ストーリーをさらに細分化した作業                                                                              |
 | 作り方                     | 人が作るか、AI と壁打ちしながら作る。壁打ちの結論はドキュメント（`context`）に書く                                                                           | ストーリーから洗い出す                                                                                        |
-| 状態                       | 着手状態（`activated_at`。null ＝ バックログ）と、`todo` / `in_progress` / `done` / `closed`（`status`）の2つの軸を持つ。完了は `status` を手で動かす（§9 Q11）        | `todo` / `in_progress` / `done` / `closed` を手で動かす                                                       |
+| 状態                       | `planning` / `todo` / `in_progress` / `done` / `closed`（`status`）の1つの軸で表す。着手前（バックログ）は `planning`（計画中）。完了は `status` を手で動かす（§9 Q11） | `todo` / `in_progress` / `done` / `closed` を手で動かす                                                       |
 | 管理のしかた               | スプリントごとの振り返り、日々の進捗確認                                                                                                                      | 日々の進捗確認                                                                                                |
 | 情報の持ち方               | **短い説明**（`description`）＋ **ドキュメント**（`context`、Markdown。正の情報）。ドキュメントは更新履歴を持つ                                               | 短い説明（`description`）＋ コメント                                                                          |
 | 依存関係・クリティカルパス | 持たない（ストーリー間の順序は §9 Q2）                                                                                                                        | 前提タスク → 後続タスク。張れるのは**同じストーリー内のタスク間**だけ。クリティカルパスはストーリー内で求める |
@@ -200,7 +200,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | description   | text        |                               | 短い説明（一覧やカードに出す 1〜2 行）                                                                                                                                                                                                                                                                               |
 | context       | text        | null可                        | **story のみ**。ドキュメント（Markdown）。壁打ちの結論をまとめた**正の情報**。見出しの型：背景・課題／ゴール／スコープと非スコープ／方針／決定事項／未決事項。保存のたびにその版を `story_context_revisions` に残す（最新版も含む）                                                                                    |
 | status        | text        | not null, default 'todo'      | `planning` / `todo` / `in_progress` / `in_review` / `done` / `closed`（作業の進み具合）。`planning`（計画中）はバックログに置いていて、まだ着手の予定に入れていない状態で、**story のみ**（タスクには入れない。CHECK `tasks_planning_story_only`）。バックログ画面から足したストーリーは `planning` で作る。未完了として扱う。`in_review` は PR を出して人のレビューを待っている状態で、**task のみ**（ストーリーには入れない。CHECK `tasks_in_review_task_only`）。未完了として扱う。`done` は終わったが未承認（カンバンに残し、デイリースクラムで報告する）、`closed` は承認を得て管理から外したもの（カンバンの列には出さず、トグルでのみ表示）。進捗では `done` と `closed` をどちらも完了として数える |
-| activated_at  | timestamptz | null可                        | **story のみ**。null ＝ バックログ、日時あり ＝ 着手済み。着手した日時を兼ねる。進み具合の `status` とは別の軸なので列を分ける                                                                                                     |
+| activated_at  | timestamptz | null可                        | **story のみ**。旧 Active / InActive（null ＝ バックログ、日時あり ＝ 着手済み）。画面は読まない・書かない（着手前はステータスの `planning` で表す）。過去の `activated` / `deactivated` の操作履歴のために列と記録トリガは残す                                                                                                     |
 | assignee_type | text        | null可                        | **task のみ**。`human`（人）/ `ai`（AI）。既定値は §9                                                                                                                                                                                                                                                                |
 | assignee_id   | uuid        | null可                        | **task のみ**。人が担当する場合の担当者（ユーザー）                                                                                                                                                                                                                                                                  |
 | assignee_client_id | text    | null可                        | **task のみ**。AI が担当する場合のエージェント（OAuth の `client_id`）。`assignee_type = 'ai'` のときだけ値を持てる。接続を解除しても担当を残すので FK は付けない。null は AI（未指定） |
@@ -716,7 +716,7 @@ create policy avatars_insert on storage.objects
 ### 5.1 画面構成
 
 - **プロジェクト選択** → **ボード**（メイン）
-- **バックログ**: プロジェクトのストーリーの一覧（Active / InActive）。並び順（`sort_order`）＝優先順位。ここから Active にして着手する。
+- **バックログ**: プロジェクトのストーリーの一覧（名前・期間・ステータス）。並び順（`sort_order`）＝優先順位。既定では完了・クローズを隠す（「完了・クローズも表示」で出す）。ここから足したストーリーは計画中で作り、ステータスを進行中にすると着手する。
 - カンバンには `status` が `in_progress` のストーリーを出す（§9 Q11）。ガントチャートはプロジェクトのストーリーとその配下のタスクを出す。
 - **設定**（`/settings`）: 左の項目ごとに URL を分ける。`/settings/profile` は表示名とアイコン、`/settings/agents` は MCP で接続中の AI エージェントの一覧と接続の解除（§7.1）。
 - ビュー切替:
@@ -1108,7 +1108,7 @@ AI がタスクに着手し、終えたら作業結果を残す。PR を作る�
 | Q8  | 人の作業待ちの知らせ方 | 次に着手できるのが人の担当タスクだけになったとき、どう知らせるか                                                     |
 | Q9  | 担当者（人）の範囲     | 自分専用か、チームで共有するか。ユーザー登録・RLS の設計に影響                                                       |
 | Q10 | 前提待ちの見せ方       | 前提が未完了の task に印（鍵アイコン等）を付けるか                                                                   |
-| Q11 | ストーリーの見せ方・完了 | **決定**: カンバンには `status` が `in_progress` のストーリーを出す（`activated_at` はバックログの軸のまま）。完了は `status` を手で動かす（配下 100% での自動化はしない）。カンバンから追加したストーリーは `activated_at` を入れて着手済みにする |
+| Q11 | ストーリーの見せ方・完了 | **決定**: カンバンには `status` が `in_progress` のストーリーを出す。完了は `status` を手で動かす（配下 100% での自動化はしない）。着手前は `planning`（計画中）で表し、`activated_at` は画面から読み書きしない（旧 Active / InActive。過去の履歴のために列だけ残す） |
 
 ---
 
