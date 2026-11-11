@@ -1,25 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getTaskNode, listBacklogStories, listProjectEvents, TIMELINE_PAGE_SIZE, updateTaskStatus } from "../lib/api";
-import type { Assignees, BacklogStory, EventType, Status, Task, TaskEvent } from "../lib/types";
+import type { Assignees, BacklogStory, Status, Task, TaskEvent } from "../lib/types";
 import { DetailPanel } from "../components/DetailPanel";
 import { TimelinePost } from "../components/TimelinePost";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Select } from "../components/ui/Select";
 import { Toolbar } from "../components/ui/Toolbar";
 
-// Filter checkboxes: 着手 and 棚上げ share one box.
-const TYPE_FILTERS: { key: string; label: string; types: EventType[] }[] = [
-  { key: "created", label: "作成", types: ["created"] },
-  { key: "status_changed", label: "ステータス変更", types: ["status_changed"] },
-  { key: "activation", label: "着手・棚上げ", types: ["activated", "deactivated"] },
-  { key: "commented", label: "コメント", types: ["commented"] },
-  { key: "context_updated", label: "コンテキスト更新", types: ["context_updated"] },
-];
-const ALL_TYPES = TYPE_FILTERS.flatMap((f) => f.types);
 const ALL_STORIES = "all";
-const ALL_ACTORS = "all";
-type Actor = "human" | "ai";
 
 // Events of one project as a single-column feed, newest first. Read 50 at a time: when the end of
 // the feed scrolls into view, the oldest occurred_at shown is passed as the next cursor.
@@ -41,17 +30,10 @@ export function TimelineView({
   const [error, setError] = useState<string | null>(null);
   const [stories, setStories] = useState<BacklogStory[]>([]);
 
-  // Filters live in the URL: ?story=<id>&types=created,commented (no types = all).
+  // The only filter is the story, kept in the URL as ?story=<id>. The RPC still takes actor / types
+  // (for MCP), but the screen does not offer them, so old ?actor= / ?types= links are ignored.
   const [searchParams, setSearchParams] = useSearchParams();
   const story = searchParams.get("story");
-  const typesParam = searchParams.get("types");
-  const types = useMemo(() => {
-    const picked = (typesParam ?? "").split(",").filter((t): t is EventType => (ALL_TYPES as string[]).includes(t));
-    return picked.length > 0 && picked.length < ALL_TYPES.length ? picked : null;
-  }, [typesParam]);
-  const typesKey = types?.join(",") ?? "";
-  const actorParam = searchParams.get("actor");
-  const actor: Actor | null = actorParam === "human" || actorParam === "ai" ? actorParam : null;
 
   // The open story / task lives in ?task= so a reload keeps the panel. Saving a change re-reads the
   // feed from the top (reloadKey) and the panel's own node.
@@ -65,19 +47,11 @@ export function TimelineView({
     setSearchParams(next);
   };
 
-  const updateFilter = (patch: { story?: string | null; types?: EventType[] | null; actor?: Actor | null }) => {
+  const updateFilter = (patch: { story?: string | null }) => {
     const next = new URLSearchParams(searchParams);
     if ("story" in patch) {
       if (patch.story) next.set("story", patch.story);
       else next.delete("story");
-    }
-    if ("actor" in patch) {
-      if (patch.actor) next.set("actor", patch.actor);
-      else next.delete("actor");
-    }
-    if ("types" in patch) {
-      if (patch.types && patch.types.length > 0 && patch.types.length < ALL_TYPES.length) next.set("types", patch.types.join(","));
-      else next.delete("types");
     }
     setSearchParams(next);
   };
@@ -96,7 +70,7 @@ export function TimelineView({
     let cancelled = false;
     setEvents(null);
     setError(null);
-    listProjectEvents(projectId, null, { story, actor, types: typesKey ? (typesKey.split(",") as EventType[]) : null })
+    listProjectEvents(projectId, null, { story })
       .then((rows) => {
         if (cancelled) return;
         setEvents(rows);
@@ -106,7 +80,7 @@ export function TimelineView({
     return () => {
       cancelled = true;
     };
-  }, [projectId, story, actor, typesKey, reloadKey]);
+  }, [projectId, story, reloadKey]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -136,11 +110,7 @@ export function TimelineView({
     if (!events?.length) return;
     setLoadingMore(true);
     try {
-      const rows = await listProjectEvents(projectId, events[events.length - 1].occurred_at, {
-        story,
-        actor,
-        types: typesKey ? (typesKey.split(",") as EventType[]) : null,
-      });
+      const rows = await listProjectEvents(projectId, events[events.length - 1].occurred_at, { story });
       setEvents((prev) => [...(prev ?? []), ...rows]);
       setHasMore(rows.length >= TIMELINE_PAGE_SIZE);
     } catch (e) {
@@ -149,7 +119,7 @@ export function TimelineView({
     } finally {
       setLoadingMore(false);
     }
-  }, [events, projectId, story, actor, typesKey]);
+  }, [events, projectId, story]);
 
   // Infinite scroll: read the next page when the sentinel after the last post comes into view
   // (a little early, so the feed keeps going while scrolling).
@@ -180,37 +150,6 @@ export function TimelineView({
             ...stories.map((s) => ({ value: s.id, label: s.title })),
           ]}
         />
-        <Select
-          className="w-32"
-          aria-label="操作者で絞り込む"
-          value={actor ?? ALL_ACTORS}
-          onChange={(v) => updateFilter({ actor: v === "human" || v === "ai" ? v : null })}
-          options={[
-            { value: ALL_ACTORS, label: "すべての操作者" },
-            { value: "human", label: "人" },
-            { value: "ai", label: "AI" },
-          ]}
-        />
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" role="group" aria-label="種別で絞り込む">
-          {TYPE_FILTERS.map((f) => {
-            const checked = !types || f.types.every((t) => types.includes(t));
-            return (
-              <label key={f.key} className="inline-flex cursor-pointer items-center gap-1.5 text-fg">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => {
-                    const current = types ?? ALL_TYPES;
-                    const next = checked ? current.filter((t) => !f.types.includes(t)) : [...current, ...f.types];
-                    // Unchecking the last box would show nothing; treat it as "all" instead.
-                    updateFilter({ types: next });
-                  }}
-                />
-                {f.label}
-              </label>
-            );
-          })}
-        </div>
       </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
