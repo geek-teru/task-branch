@@ -36,12 +36,13 @@ const isDate =(v: string | null): v is string => v != null && /^\d{4}-\d{2}-\d{2
 // ストーリー作成・タスク作成・タスク完了の件数を日 / 週ごとに集計して出す（RPC project_activity_counts）。
 // 粒度と期間は URL（?bucket= / ?weeks= / ?from= / ?to=）に持つ。from / to が無ければ ?weeks=4 / 12 で「直近 N 週」、
 // どれも無ければ「直近 1 か月」。粒度は ?bucket=week で週、無ければ日。
+// projectId が null なら、見えるすべてのプロジェクトを合わせて数える（?project=all）。
 export function PerformanceView({
   projectId,
   projectSelect,
   onError,
 }: {
-  projectId: string;
+  projectId: string | null;
   projectSelect?: ReactNode;
   onError: (message: string) => void;
 }) {
@@ -62,7 +63,7 @@ export function PerformanceView({
         : { from: addDays(today, -(range === "4w" ? 4 : 12) * 7 + 1), to: today };
 
   const [rows, setRows] = useState<{ key: string; counts: ActivityCount[] } | null>(null);
-  const key = `${projectId}|${bucket}|${from}|${to}`;
+  const key = `${projectId ?? "all"}|${bucket}|${from}|${to}`;
   useEffect(() => {
     if (from > to) return;
     let cancelled = false;

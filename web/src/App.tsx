@@ -156,8 +156,13 @@ export default function App() {
   const kanbanProjectId = isKanban ? searchParams.get("project") ?? selectedId : null;
   // Timeline: ?project=, defaulting as the Gantt does.
   const timelineProjectId = isTimeline ? searchParams.get("project") ?? defaultProjectId : undefined;
-  // Performance: ?project=, defaulting as the Gantt does.
-  const performanceProjectId = isPerformance ? searchParams.get("project") ?? defaultProjectId : undefined;
+  // Performance: ?project=, defaulting as the Gantt does; ?project=all (null) adds up every project.
+  const performanceProjectParam = isPerformance ? searchParams.get("project") : null;
+  const performanceProjectId = isPerformance
+    ? performanceProjectParam === "all"
+      ? null
+      : performanceProjectParam ?? defaultProjectId
+    : undefined;
 
   // A project named in the URL becomes the selection, so the next page opens on it too.
   const urlProjectId =
@@ -630,17 +635,18 @@ export default function App() {
     else if (projectMatch) navigate(`/projects/${id}`);
     else navigate(`/backlog?project=${id}`);
   };
-  // Clears the selection: the Kanban then shows every project; other pages go to the project list.
+  // Clears the selection: the Kanban and the performance page then show every project; other pages
+  // go to the project list.
   const handleSelectAllProjects = () => {
     selectProject(null);
-    navigate(isKanban ? "/kanban" : "/projects");
+    navigate(isKanban ? "/kanban" : isPerformance ? "/performance?project=all" : "/projects");
   };
   // The toolbar's picker works on the same selection as the header's switcher.
   const projectSelect = (value: string | null | undefined) => (
     <ProjectSelect
       projects={projects}
       value={value ?? null}
-      allowAll={isKanban}
+      allowAll={isKanban || isPerformance}
       onChange={(id) => (id ? handleHeaderSelectProject(id) : handleSelectAllProjects())}
     />
   );
@@ -687,7 +693,7 @@ export default function App() {
       <GlobalHeader
         projects={projects}
         currentProjectId={headerProjectId ?? null}
-        allProjectsLabel={isKanban ? "すべてのプロジェクト" : undefined}
+        allProjectsLabel={isKanban || isPerformance ? "すべてのプロジェクト" : undefined}
         onSelectProject={handleHeaderSelectProject}
         onSelectAllProjects={handleSelectAllProjects}
         pageTitle={isSettings ? "設定" : undefined}
@@ -786,11 +792,11 @@ export default function App() {
                     <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
                   ) : projects.length === 0 ? (
                     <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
-                  ) : !projects.some((p) => p.id === performanceProjectId) ? (
+                  ) : performanceProjectId !== null && !projects.some((p) => p.id === performanceProjectId) ? (
                     <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
                   ) : (
                     <PerformanceView
-                      projectId={performanceProjectId!}
+                      projectId={performanceProjectId ?? null}
                       projectSelect={projectSelect(performanceProjectId)}
                       onError={setError}
                     />

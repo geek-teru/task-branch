@@ -5,7 +5,7 @@ import { Select, type SelectOption } from "./ui/Select";
 const ALL = "";
 
 // First part of the toolbar on the backlog / Gantt / Kanban. Works on the same selection as the
-// header's switcher. Only the Kanban passes allowAll (null = all projects).
+// header's switcher. The Kanban and the performance page pass allowAll (null = all projects).
 export function ProjectSelect({
   projects,
   value,
