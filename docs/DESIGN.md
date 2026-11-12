@@ -331,6 +331,33 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 - アイコン画像は Supabase Storage の公開バケット `avatars` に `<uid>/<ランダム>.<拡張子>` で置く（2MB まで、png / jpeg / webp）。公開にするのは `<img>` で署名付き URL を作らずに出すため（アイコンは秘密ではない）。
 - `0020_profiles.sql` で入れた。
 
+#### usage_events
+
+AI エージェントの使用量（トークン・費用）。API 応答 1 件 = 1 行。集め方は [usage-collection.md](usage-collection.md)（Claude Code のフック＋transcript）。
+
+| カラム                      | 型            | 制約                                                        | 説明                                                                                   |
+| --------------------------- | ------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| id                          | uuid          | PK, default gen_random_uuid()                               |                                                                                        |
+| owner_id                    | uuid          | FK→auth.users.id, not null, default current_owner_id(), on delete cascade | 持ち主（人）。AI が送っても持ち主の人                                    |
+| project_id                  | uuid          | FK→projects.id, null可, on delete cascade                   | ひも付けたタスクのプロジェクト（タスクから埋める）                                     |
+| task_id                     | uuid          | FK→tasks.id, null可, on delete set null                     | ひも付けたタスク。区間の外・見えないタスクは null                                      |
+| client_id                   | text          | null可, default current_actor_client_id()                  | 送ったエージェント（OAuth の client_id）。人の JWT で送ったら null                     |
+| source                      | text          | not null, check in ('claude_code_transcript','otel')        | 取り方                                                                                 |
+| session_id                  | text          | not null                                                    | Claude Code のセッション                                                               |
+| request_key                 | text          | not null, UNIQUE(owner_id, request_key)                     | 応答の一意キー（transcript の message.id、OTel の request_id）                         |
+| model                       | text          | not null                                                    |                                                                                        |
+| is_subagent                 | boolean       | not null, default false                                     | サブエージェントの応答か                                                               |
+| input_tokens ほか 3 列      | bigint        | not null, default 0, check >= 0                             | input / output / cache_read_input / cache_creation_input                               |
+| cost_usd                    | numeric(14,8) | null可, check >= 0                                          | 応答ごとの費用。transcript ではセッションの費用を按分した値。分からなければ null       |
+| occurred_at                 | timestamptz   | not null                                                    | 応答の日時                                                                             |
+| created_at                  | timestamptz   | not null, default now()                                     | 記録した日時                                                                           |
+
+- check (task_id is null or project_id is not null)。インデックス：(owner_id, occurred_at desc)、(project_id, occurred_at desc)、(task_id)。
+- 書き込みは RPC `record_usage_events()`（§4.2）だけ。同じ応答を何度送っても 1 行（Stop と SessionEnd の両方から送れる）。先に費用なしで入った行は、あとで費用付きで送ると cost_usd だけ埋まる。
+- タスクへのひも付けは送り手が決める（MCP の `start_task` 〜 `request_task_review` / `complete_task` の区間）。DB は持ち主のプロジェクトのタスクだけを受け付け、それ以外は task_id を null にして記録する（使用量は落とさない）。
+- 費用の按分: transcript には応答ごとの費用が無いので、送り手が `cost-state` のモデルごとの `costUSD` を、そのモデルの応答にトークンの重み（入力 1・出力 5・キャッシュ読み 0.1・キャッシュ作成 1.25）で按分する。単価表は持たない。
+- ゲストは記録できない。`0035_usage_events.sql` で入れた。
+
 ### 3.3 派生概念（計算で導出）
 
 いずれも依存から導出する。依存のデータの持ち方は未設計で、実装時に設計する（§1.2）。
@@ -632,6 +659,18 @@ create policy profiles_update on profiles
   with check (user_id = auth.uid() and current_actor_type() = 'human');
 ```
 
+##### usage_events
+
+持ち主（`owner_id = current_owner_id()`）だけが読める。insert / update / delete のポリシーは作らない。書き込みは `record_usage_events()`（security definer）だけが行う。
+
+```sql
+alter table usage_events enable row level security;
+
+create policy usage_events_select on usage_events
+  for select to authenticated
+  using (owner_id = current_owner_id());
+```
+
 ##### storage.objects（avatars バケット）
 
 自分の uid のフォルダにだけ、人だけが置ける・差し替えられる・消せる。公開バケットなので画像の取得（公開 URL）はポリシーに依らない。select は Storage の削除・差し替えが対象の行を読むために要るので、自分のフォルダだけ読めるようにする。
@@ -687,6 +726,7 @@ create policy avatars_insert on storage.objects
 | `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int, actor text)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を、`actor`（`human` / `ai`。それ以外は例外）で actor_type を絞る。task_title / story_title / actor_id / actor_client_id / comment_excerpt（本文の先頭 80 文字）/ comment_body（本文の全文。コメントが消えていたらどちらも null）込み。security invoker（`0026_task_events_rpc.sql`、`0030_task_events_actor_client.sql`） |
 | `project_activity_counts(project uuid, bucket text, from_date date, to_date date)` | パフォーマンス | `bucket`（`day` / `week`＝月曜始まり、Asia/Tokyo）ごとに stories_created / tasks_created / tasks_done を返す。空の区間も 0。`project` が null なら、呼び出したユーザーが見えるすべてのプロジェクト（RLS の範囲。アーカイブ済みも含む。カンバンの「すべてのプロジェクト」と同じ）を合わせて数える（画面は `?project=all`）。security invoker（`0026_task_events_rpc.sql`、`0033_activity_counts_all_projects.sql`） |
 
+| `record_usage_events(events jsonb)` | 使用量 | API 応答ごとの使用量（配列。1 回 500 件まで）を usage_events に記録し `{inserted, updated, skipped}` を返す。必須は session_id / request_key / model / occurred_at。持ち主は `current_owner_id()`、task_id は持ち主のプロジェクトのタスクだけ受け付け（それ以外は null）、project_id はタスクから埋める。同じ (owner_id, request_key) は、cost_usd が null で新しい値があるときだけ埋め（updated）、ほかは skipped。呼び出し内の重複は先頭だけ使う。JWT が無い・ゲストは例外。security definer、execute は authenticated のみ（`0035_usage_events.sql`） |
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
 - AI・UI が同じ RPC を使い、計算結果を一致させる。
 
