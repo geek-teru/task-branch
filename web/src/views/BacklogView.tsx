@@ -88,60 +88,62 @@ export function BacklogView({
       </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
-        {!visible ? (
-          <div className="text-[13px] text-fg-muted">読み込み中…</div>
-        ) : stories!.length === 0 ? (
-          <div className="text-[13px] text-fg-muted">ストーリーがありません。「New Story」から登録してください。</div>
-        ) : visible.length === 0 ? (
-          <div className="text-[13px] text-fg-muted">
-            完了・クローズ以外のストーリーはありません。完了・クローズは「完了・クローズも表示」で出せます。
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-border bg-surface">
-            <table className="w-full table-fixed border-collapse text-[13px]">
-              <thead>
-                <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
-                  <th className="w-24 px-3 py-2 font-medium">ID</th>
-                  <SortableTh label="名前" sortKey="title" sort={sort} onSort={toggle} className="px-3 py-2" />
-                  <SortableTh label="開始日" sortKey="start_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
-                  <SortableTh label="期限" sortKey="due_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
-                  <SortableTh label="ステータス" sortKey="status" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: status.width }}>
-                    <ResizeHandle onMouseDown={status.startResize} side="left" />
-                  </SortableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((s) => {
-                  // 完了・クローズはグレーアウト。opacity は tr ではなくステータス以外のセルに付ける
-                  // （tr に付けるとメニューが行の重なりに閉じ込められ、下の行に隠れる）。
-                  const dim = isFinished(s.status) && "opacity-60";
-                  return (
-                    <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
-                      <td className={cn("px-3 py-2", dim)}>
-                        <IdBadge id={s.id} />
-                      </td>
-                      <td className={cn("truncate px-3 py-2", dim)}>
-                        <Link
-                          to={`/stories/${s.id}`}
-                          data-tooltip="詳細を開く"
-                          className="font-medium text-fg no-underline hover:underline"
-                        >
-                          {s.title}
-                        </Link>
-                      </td>
-                      <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.start_date ?? "—"}</td>
-                      <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.due_date ?? "—"}</td>
-                      <td className="relative px-3 py-2">
-                        <StatusPicker status={s.status} statuses={STORY_STATUSES} onPick={(next) => onChangeStatus(s.id, next)} />
-                        <ResizeHandle onMouseDown={status.startResize} side="left" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="max-w-[960px]">
+          {!visible ? (
+            <div className="text-[13px] text-fg-muted">読み込み中…</div>
+          ) : stories!.length === 0 ? (
+            <div className="text-[13px] text-fg-muted">ストーリーがありません。「New Story」から登録してください。</div>
+          ) : visible.length === 0 ? (
+            <div className="text-[13px] text-fg-muted">
+              完了・クローズ以外のストーリーはありません。完了・クローズは「完了・クローズも表示」で出せます。
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-md border border-border bg-surface">
+              <table className="w-full table-fixed border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
+                    <th className="w-24 px-3 py-2 font-medium">ID</th>
+                    <SortableTh label="名前" sortKey="title" sort={sort} onSort={toggle} className="px-3 py-2" />
+                    <SortableTh label="開始日" sortKey="start_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
+                    <SortableTh label="期限" sortKey="due_date" sort={sort} onSort={toggle} className="w-28 px-3 py-2" />
+                    <SortableTh label="ステータス" sortKey="status" sort={sort} onSort={toggle} className="relative px-3 py-2" style={{ width: status.width }}>
+                      <ResizeHandle onMouseDown={status.startResize} side="left" />
+                    </SortableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((s) => {
+                    // 完了・クローズはグレーアウト。opacity は tr ではなくステータス以外のセルに付ける
+                    // （tr に付けるとメニューが行の重なりに閉じ込められ、下の行に隠れる）。
+                    const dim = isFinished(s.status) && "opacity-60";
+                    return (
+                      <tr key={s.id} className="h-10 border-b border-border transition-colors last:border-b-0 hover:bg-surface-muted">
+                        <td className={cn("px-3 py-2", dim)}>
+                          <IdBadge id={s.id} />
+                        </td>
+                        <td className={cn("truncate px-3 py-2", dim)}>
+                          <Link
+                            to={`/stories/${s.id}`}
+                            data-tooltip="詳細を開く"
+                            className="font-medium text-fg no-underline hover:underline"
+                          >
+                            {s.title}
+                          </Link>
+                        </td>
+                        <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.start_date ?? "—"}</td>
+                        <td className={cn("whitespace-nowrap px-3 py-2 text-fg-muted", dim)}>{s.due_date ?? "—"}</td>
+                        <td className="relative px-3 py-2">
+                          <StatusPicker status={s.status} statuses={STORY_STATUSES} onPick={(next) => onChangeStatus(s.id, next)} />
+                          <ResizeHandle onMouseDown={status.startResize} side="left" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {adding && (
