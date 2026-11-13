@@ -11,6 +11,7 @@ import type { ContextRevision, Project, Task } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
+import { AttachmentTextarea } from "../components/AttachmentTextarea";
 import { IdBadge } from "../components/IdBadge";
 import { Markdown } from "../components/Markdown";
 import { EditIcon } from "../components/Icons";
@@ -51,6 +52,7 @@ export function StoryDetailPage({
   const [draft, setDraft] = useState<string | null>(null); // non-null while editing
   const [saving, setSaving] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
+  const [uploading, setUploading] = useState(false); // images being attached to the context
   const { sorted: sortedTasks, sort, toggle } = useTableSort(tasks, SORT_COLUMNS);
 
   const load = useCallback(async () => {
@@ -79,7 +81,7 @@ export function StoryDetailPage({
   const dirty = editing && draft !== (story.context ?? "");
 
   const save = async () => {
-    if (draft === null) return;
+    if (draft === null || uploading) return;
     setSaving(true);
     try {
       await updateStoryContext(story.id, draft.trim() === "" ? null : draft);
@@ -149,7 +151,7 @@ export function StoryDetailPage({
                 <Button size="sm" onClick={cancel} disabled={saving}>
                   キャンセル
                 </Button>
-                <Button size="sm" variant="primary" onClick={save} disabled={saving || !dirty}>
+                <Button size="sm" variant="primary" onClick={save} disabled={saving || uploading || !dirty}>
                   {saving ? "保存中…" : "保存"}
                 </Button>
               </>
@@ -161,10 +163,13 @@ export function StoryDetailPage({
           </CardHeader>
           <div className="px-5 py-4 text-sm">
             {editing ? (
-              <Textarea
+              <AttachmentTextarea
                 autoFocus
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={setDraft}
+                projectId={story.project_id}
+                taskId={story.id}
+                onUploadingChange={setUploading}
                 rows={20}
                 placeholder={"## 背景・課題\n\n## ゴール\n\n## スコープと非スコープ\n\n## 方針\n\n## 決定事項\n\n## 未決事項"}
                 // ! beats fieldClass's font-sans (cn does not resolve conflicting utilities).

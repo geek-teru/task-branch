@@ -175,7 +175,7 @@ export function DetailPanel<T extends DetailNode>({
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
         <Field label="クローズ日時">{node?.closed_at ? fmtDateTime(node.closed_at) : DASH}</Field>
         {node?.level === "task" && (
-          <TaskComments taskId={node.id} assignees={assignees ?? NO_ASSIGNEES} refreshKey={commentsVersion} />
+          <TaskComments taskId={node.id} projectId={node.project_id} assignees={assignees ?? NO_ASSIGNEES} refreshKey={commentsVersion} />
         )}
       </div>
 

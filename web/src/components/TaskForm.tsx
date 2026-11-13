@@ -2,17 +2,18 @@ import { useState } from "react";
 import type { Assignees, Status, StoryInput } from "../lib/types";
 import { STATUS_LABEL, STORY_STATUSES, assigneeFields, assigneeKey, assigneeOf } from "../lib/types";
 import { UNASSIGNED, assigneeSelectOptions } from "./AssigneeLabel";
+import { AttachmentTextarea } from "./AttachmentTextarea";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
 import { Dialog } from "./ui/Dialog";
 import { Input } from "./ui/Input";
 import { Select } from "./ui/Select";
-import { Textarea } from "./ui/Textarea";
 
 const fieldLabel = "mb-1.5 block text-xs text-fg-muted";
 
 // Modal form to create or edit a story or task (title / status / dates / description, and the
-// assignee when assignees is given).
+// assignee when assignees is given). attachTo turns on image attachments in the description; it is
+// only given when editing a task, since a new one has no id to attach to yet.
 export function TaskForm({
   heading,
   noun = "ストーリー",
@@ -21,6 +22,7 @@ export function TaskForm({
   todoHint,
   statuses = STORY_STATUSES,
   assignees,
+  attachTo,
   onSubmit,
   onCancel,
 }: {
@@ -31,6 +33,7 @@ export function TaskForm({
   todoHint?: string; // shown under the status select while 未着手 is picked
   statuses?: Status[]; // status choices; tasks pass TASK_STATUSES (in_review is task-only)
   assignees?: Assignees; // tasks only: shows the 担当者 select with these candidates
+  attachTo?: { projectId: string; taskId: string };
   onSubmit: (values: StoryInput) => void;
   onCancel: () => void;
 }) {
@@ -41,10 +44,11 @@ export function TaskForm({
   const [description, setDescription] = useState(initial.description ?? "");
   const initialAssignee = assigneeKey(initial) ?? UNASSIGNED;
   const [assignee, setAssignee] = useState(initialAssignee);
+  const [uploading, setUploading] = useState(false);
   const trimmedTitle = title.trim();
 
   const handleSubmit = () => {
-    if (!trimmedTitle) return;
+    if (!trimmedTitle || uploading) return;
     const d = description.trim();
     onSubmit({
       title: trimmedTitle,
@@ -65,7 +69,7 @@ export function TaskForm({
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={!trimmedTitle}>
+          <Button variant="primary" onClick={handleSubmit} disabled={!trimmedTitle || uploading}>
             {submitLabel}
           </Button>
         </>
@@ -115,9 +119,12 @@ export function TaskForm({
       </div>
 
       <label className={`${fieldLabel} mt-3.5`}>詳細（任意）</label>
-      <Textarea
+      <AttachmentTextarea
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
+        onChange={setDescription}
+        projectId={attachTo?.projectId}
+        taskId={attachTo?.taskId}
+        onUploadingChange={setUploading}
         rows={3}
         placeholder={`${noun}の説明`}
       />

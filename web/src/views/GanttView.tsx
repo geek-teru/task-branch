@@ -765,6 +765,11 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
           assignees={
             form.mode === "create-task" || (form.mode === "edit" && form.node.level === "task") ? assignees : undefined
           }
+          attachTo={
+            form.mode === "edit" && form.node.level === "task"
+              ? { projectId: form.node.project_id, taskId: form.node.id }
+              : undefined
+          }
           onSubmit={submitForm}
           onCancel={() => setForm(null)}
         />

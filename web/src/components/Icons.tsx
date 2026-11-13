@@ -210,6 +210,15 @@ export function CommentIcon(p: IconProps) {
   );
 }
 
+// Attach (画像を添付): a paper clip.
+export function AttachIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M13 7.5l-5.3 5.3a3.2 3.2 0 0 1-4.5-4.5l5.6-5.6a2.1 2.1 0 0 1 3 3L6.2 11.3a1.1 1.1 0 0 1-1.5-1.5L10 4.5" />
+    </Icon>
+  );
+}
+
 // Search: a magnifier.
 // Opens a dropdown (Select, status / state pickers).
 export function ChevronDownIcon(p: IconProps) {
