@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Claude Code の transcript（セッションの JSONL）から、トークンの使用量をタスクごとに集計する（検証用の試作）。
 
-使い方: python3 scripts/usage-from-transcript.py <transcript.jsonl>
+使い方: python3 scripts/usage-from-transcript.py [--events] <transcript.jsonl>
+  - --events を付けると、タスクごとの集計の代わりに、API 応答 1 件 = 1 要素の配列を出す。
+    そのまま task-branch の RPC record_usage_events(events) に渡せる形（supabase/migrations/0035_usage_events.sql）
   - transcript は ~/.claude/projects/<作業ディレクトリ>/<session_id>.jsonl
     （フックの入力の transcript_path でも渡される）
   - サブエージェントの分は <session_id>/subagents/agent-*.jsonl にあり、これも読む
@@ -15,6 +17,9 @@
     区間の外の使用量は task_id = null に入れる
   - 費用（USD）は transcript の行ごとには無い。セッションの合計だけ、終了時に書かれる
     cost-state 行（totalCostUSD / modelUsage）から取る
+  - --events の cost_usd は、cost-state のモデルごとの costUSD を、そのモデルの応答に
+    トークンの重み（COST_WEIGHTS）で按分した値。単価表は持たない（合計はセッションの費用と一致する）。
+    cost-state が無い（セッションの途中など）ときは null
 """
 import glob
 import json
@@ -31,6 +36,14 @@ FIELDS = (
     "cache_read_input_tokens",
     "cache_creation_input_tokens",
 )
+# 按分の重み（入力 1 に対する比）。Claude の各モデルで共通の単価の比
+# （出力 5 倍、キャッシュ読み 0.1 倍、キャッシュ作成 1.25 倍）
+COST_WEIGHTS = {
+    "input_tokens": 1.0,
+    "output_tokens": 5.0,
+    "cache_read_input_tokens": 0.1,
+    "cache_creation_input_tokens": 1.25,
+}
 
 
 def read_jsonl(path):
@@ -80,11 +93,45 @@ def active_task(events, ts):
     return current
 
 
+def to_events(session_id, responses, cost_state):
+    """応答ごとの行を record_usage_events に渡す形にし、モデルごとの費用を按分する。"""
+    model_cost = {
+        m: u.get("costUSD")
+        for m, u in ((cost_state or {}).get("modelUsage") or {}).items()
+    }
+    weight_sum = defaultdict(float)
+    for r in responses:
+        r["weight"] = sum(r["usage"][f] * w for f, w in COST_WEIGHTS.items())
+        weight_sum[r["model"]] += r["weight"]
+    events = []
+    for r in responses:
+        cost = model_cost.get(r["model"])
+        if cost is not None and weight_sum[r["model"]] > 0:
+            cost = round(cost * r["weight"] / weight_sum[r["model"]], 8)
+        elif cost is not None:
+            cost = 0.0
+        events.append({
+            "source": "claude_code_transcript",
+            "session_id": session_id,
+            "request_key": r["key"],
+            "model": r["model"],
+            "occurred_at": r["timestamp"],
+            "task_id": r["task_id"],
+            "is_subagent": r["is_subagent"],
+            **r["usage"],
+            "cost_usd": cost,
+        })
+    return events
+
+
 def main():
-    if len(sys.argv) != 2:
+    args = sys.argv[1:]
+    as_events = "--events" in args
+    args = [a for a in args if a != "--events"]
+    if len(args) != 1:
         print(__doc__, file=sys.stderr)
         sys.exit(2)
-    path = sys.argv[1]
+    path = args[0]
     main_rows = list(read_jsonl(path))
     session_dir = os.path.splitext(path)[0]
     sub_paths = sorted(glob.glob(os.path.join(session_dir, "subagents", "agent-*.jsonl")))
@@ -93,6 +140,7 @@ def main():
     seen = set()
     by_task = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
     cost_state = None
+    responses = []
 
     def add(rows, source):
         nonlocal cost_state
@@ -114,13 +162,27 @@ def main():
                 bucket[field] += int(usage.get(field) or 0)
             bucket["requests"] += 1
             bucket["subagent_requests"] += 1 if source == "subagent" else 0
+            responses.append({
+                "key": key,
+                "model": msg.get("model") or "unknown",
+                "timestamp": r.get("timestamp"),
+                "task_id": task_id,
+                "is_subagent": source == "subagent",
+                "usage": {field: int(usage.get(field) or 0) for field in FIELDS},
+            })
 
     add(main_rows, "main")
     for p in sub_paths:
         add(read_jsonl(p), "subagent")
 
+    session_id = next((r.get("sessionId") for r in main_rows if r.get("sessionId")), None)
+    if as_events:
+        json.dump(to_events(session_id, responses, cost_state), sys.stdout, ensure_ascii=False, indent=2)
+        print()
+        return
+
     result = {
-        "session_id": next((r.get("sessionId") for r in main_rows if r.get("sessionId")), None),
+        "session_id": session_id,
         "subagent_transcripts": len(sub_paths),
         "tasks": [
             {"task_id": task_id, "models": {m: dict(v) for m, v in models.items()}}

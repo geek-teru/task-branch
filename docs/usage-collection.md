@@ -15,7 +15,7 @@ Claude Code 2.1.322 で実際に動かして確かめた（2026-11-12）。
   (2) do スキルは1セッションで複数のタスクを触ることがあり、A は MCP の呼び出しで区切れるが、B は起動時の属性に固定される。
   (3) トークン数は A と Claude Code 自身の集計（`cost-state`）が一致した（下の「確認結果」）
 - A の弱点は、**API 応答ごとの費用が transcript に無い**こと。タスクごとの費用は、トークン数とモデルの単価表から計算するか、
-  セッション合計の費用をトークン比で按分する。単価表を持つかどうかは「usage_events テーブルとタスクへのひも付け」で決める
+  セッション合計の費用をトークン比で按分する。→ **按分に決めた**（下の「記録先」）
 - B は、あとでチームや Devin などの利用を集めるとき（Collector を立てる価値が出たとき）に足す。A と同じ `usage_events` に入れられる形にしておく
 
 ## A. フック＋ transcript
@@ -55,9 +55,22 @@ python3 scripts/usage-from-transcript.py ~/.claude/projects/<作業ディレク�
 - `start_task(X)` から `request_task_review(X)` / `complete_task(X)` までの間の応答を X に、区間の外を `task_id: null` に入れる
 - `cost-state` があれば `session_total` にセッション合計の費用を出す
 
+`--events` を付けると、API 応答 1 件 = 1 要素の配列を出す。そのまま RPC `record_usage_events(events)` に渡せる（下の「記録先」）。
+
 本番に入れるときは、このロジックを `SessionEnd`（と、長いセッションに備えて `Stop`）のフックから呼び、
 結果を task-branch の API（MCP ツールか RPC）に送る。同じ応答を二重に送らないよう、`message.id`（または `requestId`）を一意キーにする。
 フックの設定はユーザーの `~/.claude/settings.json` に置く（リポジトリには例だけを置く）。
+
+### 記録先（usage_events）
+
+「usage_events テーブルとタスクへのひも付け」で決めた形（`supabase/migrations/0035_usage_events.sql`、DESIGN.md §3.2 usage_events）。
+
+- テーブル `usage_events` に API 応答 1 件 = 1 行。一意キーは (持ち主, `request_key` = message.id)。何度送っても 1 行
+- 書き込みは RPC `record_usage_events(events jsonb)`（1 回 500 件まで、返り値 `{inserted, updated, skipped}`）だけ。読めるのは持ち主だけ
+- task_id は送り手が上の区間で決める。DB は持ち主のプロジェクトのタスクだけ受け付け、それ以外は null で記録する
+- 費用は、`cost-state` のモデルごとの `costUSD` を、そのモデルの応答にトークンの重み（入力 1・出力 5・キャッシュ読み 0.1・キャッシュ作成 1.25。Claude の各モデルで共通の単価の比）で按分する。
+  単価表を持たずに済み、合計はセッションの費用と一致する。`cost-state` が無い時点（`Stop` の途中など）で送ると `cost_usd` は null。あとで `SessionEnd` から費用付きで送り直すと、null の行だけ埋まる（トークンは上書きしない）
+- フックから送る仕組み（トークンの持ち方・設定例）は未実装
 
 ## B. OpenTelemetry
 
@@ -93,5 +106,4 @@ claude -p "…"
 
 - `Stop` のたびに送る場合の重複除き（API 側の一意キー）と、`SessionEnd` が呼ばれない終わり方（強制終了）での取りこぼし
 - Windows（Claude Code のネイティブ版）での transcript の置き場所とフックの実行（今回は Linux のクラウド環境だけで確かめた）
-- 単価表を持って応答ごとの費用を計算するか、セッション合計を按分するか（「usage_events テーブルとタスクへのひも付け」で決める）
 - Devin など Claude Code 以外のエージェントの使用量（フックも OTel も Claude Code のもの）
