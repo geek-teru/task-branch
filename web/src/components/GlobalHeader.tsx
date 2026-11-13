@@ -57,15 +57,16 @@ export function GlobalHeader({
 
   return (
     <header
-      className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-4 text-fg"
+      className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-3 text-fg md:px-4"
       style={{ height: HEADER_H }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="flex shrink-0 items-center gap-2 text-[15px] font-medium whitespace-nowrap">
+        {/* Phones keep only the project switcher and the user menu, so the bar stays one line. */}
+        <span className="flex shrink-0 items-center gap-2 text-[15px] font-medium whitespace-nowrap max-md:hidden">
           <ServiceIcon />
           task-branch
         </span>
-        <span className="shrink-0 text-lg text-border-strong" aria-hidden>
+        <span className="shrink-0 text-lg text-border-strong max-md:hidden" aria-hidden>
           /
         </span>
         {pageTitle ? (
@@ -80,7 +81,7 @@ export function GlobalHeader({
             menuClassName="max-h-[60vh] min-w-[240px] overflow-y-auto"
             trigger={
               <>
-                <span className={current ? "max-w-[320px] truncate" : allProjectsLabel ? undefined : "text-fg-muted"}>
+                <span className={current ? "max-w-[55vw] truncate md:max-w-[320px]" : allProjectsLabel ? "truncate" : "truncate text-fg-muted"}>
                   {current?.name ?? allProjectsLabel ?? "プロジェクトを選択"}
                 </span>
                 <span className="flex text-fg-muted">
@@ -146,6 +147,7 @@ export function GlobalHeader({
 }
 
 // Icon-only link next to the project switcher; opens the project's repository or site in a new tab.
+// Hidden on phones to keep the header to one line.
 function HeaderLink({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   return (
     <a
@@ -154,7 +156,7 @@ function HeaderLink({ href, label, children }: { href: string; label: string; ch
       rel="noopener noreferrer"
       aria-label={label}
       title={`${label}: ${href}`}
-      className="flex size-7 shrink-0 items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg"
+      className="flex size-7 shrink-0 items-center justify-center rounded text-fg-muted transition-colors hover:bg-surface-muted hover:text-fg max-md:hidden"
     >
       {children}
     </a>

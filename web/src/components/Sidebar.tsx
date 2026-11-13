@@ -7,7 +7,8 @@ import { Button } from "./ui/Button";
 export type MenuKey = "projects" | "backlog" | "gantt" | "kanban" | "timeline" | "performance";
 
 // icon: shown next to the label, and alone while the sidebar is collapsed.
-const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
+// Shared with BottomTabBar (the phone layout's menu).
+export const MENU: { key: MenuKey; label: string; icon: ReactNode }[] = [
   { key: "projects", label: "Projects", icon: <ProjectIcon /> },
   { key: "backlog", label: "Backlog", icon: <BacklogIcon /> },
   { key: "gantt", label: "Gantt", icon: <GanttIcon /> },
