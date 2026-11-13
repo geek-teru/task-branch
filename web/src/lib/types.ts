@@ -182,6 +182,23 @@ export interface TaskComment {
   updated_at: string;
 }
 
+// Image types the attachments bucket accepts (allowed_mime_types in 0036_task_attachments.sql). No SVG.
+export type AttachmentMimeType = "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+
+// An image attached to a task or story (task_attachments). The file is at storage_path in the
+// private attachments bucket; bodies reference it as ![name](attachment:<id>).
+export interface Attachment {
+  id: string;
+  project_id: string;
+  task_id: string; // the task or story row
+  storage_path: string; // <project_id>/<id>.<png|jpg|webp|gif>
+  mime_type: AttachmentMimeType;
+  size_bytes: number;
+  original_name: string | null; // display only; never used in the path
+  created_by: string;
+  created_at: string;
+}
+
 // predecessor (前提) → successor (後続), between tasks of the same story.
 export interface TaskDependency {
   id: string;
