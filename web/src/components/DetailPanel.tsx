@@ -4,10 +4,11 @@ import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf } from "../lib/types";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AssigneeLabel } from "./AssigneeLabel";
+import { AttachmentList } from "./AttachmentList";
 import { IdBadge } from "./IdBadge";
 import { Markdown } from "./Markdown";
 import { TaskComments } from "./TaskComments";
-import { ChevronDownIcon, CloseIcon, DeleteIcon, EditIcon } from "./Icons";
+import { AttachIcon, ChevronDownIcon, CloseIcon, DeleteIcon, EditIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
 import { Button, IconButton } from "./ui/Button";
 import { DropdownMenu, DropdownMenuItem } from "./ui/DropdownMenu";
@@ -174,6 +175,20 @@ export function DetailPanel<T extends DetailNode>({
         <Field label="更新日時">{node?.updated_at ? fmtDateTime(node.updated_at) : DASH}</Field>
         <Field label="完了日時">{node?.completed_at ? fmtDateTime(node.completed_at) : DASH}</Field>
         <Field label="クローズ日時">{node?.closed_at ? fmtDateTime(node.closed_at) : DASH}</Field>
+        {node?.level === "task" && (
+          <AttachmentList
+            taskId={node.id}
+            frame={(count, list) => (
+              <div className="mt-1 mb-3 border-t border-border pt-3">
+                <div className="mb-1 flex items-center gap-1.5 text-sm font-medium text-fg">
+                  <AttachIcon size={14} />
+                  添付（{count}）
+                </div>
+                {list}
+              </div>
+            )}
+          />
+        )}
         {node?.level === "task" && (
           <TaskComments taskId={node.id} projectId={node.project_id} assignees={assignees ?? NO_ASSIGNEES} refreshKey={commentsVersion} />
         )}
