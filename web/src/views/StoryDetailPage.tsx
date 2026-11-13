@@ -11,6 +11,7 @@ import type { ContextRevision, Project, Task } from "../lib/types";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
+import { AttachmentList } from "../components/AttachmentList";
 import { AttachmentTextarea } from "../components/AttachmentTextarea";
 import { IdBadge } from "../components/IdBadge";
 import { Markdown } from "../components/Markdown";
@@ -184,6 +185,17 @@ export function StoryDetailPage({
             )}
           </div>
         </Card>
+
+        {/* Shown only when the story has attachments (images added to its context). */}
+        <AttachmentList
+          taskId={story.id}
+          frame={(count, list) => (
+            <Card className="mt-6">
+              <CardHeader title="添付" meta={`${count} 件`} />
+              <div className="px-5 py-1">{list}</div>
+            </Card>
+          )}
+        />
 
         {/* @container: the description column is dropped when the card is narrow. */}
         <Card className="@container mt-6 overflow-hidden">

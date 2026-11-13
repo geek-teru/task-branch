@@ -141,7 +141,16 @@ export async function uploadAttachment({
     await supabase.from("task_attachments").delete().eq("id", id);
     throw uploadError;
   }
+  notifyAttachmentsChanged(taskId);
   return data as Attachment;
+}
+
+// Fired on window after an attachment is uploaded or deleted, so lists of that task reload.
+export const ATTACHMENTS_CHANGED_EVENT = "attachments:changed";
+export type AttachmentsChangedDetail = { taskId: string };
+
+function notifyAttachmentsChanged(taskId: string): void {
+  window.dispatchEvent(new CustomEvent<AttachmentsChangedDetail>(ATTACHMENTS_CHANGED_EVENT, { detail: { taskId } }));
 }
 
 // Attachments of a task or story, newest first.
@@ -156,12 +165,13 @@ export async function listAttachments(taskId: string): Promise<Attachment[]> {
 }
 
 // File first, then the row: the storage delete policy needs the row to still exist.
-export async function deleteAttachment(a: Pick<Attachment, "id" | "storage_path">): Promise<void> {
+export async function deleteAttachment(a: Pick<Attachment, "id" | "storage_path" | "task_id">): Promise<void> {
   const { error: removeError } = await supabase.storage.from(ATTACHMENT_BUCKET).remove([a.storage_path]);
   if (removeError) throw removeError;
   const { error } = await supabase.from("task_attachments").delete().eq("id", a.id);
   if (error) throw error;
   signedUrlCache.delete(a.id);
+  notifyAttachmentsChanged(a.task_id);
 }
 
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
