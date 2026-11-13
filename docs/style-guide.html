@@ -290,6 +290,7 @@
         <li><a href="#space-2">4.2 角丸</a></li>
         <li><a href="#space-3">4.3 影・重なり</a></li>
         <li><a href="#space-4">4.4 ページの骨格</a></li>
+        <li><a href="#space-5">4.5 スマホ表示</a></li>
       </ul>
     </li>
     <li><a href="#parts">5. コンポーネント</a>
@@ -562,6 +563,21 @@
   <div style="padding:16px 24px;font-size:13px;color:var(--color-fg-muted)">本文（表・ボード・タイムライン）</div>
 </div>
 <p class="note">作業画面の骨格の見本。読む画面ではツールバーの <code>border-b</code> が無く（<code>Toolbar variant="inline"</code>）、本文が最大幅で止まる。</p>
+
+<h3 id="space-5">スマホ表示（<code>lib/useIsMobile.ts</code>）</h3>
+<p>画面幅 <strong>768px 未満</strong>（Tailwind の <code>md</code> 未満）をスマホ表示にする。タブレット以上は PC 表示のまま。独自のブレークポイントは足さない。</p>
+<table>
+  <thead><tr><th>決まり</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>切り替えの書き方</td><td>大きさ・表示／非表示・並びの向きなど CSS で済むものは、スマホを基本に書いて <code>md:</code> で PC の値を足す（例: <code>w-full md:w-[420px]</code>）。描く部品そのものが違うところ（サイドナビ ↔ 下部タブバー、横並びの詳細パネル ↔ 全画面シート）だけ <code>useIsMobile()</code> で描き分ける</td></tr>
+    <tr><td>判定の値</td><td><code>useIsMobile()</code> は <code>matchMedia("(max-width: 767.98px)")</code>（<code>MOBILE_QUERY</code>）。幅が 768px をまたぐと再描画される</td></tr>
+    <tr><td>タップ領域</td><td>スマホで押すボタン・リンク・タブは 40px 角以上（<code>size-10</code> / <code>h-10</code>）。見た目を小さくするときも、押せる範囲は余白で 40px を取る</td></tr>
+    <tr><td>入力欄の文字</td><td>スマホでは 16px 以上（<code>text-base md:text-[13px]</code> など）。16px 未満だと iOS Safari がフォーカス時に自動でズームする</td></tr>
+    <tr><td>端末の余白</td><td><code>index.html</code> の viewport に <code>viewport-fit=cover</code> を付けている。画面の下端・上端に固定する部品（下部タブバーなど）は <code>env(safe-area-inset-bottom)</code> などの余白を足し、ホームインジケーターと重ねない</td></tr>
+  </tbody>
+</table>
+<pre><code>const isMobile = useIsMobile();
+return isMobile ? &lt;BottomTabBar /&gt; : &lt;Sidebar /&gt;;</code></pre>
 
 <h2 id="parts">5. コンポーネント</h2>
 <p>部品は <code>web/src/components/ui/</code> にある。画面はこれを使い、同じ見た目を <code>className</code> で書き直さない。見本は部品のクラスと同じ値で描いている（hover・フォーカスも動く）。</p>
