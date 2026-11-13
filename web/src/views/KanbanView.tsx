@@ -479,6 +479,7 @@ export function KanbanView({
                 }
           }
           assignees={editing.level === "story" ? undefined : assignees}
+          attachTo={editing.level === "story" ? undefined : { projectId: editing.project_id, taskId: editing.id }}
           onSubmit={(values) => {
             onUpdateTask(editing.id, values);
             setEditing(null);

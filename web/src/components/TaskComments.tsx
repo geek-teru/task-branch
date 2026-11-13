@@ -4,12 +4,12 @@ import type { Assignees, TaskComment } from "../lib/types";
 import { commentAuthorOf } from "../lib/types";
 import { useSession } from "../lib/useSession";
 import { AssigneeIcon } from "./AssigneeLabel";
+import { AttachmentTextarea } from "./AttachmentTextarea";
 import { Avatar } from "./Avatar";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CommentIcon, DeleteIcon, EditIcon } from "./Icons";
 import { Markdown } from "./Markdown";
 import { Button, IconButton } from "./ui/Button";
-import { Textarea } from "./ui/Textarea";
 
 const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
 
@@ -31,12 +31,15 @@ function CommentAuthor({ comment, assignees }: { comment: TaskComment; assignees
 // Comment list + post form for a task, shown at the bottom of the detail panel.
 // Fetches on mount / task change and after posting, editing or deleting (no realtime subscription).
 // refreshKey: bump it to refetch after a comment was posted from outside (the kanban's status dialog).
+// projectId: where images attached to a comment are stored (the attachments belong to the task).
 export function TaskComments({
   taskId,
+  projectId,
   assignees,
   refreshKey,
 }: {
   taskId: string;
+  projectId: string;
   assignees: Assignees;
   refreshKey?: number;
 }) {
@@ -51,6 +54,9 @@ export function TaskComments({
   const [editDraft, setEditDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Image uploads running in the post / edit fields. Posting or saving waits for them.
+  const [postUploading, setPostUploading] = useState(false);
+  const [editUploading, setEditUploading] = useState(false);
 
   const reload = useCallback(async () => {
     setComments(await listTaskComments(taskId));
@@ -81,7 +87,7 @@ export function TaskComments({
   }, [refreshKey, reload]);
 
   const body = draft.trim();
-  const canPost = body.length > 0 && !posting;
+  const canPost = body.length > 0 && !posting && !postUploading;
 
   async function post() {
     if (!canPost) return;
@@ -104,7 +110,7 @@ export function TaskComments({
 
   const editing = comments.find((c) => c.id === editingId) ?? null;
   const editBody = editDraft.trim();
-  const canSave = !!editing && editBody.length > 0 && editBody !== editing.body && !saving;
+  const canSave = !!editing && editBody.length > 0 && editBody !== editing.body && !saving && !editUploading;
 
   function startEdit(c: TaskComment) {
     setEditingId(c.id);
@@ -172,9 +178,12 @@ export function TaskComments({
             </div>
             {editingId === c.id ? (
               <>
-                <Textarea
+                <AttachmentTextarea
                   value={editDraft}
-                  onChange={(e) => setEditDraft(e.target.value)}
+                  onChange={setEditDraft}
+                  projectId={projectId}
+                  taskId={taskId}
+                  onUploadingChange={setEditUploading}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
@@ -208,9 +217,12 @@ export function TaskComments({
 
       {error && <div className="mb-2 text-xs text-danger">{error}</div>}
 
-      <Textarea
+      <AttachmentTextarea
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={setDraft}
+        projectId={projectId}
+        taskId={taskId}
+        onUploadingChange={setPostUploading}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
@@ -220,7 +232,7 @@ export function TaskComments({
         placeholder="コメントを書く（Ctrl+Enter で投稿）"
         rows={3}
         disabled={posting}
-        className="mt-2"
+        wrapperClassName="mt-2"
       />
       <div className="mt-1.5 flex justify-end">
         <Button size="sm" variant="primary" onClick={post} disabled={!canPost}>
