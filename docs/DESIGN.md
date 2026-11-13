@@ -166,6 +166,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
                  ├──< story_context_revisions (story のドキュメントの更新履歴)
                  ├──< task_comments (task へのコメント。本文は編集できる)
                  ├──< task_events (操作履歴。トリガだけが書く)
+                 ├──< task_attachments (添付画像。ファイルは Storage の attachments バケット)
                  └──> 担当者（人の場合。ユーザー）
 ```
 
@@ -358,6 +359,29 @@ AI エージェントの使用量（トークン・費用）。API 応答 1 件 
 - 費用の按分: transcript には応答ごとの費用が無いので、送り手が `cost-state` のモデルごとの `costUSD` を、そのモデルの応答にトークンの重み（入力 1・出力 5・キャッシュ読み 0.1・キャッシュ作成 1.25）で按分する。単価表は持たない。
 - ゲストは記録できない。`0035_usage_events.sql` で入れた。
 
+#### task_attachments
+
+タスク（ストーリーを含む tasks の行）にひも付く添付画像。コメント・ストーリーのコンテキスト・タスクの説明の本文に `![名前](attachment:<添付の id>)` で差し込む。ファイルは Supabase Storage の非公開バケット `attachments` に置く。
+
+| カラム        | 型          | 制約                                                                 | 説明                                                         |
+| ------------- | ----------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
+| id            | uuid        | PK, default gen_random_uuid()                                        | 画面で `crypto.randomUUID()` を作って渡す（パスに使うため）  |
+| project_id    | uuid        | FK→projects.id, not null, on delete cascade                          | task_id の行の project_id と一致すること（トリガ）           |
+| task_id       | uuid        | FK→tasks.id, not null, on delete cascade                             | ひも付けるタスク・ストーリー                                 |
+| storage_path  | text        | not null, UNIQUE, check（下記）                                      | attachments バケット内のパス `<project_id>/<id>.<拡張子>`    |
+| mime_type     | text        | not null, check in ('image/png','image/jpeg','image/webp','image/gif') | SVG は許さない（スクリプトを含められるため）               |
+| size_bytes    | integer     | not null, check between 1 and 5242880                                | 5MB まで                                                     |
+| original_name | text        | null可, check (char_length <= 255)                                   | 元のファイル名（表示用。パスには使わない）                   |
+| created_by    | uuid        | not null, default auth.uid()                                         | アップロードした人                                           |
+| created_at    | timestamptz | not null, default now()                                              |                                                              |
+
+- check `task_attachments_storage_path`: `storage_path = project_id || '/' || id || '.' || <拡張子>`。拡張子は mime_type から決まる（png / jpg / webp / gif）。別のプロジェクトのパス、`../` を含むパス、mime と違う拡張子は入らない。
+- トリガ `check_task_attachment()`（before insert、security invoker）: task_id の行が同じ project_id にあることを確かめる。tasks は RLS の下で読むので、見えないタスクにも付けられない。
+- インデックス：(task_id)。update はポリシーを作らない（変えられない）。
+- 手順: 先に行を作り、その storage_path と同じ名前でだけ Storage にアップロードできる（§3.5）。削除は Storage のファイル → 行の順（行を先に消すと、Storage の delete のポリシーが通らない）。
+- 行が消えると Storage の select が通らなくなり、署名付き URL を作れない（ファイルが残っても読めない）。タスク・プロジェクト・ゲストの削除で Storage に残るファイルの掃除は今はしない。
+- `0036_task_attachments.sql` で入れた。
+
 ### 3.3 派生概念（計算で導出）
 
 いずれも依存から導出する。依存のデータの持ち方は未設計で、実装時に設計する（§1.2）。
@@ -470,10 +494,13 @@ $$ language sql stable;
 | task_events            | 不可（トリガだけ）                              | 所有者 | 不可                                | 不可       |
 | profiles               | 本人の人                                        | 本人   | 本人の人                            | 不可       |
 | storage.objects（avatars） | 本人の人（自分の uid のフォルダ。ゲスト不可） | 本人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ。ゲスト不可） | 本人の人（自分の uid のフォルダ） |
+| task_attachments       | 所有者の人（ゲスト不可。`created_by` は自分）   | 所有者 | 不可                                | 所有者の人 |
+| storage.objects（attachments） | 所有者の人（task_attachments に行のあるパスだけ。ゲスト不可） | 所有者（行のあるパスだけ） | 不可（上書き不可） | 所有者の人（行のあるパスだけ） |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
 - 「書いた本人」は `author_id = auth.uid() and author_type = current_actor_type()`。人と AI は uid が同じなので、種別も合わせて別の投稿者として扱う（AI は人のコメントを、人は AI のコメントを編集・削除できない）。
 - 「本人」は `user_id = auth.uid()`（avatars はパスの先頭のフォルダが `auth.uid()`）。人と AI のどちらも含む。「本人の人」はそれに加えて `current_actor_type() = 'human'`（AI は書けない）。
+- 「所有者の人」は「所有者」に加えて `current_actor_type() = 'human'`（AI は書けない）。
 - 「不可」はポリシーを作らない。
 
 #### ゲストの件数上限
@@ -495,6 +522,7 @@ $$ language sql stable;
 - pg_cron のジョブ `delete-expired-guests` が毎日 18:00 UTC（JST 3:00）に実行する。実行結果は `cron.job_run_details` で見る。
 - `delete_expired_guests()` / `guest_retention()` の execute は public / anon / authenticated から revoke（RPC で呼ばせない）。
 - ゲストのアイコン画像は SQL から消せない（storage.objects は Storage API で消す）ため、avatars の insert / update ポリシーで JWT の `is_anonymous` が true のときは拒否し、ゲストにはアップロードさせない。
+- 添付画像（attachments バケット）も同じ理由で、task_attachments と storage.objects の insert ポリシーでゲストを拒否する（`0036_task_attachments.sql`）。task_attachments の行はプロジェクトの on delete cascade で消える。
 
 ポリシー定義:
 
@@ -692,6 +720,61 @@ create policy avatars_insert on storage.objects
     and current_actor_type() = 'human'
   );
 ```
+
+##### task_attachments
+
+所有者（人・AI）が読める。作れるのは所有者の人だけで、AI とゲスト（JWT の `is_anonymous` が true）は作れない。消せるのは所有者の人だけ。update はポリシーを作らない。
+
+```sql
+alter table task_attachments enable row level security;
+
+create policy task_attachments_select on task_attachments
+  for select to authenticated
+  using (exists (select 1 from projects p
+                  where p.id = task_attachments.project_id and p.owner_id = current_owner_id()));
+
+create policy task_attachments_insert on task_attachments
+  for insert to authenticated
+  with check (
+    created_by = auth.uid()
+    and current_actor_type() = 'human'
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) is not true
+    and exists (select 1 from projects p
+                 where p.id = task_attachments.project_id and p.owner_id = current_owner_id())
+  );
+
+create policy task_attachments_delete on task_attachments
+  for delete to authenticated
+  using (current_actor_type() = 'human'
+         and exists (select 1 from projects p
+                      where p.id = task_attachments.project_id and p.owner_id = current_owner_id()));
+```
+
+##### storage.objects（attachments バケット）
+
+非公開バケット（5MB まで、png / jpeg / webp / gif）。task_attachments に行のあるパスだけを扱える。exists は task_attachments の RLS の下で評価されるので、所有者の行しか見えない。表示は署名付き URL（有効期限 10 分）で、公開 URL は使わない。update はポリシーを作らない（upsert での上書き不可。差し替えは削除して作り直す）。
+
+```sql
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('attachments', 'attachments', false, 5242880,
+        array['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+create policy attachments_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'attachments'
+         and exists (select 1 from public.task_attachments a where a.storage_path = objects.name));
+
+create policy attachments_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'attachments'
+              and current_actor_type() = 'human'
+              and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) is not true
+              and exists (select 1 from public.task_attachments a where a.storage_path = objects.name));
+
+-- delete は select と同じ exists に current_actor_type() = 'human' を足す
+```
+
+- 行の無いパス、行と違うパス（別のプロジェクト・拡張子違い）、AI・ゲスト・他人のアップロードは insert のポリシーで止まる。種類とサイズはバケットの設定と task_attachments の check の両方で止まる。
 
 - `story_context_revisions` の insert は、ストーリーの `context` の保存時にトリガ（`save_story_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
 - RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
