@@ -77,7 +77,15 @@ function CommentBody({ body }: { body: string | null }) {
 
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && !expanded) setOverflows(el.scrollHeight > el.clientHeight + 1);
+    if (!el || expanded) return;
+    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    // Attached images load after the first layout and change the height, so measure again then.
+    const content = el.firstElementChild;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    return () => observer.disconnect();
   }, [body, expanded]);
 
   if (body === null) return <span className="text-fg-muted">（削除されたコメント）</span>;
