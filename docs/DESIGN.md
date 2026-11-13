@@ -776,6 +776,43 @@ create policy attachments_insert on storage.objects
 
 - 行の無いパス、行と違うパス（別のプロジェクト・拡張子違い）、AI・ゲスト・他人のアップロードは insert のポリシーで止まる。種類とサイズはバケットの設定と task_attachments の check の両方で止まる。
 
+##### 添付のアクセス制御の検証
+
+画面を通さず REST / Storage API を直接たたき、画面の検査を迂回されてもバケットの設定と RLS で止まることを確かめた（ローカル、Supabase CLI 2.117.0）。
+スクリプトは `scripts/attachments-access-check.mjs`（依存なし。毎回ユーザー・プロジェクトを作り、終わったら消すので繰り返し実行できる。ローカル専用）。
+
+```bash
+set -a; eval "$(supabase status -o env)"; set +a
+node scripts/attachments-access-check.mjs   # 期待と違う結果が1つでもあれば終了コード 1
+```
+
+使う JWT: A（所有者の人）/ B（別のユーザー）/ AI（A のトークンに `client_id` を足してローカルの署名鍵で署名し直したもの。OAuth の MCP と同じく `sub` は A）/ ゲスト（匿名サインイン）。
+
+| 主体 | 操作 | 期待 | 結果 |
+| --- | --- | --- | --- |
+| A | 行の作成 → アップロード → 署名付き URL の作成・取得 → 一覧 → Storage のファイル → 行の順に削除 | 許可 | 201 / 200（取得した中身が一致）/ 一覧に 1 件 / 削除で 1 件ずつ返る |
+| AI | A の添付の署名付き URL の作成 | 許可（読むのは所有者の人・AI） | 200 |
+| B | A のプロジェクトに行を作る | 拒否 | 400 `attachment project_id must match its task`（A のタスクが見えないためトリガで止まる） |
+| B | A の行のあるパスへアップロード | 拒否 | 400 `new row violates row-level security policy` |
+| B | A の添付の署名付き URL の作成 | 拒否 | 400 `Object not found` |
+| B | A のプロジェクトの一覧（list）・task_attachments の読み取り | 拒否 | 200 `[]`（何も見えない） |
+| B | A の添付の Storage・行の削除 | 拒否 | 200 `[]`（消えない） |
+| A | 行の無いパス、別の project_id のパス、`../` / `%2E%2E` を含むパス、拡張子違い（行は .png、.jpg へ）へのアップロード | 拒否 | 400 `new row violates row-level security policy` |
+| A | storage_path が形に合わない行、別のプロジェクトのタスクを指す行、mime_type が image/svg+xml の行、created_by が他人の行 | 拒否 | 400（check / トリガ）・403（RLS） |
+| A | Content-Type が image/svg+xml・text/html・application/octet-stream のアップロード | 拒否 | 400 `mime type ... is not supported` |
+| A | 5MB を超える（5242881 バイト）アップロード | 拒否 | 400 `The object exceeded the maximum allowed size` |
+| A | 既存のパスへの `x-upsert: true`・PUT での上書き | 拒否 | 400 `new row violates row-level security policy`（update のポリシーが無い） |
+| A | 既存のパスへ同じ名前で再アップロード | 拒否 | 400 `The resource already exists` |
+| AI | 行の作成・アップロード | 拒否 | 403 / 400（RLS） |
+| AI | A の添付の Storage・行の削除 | 拒否 | 200 `[]`（消えない） |
+| ゲスト | 自分のプロジェクトに行を作る | 拒否 | 403（RLS） |
+| ゲスト | 自分の行のあるパスへアップロード（行は service role で用意） | 拒否 | 400（RLS） |
+| トークン無し | 公開 URL（`/object/public/attachments/...`）・認証付きの取得（`/object/attachments/...`） | 拒否 | 400 `Bucket not found` / `Object not found` |
+| A | 行だけ消したあと（ファイルは残る）の署名付き URL の作成 | 拒否 | 400 `Object not found`（一覧にも出ない） |
+
+- Storage はパスの `..`（`%2E%2E` を含む）を正規化してから名前にする。`<project_id>/../<別の project_id>/<id>.png` は `<別の project_id>/<id>.png` になり、行が無いので止まる。正規化した結果が行のあるパスなら、そのパスへの普通のアップロードと同じ扱いになる（逃げ道にはならない）。
+- 中身が HTML のファイルを Content-Type image/png で上げると、受け付けられる（Storage は中身を見ず、Content-Type と拡張子だけを見る）。署名付き URL で取ると `Content-Type: image/png` のまま返り、`X-Content-Type-Options` と `Content-Disposition` は付かない（ローカル）。画面は `<img>` で表示するので、HTML として解釈されることはない。
+
 - `story_context_revisions` の insert は、ストーリーの `context` の保存時にトリガ（`save_story_context_revision()`）が利用者の権限で行う。そのため insert のポリシーが要る。
 - RPC（`get_progress` / `get_task_graph` / `export_project`）とトリガは security invoker のままにし、RLS の下で動かす。ビューを作るときは `security_invoker = true` にする。
 - `current_actor_type()` の `client_id` 判定と、task_comments の update / delete で種別も見る条件は `0014_actor_type_oauth_client.sql` で入れた（それまでは `app_metadata.actor_type` で判定し、update / delete は `author_id` だけを見ていた）。
