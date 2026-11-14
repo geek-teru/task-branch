@@ -19,12 +19,14 @@ import { DetailPanel, type StoryOption } from "../components/DetailPanel";
 import { IdBadge } from "../components/IdBadge";
 import { AssigneeIcon, AssigneeLabel } from "../components/AssigneeLabel";
 import { useResizableWidth } from "../lib/useResizableWidth";
+import { useIsMobile } from "../lib/useIsMobile";
 import { AddIcon } from "../components/Icons";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Select, type SelectOption } from "../components/ui/Select";
 import { Switch } from "../components/ui/Switch";
 import { PageHeader } from "../components/ui/PageHeader";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Toolbar } from "../components/ui/Toolbar";
 
 
@@ -50,6 +52,11 @@ const ASSIGNEE_FILTER_KEY = "kanban.assigneeFilter";
 // フィルタの値。「すべて」「未割り当て」は担当者の id と重ならない文字列にする。
 const FILTER_ALL = "__all__";
 const FILTER_UNASSIGNED = "__unassigned__";
+// スマホ表示で選んでいるステータス。同じくブラウザごとに覚える。既定は進行中。
+const MOBILE_STATUS_KEY = "kanban.mobileStatus";
+const DEFAULT_MOBILE_STATUS: Status = "in_progress";
+// スマホ表示の切り替えに出すステータス。クローズはトグルが入っているときだけ足す。
+const MOBILE_STATUSES: Status[] = ["todo", "in_progress", "in_review", "done"];
 
 // One board per project: a swimlane per in-progress story, columns = task status.
 // The project filter (null = all projects) is owned by the caller (the app-wide selection, switched
@@ -115,6 +122,26 @@ export function KanbanView({
       // Ignore: the filter still applies for this session.
     }
   };
+  const isMobile = useIsMobile();
+  const [mobileStatus, setMobileStatus] = useState<Status>(() => {
+    try {
+      const saved = localStorage.getItem(MOBILE_STATUS_KEY) as Status | null;
+      return saved && BOARD_STATUSES.includes(saved) ? saved : DEFAULT_MOBILE_STATUS;
+    } catch {
+      return DEFAULT_MOBILE_STATUS;
+    }
+  });
+  const changeMobileStatus = (value: Status) => {
+    setMobileStatus(value);
+    try {
+      localStorage.setItem(MOBILE_STATUS_KEY, value);
+    } catch {
+      // Ignore: the choice still applies for this session.
+    }
+  };
+  const mobileStatuses = showClosed ? BOARD_STATUSES : MOBILE_STATUSES;
+  // クローズを選んだあとにトグルを切ったら、既定（進行中）を出す。
+  const effectiveMobileStatus = mobileStatuses.includes(mobileStatus) ? mobileStatus : DEFAULT_MOBILE_STATUS;
   const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<Task | null>(null);
   // targetStory がある＝別ストーリーへの移動。無ければ同じストーリー内のステータス変更。
@@ -255,6 +282,64 @@ export function KanbanView({
   const cardsIn = (tasks: Task[], s: Status) =>
     s === "closed" && !showClosed ? [] : tasks.filter((t) => t.status === s && matchesAssignee(t));
 
+  // 表示中のプロジェクトの、その status のタスク数（PC の列見出しと同じく、カードを隠していても数える）。
+  const countIn = (projectLanes: KanbanLane[], s: Status) =>
+    projectLanes.reduce((n, lane) => n + lane.tasks.filter((t) => t.status === s).length, 0);
+  const visibleLanes = visibleProjects.flatMap((p) => lanesByProject.get(p.id) ?? []);
+
+  // スマホ: レーンを縦に積み、見出しの下に選んだステータスのカードを1列で並べる。
+  // 0件のレーンは見出しだけ。列幅のつまみは出さない。
+  const renderMobileLane = ({ story, tasks }: KanbanLane) => {
+    const done = tasks.filter((t) => isFinished(t.status)).length;
+    const cards = cardsIn(tasks, effectiveMobileStatus);
+    return (
+      <div key={story.id} className="border-b border-border last:border-b-0">
+        <div
+          onClick={() => setSelectedId(story.id)}
+          className={cn(
+            "cursor-pointer px-3 py-2.5 transition-colors",
+            selectedId === story.id ? "bg-brand/10 shadow-[inset_2px_0_0_var(--color-brand)]" : "hover:bg-surface-muted",
+          )}
+        >
+          <div className="flex items-center gap-1.5 text-[11px] text-fg-muted">
+            <div className="flex-1">
+              <IdBadge id={story.id} />
+            </div>
+            <IconButton
+              label="タスクを追加"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAdding(story);
+              }}
+            >
+              <AddIcon size={14} />
+            </IconButton>
+          </div>
+          <div className="mt-0.5 text-sm text-fg">{story.title}</div>
+          <div className="mt-1 text-[11px] text-fg-muted">
+            {tasks.length === 0 ? "タスクなし" : `完了 ${done} / ${tasks.length}`}
+          </div>
+        </div>
+        {cards.length > 0 && (
+          <div className="flex flex-col gap-1.5 px-3 pb-3">
+            {cards.map((t) => (
+              <TaskCard
+                key={t.id}
+                task={t}
+                assignee={assigneeOf(t, assignees)}
+                dragging={drag?.task.id === t.id}
+                selected={selectedId === t.id}
+                onSelect={() => setSelectedId(t.id)}
+                onDragStart={() => setDrag({ task: t, storyId: story.id })}
+                onDragEnd={endDrag}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderLane = ({ story, tasks }: KanbanLane) => {
     // クローズも完了として数える。トグルで隠していても数は変えない。
     const done = tasks.filter((t) => isFinished(t.status)).length;
@@ -370,13 +455,35 @@ export function KanbanView({
             />
           </div>
           <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
+          {isMobile && (
+            <SegmentedControl<Status>
+              value={effectiveMobileStatus}
+              onChange={changeMobileStatus}
+              label="表示するステータス"
+              // ラベルと件数を2段にし、幅の狭い端末（320px）でクローズを足しても語の途中で折り返さない。
+              options={mobileStatuses.map((s) => {
+                const count = countIn(visibleLanes, s);
+                return {
+                  value: s,
+                  label: `${STATUS_LABEL[s]} ${count}`,
+                  icon: (
+                    <span className="flex flex-col items-center leading-tight whitespace-nowrap">
+                      <span>{STATUS_LABEL[s]}</span>
+                      <span className="text-[11px] text-fg-muted">{count}</span>
+                    </span>
+                  ),
+                };
+              })}
+              className="h-11 w-full [&>button]:h-[38px] [&>button]:w-auto [&>button]:flex-1 [&>button]:px-0 [&>button]:text-[11px]"
+            />
+          )}
         </Toolbar>
 
         <div
           ref={boardRef}
           onDragOver={(e) => updateAutoScroll(e.clientY)}
           onDrop={stopAutoScroll}
-          className="box-border min-h-0 flex-1 overflow-auto px-6 py-4"
+          className="box-border min-h-0 flex-1 overflow-auto px-6 py-4 max-md:px-4"
         >
           {visibleProjects.length === 0 ? (
             <div className="text-fg-muted">
@@ -390,6 +497,8 @@ export function KanbanView({
                   <h3 className="m-0 mb-2 text-sm font-medium">{p.name}</h3>
                   {projectLanes.length === 0 ? (
                     <div className="text-[13px] text-fg-muted">進行中のストーリーがありません。</div>
+                  ) : isMobile ? (
+                    <div className="rounded-md border border-border bg-surface">{projectLanes.map(renderMobileLane)}</div>
                   ) : (
                     <div className="rounded-md border border-border bg-surface" style={{ minWidth: LABEL_W + BOARD_STATUSES.length * 220 }}>
                       <div className="flex border-b border-border">
@@ -408,9 +517,7 @@ export function KanbanView({
                             <span className={cn("inline-block h-2 w-2 rounded-full", STATUS_DOT[s])} />
                             <span className="text-fg">{STATUS_LABEL[s]}</span>
                             {/* カードを隠していてもその status の件数を出す */}
-                            <span>
-                              {projectLanes.reduce((n, lane) => n + lane.tasks.filter((t) => t.status === s).length, 0)}
-                            </span>
+                            <span>{countIn(projectLanes, s)}</span>
                           </div>
                         ))}
                       </div>
