@@ -182,6 +182,7 @@ export function TimelineView({
         place={node.level === "task" ? { story: placeStory } : undefined}
         storyLink={node.level === "story" ? `/stories/${node.id}` : undefined}
         onClose={() => select(null)}
+        closeOnBack={false}
         onStart={node.level === "task" ? (t) => changeStatus(t, "in_progress") : undefined}
         onComplete={(t) => changeStatus(t, "done")}
         onChangeStatus={changeStatus}

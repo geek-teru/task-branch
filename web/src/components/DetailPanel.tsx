@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf } from "../lib/types";
+import { useIsMobile } from "../lib/useIsMobile";
 import { useResizableWidth } from "../lib/useResizableWidth";
 import { AssigneeLabel } from "./AssigneeLabel";
 import { AttachmentList } from "./AttachmentList";
@@ -55,6 +56,7 @@ export function DetailPanel<T extends DetailNode>({
   assignees,
   onChangeAssignee,
   commentsVersion,
+  closeOnBack = true,
 }: {
   title: string;
   node: T | null;
@@ -74,6 +76,9 @@ export function DetailPanel<T extends DetailNode>({
   assignees?: Assignees; // tasks only: 担当者 is shown when given
   onChangeAssignee?: (node: T, assigneeId: string | null) => void; // null = 未割り当て
   commentsVersion?: number; // 変わったらコメント一覧を読み直す（パネルの外から投稿したとき）
+  // スマホの全画面表示で、ブラウザの戻るで閉じられるよう履歴を1つ積む。開いている状態を URL に
+  // 持つ画面（タイムラインの ?task=）は、戻るがすでに閉じる操作になるので false を渡す。
+  closeOnBack?: boolean;
 }) {
   const fmt = (d: Date | null) => (d ? `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}` : "—");
   const fmtDateTime = (s: string) => new Date(s).toLocaleString("ja-JP");
@@ -85,14 +90,26 @@ export function DetailPanel<T extends DetailNode>({
   const DASH = <span className="text-fg-muted">-</span>;
   // 左端のハンドルで幅を変える。右へドラッグすると狭くなる。
   const { width, startResize } = useResizableWidth("detailPanel.width", 320, 280, 800, { invert: true });
+  // スマホ（768px 未満）では右の横並びではなく、画面全体を覆うシートで開く。幅のドラッグは出さない。
+  const isMobile = useIsMobile();
+  const close = useBackToClose(isMobile && closeOnBack, onClose);
 
   return (
-    <div style={{ width }} className="relative flex shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
-      <div
-        onMouseDown={startResize}
-        data-tooltip="ドラッグで幅を変更"
-        className="absolute inset-y-0 left-0 z-[5] w-[7px] cursor-col-resize select-none"
-      />
+    <div
+      style={isMobile ? undefined : { width }}
+      className={
+        isMobile
+          ? "fixed inset-0 z-40 flex flex-col overflow-hidden bg-surface"
+          : "relative flex shrink-0 flex-col overflow-hidden border-l border-border bg-surface"
+      }
+    >
+      {!isMobile && (
+        <div
+          onMouseDown={startResize}
+          data-tooltip="ドラッグで幅を変更"
+          className="absolute inset-y-0 left-0 z-[5] w-[7px] cursor-col-resize select-none"
+        />
+      )}
       <div className="shrink-0 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-xs text-fg-muted">{node ? LEVEL_LABEL[node.level] : "詳細"}</span>
@@ -109,14 +126,14 @@ export function DetailPanel<T extends DetailNode>({
               </IconButton>
             )}
           </span>
-          <IconButton label="閉じる" onClick={onClose}>
-            <CloseIcon size={14} />
+          <IconButton label="閉じる" onClick={close} className="max-md:size-10!">
+            <CloseIcon size={isMobile ? 18 : 14} />
           </IconButton>
         </div>
         <div className="mt-1 break-words text-sm font-medium text-fg">{title}</div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onFocus={isMobile ? revealFocusedField : undefined}>
         {node && (
           <Field label="ステータス">
             {onChangeStatus ? (
@@ -195,7 +212,7 @@ export function DetailPanel<T extends DetailNode>({
       </div>
 
       {node && ((canStart && onStart) || (canComplete && onComplete)) && (
-        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-surface p-3">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-surface p-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {canStart && onStart && (
             <Button
               variant="primary"
@@ -214,6 +231,60 @@ export function DetailPanel<T extends DetailNode>({
       )}
     </div>
   );
+}
+
+// While enabled, pushes one history entry so the browser's back button closes the panel. Returns
+// the close handler for the panel's own button: it goes back over that entry (the popstate then
+// closes the panel), so the entry does not pile up. If the panel unmounts some other way (the
+// caller clears the selection, e.g. after a delete), the leftover entry is taken back afterwards —
+// deferred so that StrictMode's unmount / remount in development (which pushes a new entry) keeps it.
+function useBackToClose(enabled: boolean, onClose: () => void): () => void {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const tokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const token = crypto.randomUUID();
+    tokenRef.current = token;
+    window.history.pushState({ ...window.history.state, detailPanel: token }, "");
+    const onPop = () => {
+      tokenRef.current = null;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (tokenRef.current !== token) return; // already went back
+      tokenRef.current = null;
+      setTimeout(() => {
+        if (window.history.state?.detailPanel === token) window.history.back();
+      }, 0);
+    };
+  }, [enabled]);
+
+  return () => {
+    if (enabled && tokenRef.current && window.history.state?.detailPanel === tokenRef.current) {
+      window.history.back();
+    } else {
+      onClose();
+    }
+  };
+}
+
+// Below the focused textarea sits its button row (コメントの「投稿」). When the soft keyboard opens,
+// the browser scrolls only the textarea itself into view, which can leave that row under the panel's
+// bottom bar. Once the keyboard has settled, scroll the panel so the room below the field shows too.
+const ROOM_BELOW_FIELD = 48;
+function revealFocusedField(e: FocusEvent<HTMLDivElement>) {
+  const field = e.target;
+  if (!(field instanceof HTMLTextAreaElement)) return;
+  const scroller = e.currentTarget;
+  setTimeout(() => {
+    if (document.activeElement !== field) return;
+    const overflow = field.getBoundingClientRect().bottom + ROOM_BELOW_FIELD - scroller.getBoundingClientRect().bottom;
+    if (overflow > 0) scroller.scrollTop += overflow;
+  }, 300);
 }
 
 // Label above, value below.

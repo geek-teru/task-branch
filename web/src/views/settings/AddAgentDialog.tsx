@@ -42,7 +42,7 @@ export function AddAgentDialog({ onClose }: { onClose: () => void }) {
     <Dialog
       onClose={onClose}
       title={provider ? `${provider.name} をつなぐ` : "エージェントを追加"}
-      className="w-[480px]"
+      className="md:w-[480px]"
       footer={
         provider ? (
           <>

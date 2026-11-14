@@ -65,7 +65,7 @@ export function TaskForm({
     <Dialog
       title={heading}
       onClose={onCancel}
-      className="w-[440px]"
+      className="md:w-[440px]"
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>
@@ -108,11 +108,11 @@ export function TaskForm({
       )}
 
       <div className="mt-3.5 flex gap-3">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <label className={fieldLabel}>開始日</label>
           <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <label className={fieldLabel}>期限</label>
           <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </div>
