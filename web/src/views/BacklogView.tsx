@@ -203,7 +203,7 @@ function BacklogForm({
     <Dialog
       title="バックログを追加"
       onClose={onCancel}
-      className="w-[420px]"
+      className="md:w-[420px]"
       footer={
         <>
           <Button onClick={onCancel} disabled={saving}>

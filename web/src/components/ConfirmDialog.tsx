@@ -19,7 +19,7 @@ export function ConfirmDialog({
   return (
     <Dialog
       onClose={onCancel}
-      className="w-[380px]"
+      className="md:w-[380px]"
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>

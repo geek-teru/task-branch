@@ -29,7 +29,7 @@ export function GroupForm({
     <Dialog
       title={heading}
       onClose={onCancel}
-      className="w-[420px]"
+      className="md:w-[420px]"
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>

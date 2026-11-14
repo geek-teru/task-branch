@@ -3,7 +3,7 @@ import { cn } from "../../lib/cn";
 
 // Shared by Input / Select / Textarea so the three fields look the same.
 export const fieldClass = cn(
-  "m-0 w-full rounded-md border border-border-strong bg-surface font-sans text-[13px] text-fg",
+  "m-0 w-full min-w-0 rounded-md border border-border-strong bg-surface font-sans text-[13px] text-fg max-md:text-base",
   "placeholder:text-fg-muted outline-none transition-colors",
   "focus:border-brand focus:ring-2 focus:ring-brand/20",
   "disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-fg-muted",

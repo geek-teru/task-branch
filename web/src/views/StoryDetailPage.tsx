@@ -301,7 +301,7 @@ function StoryInfoForm({
     <Dialog
       title="ストーリーを変更"
       onClose={onCancel}
-      className="w-[420px]"
+      className="md:w-[420px]"
       footer={
         <>
           <Button onClick={onCancel} disabled={saving}>
@@ -332,11 +332,11 @@ function StoryInfoForm({
       />
 
       <div className="mt-3.5 flex gap-3">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <label className="mb-1.5 block text-xs text-fg-muted">開始日</label>
           <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <label className="mb-1.5 block text-xs text-fg-muted">期限</label>
           <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </div>
