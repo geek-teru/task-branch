@@ -167,10 +167,10 @@ export function TaskComments({
               </span>
               {canModify(c) && editingId !== c.id && (
                 <span className="flex shrink-0 gap-0.5">
-                  <IconButton label="変更" onClick={() => startEdit(c)} className="size-6!">
+                  <IconButton label="変更" onClick={() => startEdit(c)} className="size-6! max-md:size-10!">
                     <EditIcon size={12} />
                   </IconButton>
-                  <IconButton label="削除" danger onClick={() => setDeletingId(c.id)} className="size-6!">
+                  <IconButton label="削除" danger onClick={() => setDeletingId(c.id)} className="size-6! max-md:size-10!">
                     <DeleteIcon size={12} />
                   </IconButton>
                 </span>
@@ -198,10 +198,10 @@ export function TaskComments({
                   disabled={saving}
                 />
                 <div className="mt-1.5 flex justify-end gap-1.5">
-                  <Button size="sm" onClick={cancelEdit} disabled={saving}>
+                  <Button size="sm" onClick={cancelEdit} disabled={saving} className="max-md:h-10 max-md:px-4">
                     キャンセル
                   </Button>
-                  <Button size="sm" variant="primary" onClick={save} disabled={!canSave}>
+                  <Button size="sm" variant="primary" onClick={save} disabled={!canSave} className="max-md:h-10 max-md:px-4">
                     {saving ? "保存中…" : "保存"}
                   </Button>
                 </div>
@@ -235,7 +235,7 @@ export function TaskComments({
         wrapperClassName="mt-2"
       />
       <div className="mt-1.5 flex justify-end">
-        <Button size="sm" variant="primary" onClick={post} disabled={!canPost}>
+        <Button size="sm" variant="primary" onClick={post} disabled={!canPost} className="max-md:h-10 max-md:px-4">
           {posting ? "投稿中…" : "投稿"}
         </Button>
       </div>

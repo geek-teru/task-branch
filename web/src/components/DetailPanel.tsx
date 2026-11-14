@@ -116,13 +116,13 @@ export function DetailPanel<T extends DetailNode>({
           {node && <IdBadge id={node.id} />}
           <span className="ml-auto flex items-center gap-0.5">
             {node && onEdit && (
-              <IconButton label="変更" onClick={() => onEdit(node)}>
-                <EditIcon size={14} />
+              <IconButton label="変更" onClick={() => onEdit(node)} className="max-md:size-10!">
+                <EditIcon size={isMobile ? 16 : 14} />
               </IconButton>
             )}
             {node && onDelete && (
-              <IconButton label="削除" danger onClick={() => onDelete(node)}>
-                <DeleteIcon size={14} />
+              <IconButton label="削除" danger onClick={() => onDelete(node)} className="max-md:size-10!">
+                <DeleteIcon size={isMobile ? 16 : 14} />
               </IconButton>
             )}
           </span>
@@ -216,6 +216,7 @@ export function DetailPanel<T extends DetailNode>({
           {canStart && onStart && (
             <Button
               variant="primary"
+              className="max-md:h-11"
               onClick={() => onStart(node)}
               data-tooltip={`この${LEVEL_LABEL[node.level]}を進行中にします`}
             >
@@ -223,7 +224,7 @@ export function DetailPanel<T extends DetailNode>({
             </Button>
           )}
           {canComplete && onComplete && (
-            <Button variant="primary" onClick={() => onComplete(node)}>
+            <Button variant="primary" className="max-md:h-11" onClick={() => onComplete(node)}>
               完了にする
             </Button>
           )}
@@ -314,7 +315,7 @@ function StoryPicker({
     return (
       <div className="flex items-center gap-1">
         <span className="min-w-0 break-words">{text ?? "-"}</span>
-        <IconButton label="ストーリーを変更" onClick={() => setEditing(true)} className="size-6!">
+        <IconButton label="ストーリーを変更" onClick={() => setEditing(true)} className="size-6! max-md:size-10!">
           <EditIcon size={13} />
         </IconButton>
       </div>
@@ -350,7 +351,8 @@ function AssigneePicker({
       variant="ghost"
       size="sm"
       label="担当者を変更"
-      menuClassName="min-w-[160px]"
+      menuClassName="min-w-[160px] max-md:[&>button]:min-h-10"
+      triggerClassName="max-md:h-10"
       className="-mx-2.5"
       trigger={
         <>

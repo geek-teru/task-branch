@@ -311,8 +311,9 @@ export function KanbanView({
                 e.stopPropagation();
                 setAdding(story);
               }}
+              className="size-10!"
             >
-              <AddIcon size={14} />
+              <AddIcon size={16} />
             </IconButton>
           </div>
           <div className="mt-0.5 text-sm text-fg">{story.title}</div>
@@ -323,15 +324,15 @@ export function KanbanView({
         {cards.length > 0 && (
           <div className="flex flex-col gap-1.5 px-3 pb-3">
             {cards.map((t) => (
+              // スマホはドラッグ＆ドロップをせず、タップで詳細（全画面）を開く。ステータスは詳細で変える。
               <TaskCard
                 key={t.id}
                 task={t}
                 assignee={assigneeOf(t, assignees)}
-                dragging={drag?.task.id === t.id}
+                dragging={false}
                 selected={selectedId === t.id}
                 onSelect={() => setSelectedId(t.id)}
-                onDragStart={() => setDrag({ task: t, storyId: story.id })}
-                onDragEnd={endDrag}
+                mobile
               />
             ))}
           </div>
@@ -662,6 +663,8 @@ function moveMessage({ task, status, targetStory }: { task: Task; status: Status
 }
 
 // 上から ID / タイトル / 期限。ストーリー名はレーンの見出しにあるので出さない。
+// mobile: ドラッグできないカード（タップで詳細を開くだけ）。ホバーのツールチップは出ないので、
+// 担当者はアイコンの横に名前も出す（説明は詳細パネルで読む）。
 function TaskCard({
   task,
   assignee,
@@ -670,6 +673,7 @@ function TaskCard({
   onSelect,
   onDragStart,
   onDragEnd,
+  mobile = false,
 }: {
   task: Task;
   // null = 未割り当て（アイコンを出さない）
@@ -677,17 +681,54 @@ function TaskCard({
   dragging: boolean;
   selected: boolean;
   onSelect: () => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  mobile?: boolean;
 }) {
   const closed = task.status === "closed";
+  if (mobile) {
+    return (
+      <Card
+        interactive
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+        className={cn(
+          "box-border min-h-16 px-3 py-2.5 text-fg",
+          selected && "border-brand ring-2 ring-brand/30 hover:border-brand",
+          closed && "opacity-60",
+        )}
+      >
+        <div className="flex items-center gap-1.5 text-[11px] leading-relaxed text-fg-muted">
+          <IdBadge id={task.id} />
+        </div>
+        <div className="mt-0.5 line-clamp-2 break-words text-sm">{task.title}</div>
+        {(task.due_date || assignee) && (
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-fg-muted">
+            {task.due_date && <span className="shrink-0">期限 {task.due_date}</span>}
+            {assignee && (
+              <span className="ml-auto min-w-0">
+                <AssigneeLabel assignee={assignee} />
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
+    );
+  }
   return (
     <Card
       interactive
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
-        onDragStart();
+        onDragStart?.();
       }}
       onDragEnd={onDragEnd}
       onClick={onSelect}
