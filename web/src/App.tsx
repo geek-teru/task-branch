@@ -40,6 +40,8 @@ import { agentAssigneeId } from "./lib/types";
 import { agentClientLabel, findAgentProvider } from "./lib/agentProviders";
 import { useAgentGrants } from "./lib/useAgentGrants";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
+import { BottomTabBar } from "./components/BottomTabBar";
+import { useIsMobile } from "./lib/useIsMobile";
 import { GlobalHeader } from "./components/GlobalHeader";
 import { GuestBanner } from "./components/GuestBanner";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -550,6 +552,9 @@ export default function App() {
     if (error) setError(`Google でのログインに失敗しました: ${error.message}`);
   }, []);
 
+  // Phone layout (< 768px): the bottom tab bar replaces the sidebar.
+  const isMobile = useIsMobile();
+
   // The side nav opens each page on the selected project.
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
@@ -673,8 +678,23 @@ export default function App() {
     </main>
   );
 
+  const activeMenu: MenuKey | null = isSettings
+    ? null
+    : isGantt
+      ? "gantt"
+      : isKanban
+        ? "kanban"
+        : isTimeline
+          ? "timeline"
+          : isPerformance
+            ? "performance"
+            : isBacklog
+              ? "backlog"
+              : "projects";
+
   return (
-    <div className="flex h-screen flex-col">
+    // dvh on phones: 100vh includes the area under Safari's toolbar, which would hide the tab bar.
+    <div className="flex h-screen flex-col max-md:h-dvh">
       <GlobalHeader
         projects={projects}
         currentProjectId={headerProjectId ?? null}
@@ -711,10 +731,7 @@ export default function App() {
         />
       )}
       <div className="flex min-h-0 flex-1">
-        <Sidebar
-          active={isSettings ? null : isGantt ? "gantt" : isKanban ? "kanban" : isTimeline ? "timeline" : isPerformance ? "performance" : isBacklog ? "backlog" : "projects"}
-          onNavigate={onNavigate}
-        />
+        {!isMobile && <Sidebar active={activeMenu} onNavigate={onNavigate} />}
 
         <div className="flex min-w-0 flex-1 flex-col">
           {error && (
@@ -894,6 +911,14 @@ export default function App() {
           </Routes>
         </div>
       </div>
+      {isMobile && (
+        <BottomTabBar
+          active={activeMenu}
+          settingsActive={isSettings}
+          onNavigate={onNavigate}
+          onOpenSettings={() => navigate("/settings/profile")}
+        />
+      )}
     </div>
   );
 }
