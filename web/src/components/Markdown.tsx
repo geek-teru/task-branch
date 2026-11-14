@@ -42,7 +42,9 @@ function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
 // Preflight resets margins and list markers, so every block sets its own.
 const block = "m-0 mb-2";
 const heading = "m-0 mb-1.5 mt-4 font-medium leading-snug text-fg first:mt-0";
-const cell = "border border-border px-2 py-1 text-left align-top";
+// min-w keeps columns readable on a phone: the table grows wider than the body and scrolls inside
+// its own wrapper, instead of every cell being squeezed to a character per line (overflow-wrap: anywhere).
+const cell = "min-w-32 border border-border px-2 py-1 text-left align-top";
 
 const components: Components = {
   p: ({ node: _node, ...props }) => <p className={cn(block, "whitespace-pre-line")} {...props} />,
