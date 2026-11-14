@@ -107,15 +107,28 @@ export async function exportProject(projectId: string): Promise<unknown> {
 }
 
 // Backlog page: stories of a project (every status), without the context document.
+// Each story carries the count of its child tasks and of those done or closed.
 export async function listBacklogStories(projectId: string): Promise<BacklogStory[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("id, title, description, status, sort_order, start_date, due_date")
-    .eq("project_id", projectId)
-    .eq("level", "story")
-    .order("sort_order", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as BacklogStory[];
+  const [stories, children] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id, title, description, status, sort_order, start_date, due_date")
+      .eq("project_id", projectId)
+      .eq("level", "story")
+      .order("sort_order", { ascending: true }),
+    supabase.from("tasks").select("parent_id, status").eq("project_id", projectId).neq("level", "story"),
+  ]);
+  if (stories.error) throw stories.error;
+  if (children.error) throw children.error;
+  const counts = new Map<string, { task_count: number; done_count: number }>();
+  for (const t of (children.data ?? []) as { parent_id: string | null; status: Status }[]) {
+    if (!t.parent_id) continue;
+    const c = counts.get(t.parent_id) ?? { task_count: 0, done_count: 0 };
+    c.task_count++;
+    if (t.status === "done" || t.status === "closed") c.done_count++;
+    counts.set(t.parent_id, c);
+  }
+  return (stories.data ?? []).map((s) => ({ ...s, ...(counts.get(s.id) ?? { task_count: 0, done_count: 0 }) })) as BacklogStory[];
 }
 
 // Timeline page: one page of the project's events, newest first. `before` is the oldest occurred_at
