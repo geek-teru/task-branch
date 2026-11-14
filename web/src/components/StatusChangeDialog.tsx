@@ -28,8 +28,10 @@ export function StatusChangeDialog({
       className={withComment ? "md:w-[440px]" : "md:w-[380px]"}
       footer={
         <>
-          <Button onClick={onCancel}>キャンセル</Button>
-          <Button variant="primary" autoFocus={!withComment} onClick={confirm}>
+          <Button onClick={onCancel} className="max-md:h-11 max-md:flex-1">
+            キャンセル
+          </Button>
+          <Button variant="primary" autoFocus={!withComment} onClick={confirm} className="max-md:h-11 max-md:flex-1">
             {confirmLabel}
           </Button>
         </>

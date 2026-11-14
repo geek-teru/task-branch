@@ -175,7 +175,7 @@ export function AttachmentTextarea({
           label="画像を添付"
           onClick={() => fileRef.current?.click()}
           disabled={disabled}
-          className="size-6!"
+          className="size-6! max-md:size-10!"
         >
           <AttachIcon size={13} />
         </IconButton>

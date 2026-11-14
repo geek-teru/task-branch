@@ -21,7 +21,9 @@ export function StatusPicker({
       size="sm"
       label="ステータスを変更"
       tooltip="クリックでステータスを変更"
-      menuClassName="min-w-[120px]"
+      // スマホではタップしやすいよう、バッジのボタンとメニューの項目を 40px 以上にする。
+      menuClassName="min-w-[120px] max-md:min-w-[160px] max-md:[&>button]:min-h-10"
+      triggerClassName="max-md:h-10"
       className="-mx-2.5"
       trigger={
         <>
