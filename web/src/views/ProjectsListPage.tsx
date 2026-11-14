@@ -1,6 +1,7 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import type { Project, ProjectInput } from "../lib/types";
 import { cn } from "../lib/cn";
+import { useIsMobile } from "../lib/useIsMobile";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
 import { ProjectForm } from "../components/ProjectForm";
 import { Badge } from "../components/ui/Badge";
@@ -68,6 +69,10 @@ export function ProjectsListPage({
     }
   });
 
+  // Phones always get the cards (one column): the table's fixed columns squash the text.
+  const isMobile = useIsMobile();
+  const shownView: ViewMode = isMobile ? "grid" : view;
+
   const changeView = (next: ViewMode) => {
     setView(next);
     try {
@@ -109,13 +114,14 @@ export function ProjectsListPage({
           </Button>
         }
       />
-      <div className="max-w-[1200px] px-6 pb-6">
+      <div className="max-w-[1200px] px-4 pb-6 md:px-6">
         <Toolbar variant="inline" className="mb-4">
           <SearchInput
             value={query}
             onChange={setQuery}
             placeholder="プロジェクトを検索"
             label="プロジェクトを名前で絞り込む"
+            className="w-full md:w-60"
           />
           <StateFilterSelect value={stateFilter} onChange={setStateFilter} />
           <Select
@@ -129,17 +135,19 @@ export function ProjectsListPage({
             className="w-32"
           />
 
-          <ToolbarEnd>
-            <SegmentedControl
-              value={view}
-              onChange={changeView}
-              label="表示"
-              options={[
-                { value: "grid", label: "グリッド表示", icon: <GridIcon size={14} /> },
-                { value: "list", label: "リスト表示", icon: <ListIcon size={14} /> },
-              ]}
-            />
-          </ToolbarEnd>
+          {!isMobile && (
+            <ToolbarEnd>
+              <SegmentedControl
+                value={view}
+                onChange={changeView}
+                label="表示"
+                options={[
+                  { value: "grid", label: "グリッド表示", icon: <GridIcon size={14} /> },
+                  { value: "list", label: "リスト表示", icon: <ListIcon size={14} /> },
+                ]}
+              />
+            </ToolbarEnd>
+          )}
         </Toolbar>
 
         {visible.length === 0 ? (
@@ -148,8 +156,8 @@ export function ProjectsListPage({
               ? "プロジェクトがありません。「New Project」から作成してください。"
               : "条件に合うプロジェクトがありません。"}
           </div>
-        ) : view === "grid" ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+        ) : shownView === "grid" ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] md:gap-4">
             {visible.map((p) => (
               <Card
                 key={p.id}
@@ -160,7 +168,7 @@ export function ProjectsListPage({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") onShowDetail(p.id);
                 }}
-                className="flex min-h-[148px] flex-col p-4 outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+                className="flex flex-col p-4 outline-none md:min-h-[148px] focus-visible:ring-2 focus-visible:ring-brand/30"
               >
                 <div className="flex items-start gap-3">
                   <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-muted text-fg-muted">

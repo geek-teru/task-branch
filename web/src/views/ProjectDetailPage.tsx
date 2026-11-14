@@ -83,14 +83,14 @@ export function ProjectDetailPage({
           </>
         }
       />
-      <div className="max-w-[960px] px-6 pb-6">
-        <p className={cn("m-0 text-sm", project.description ? "text-fg" : "text-fg-muted")}>
+      <div className="max-w-[960px] px-4 pb-6 md:px-6">
+        <p className={cn("m-0 whitespace-pre-wrap break-words text-sm", project.description ? "text-fg" : "text-fg-muted")}>
           {project.description ?? "説明なし"}
         </p>
 
         <Card className="mt-6 max-w-[720px]">
-          <div className="border-b border-border px-5 py-3 text-sm font-medium text-fg">基本情報</div>
-          <dl className="m-0 px-5 py-2">
+          <div className="border-b border-border px-4 py-3 text-sm font-medium text-fg md:px-5">基本情報</div>
+          <dl className="m-0 px-4 py-2 md:px-5">
             <Field label="URL">
               {project.url ? <ExternalLink href={project.url} /> : DASH}
             </Field>
@@ -152,8 +152,8 @@ const DASH = <span className="text-fg-muted">—</span>;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex gap-4 border-b border-border py-2.5 text-[13px] last:border-b-0">
-      <dt className="w-24 shrink-0 text-xs leading-5 text-fg-muted">{label}</dt>
+    <div className="flex flex-col gap-0.5 border-b border-border py-2.5 text-[13px] last:border-b-0 md:flex-row md:gap-4">
+      <dt className="shrink-0 text-xs leading-5 text-fg-muted md:w-24">{label}</dt>
       <dd className="m-0 min-w-0 break-all leading-5 text-fg">{children}</dd>
     </div>
   );
