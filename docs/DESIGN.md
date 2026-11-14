@@ -847,6 +847,7 @@ node scripts/attachments-access-check.mjs   # 期待と違う結果が1つでも
 | `project_activity_counts(project uuid, bucket text, from_date date, to_date date)` | パフォーマンス | `bucket`（`day` / `week`＝月曜始まり、Asia/Tokyo）ごとに stories_created / tasks_created / tasks_done を返す。空の区間も 0。`project` が null なら、呼び出したユーザーが見えるすべてのプロジェクト（RLS の範囲。アーカイブ済みも含む。カンバンの「すべてのプロジェクト」と同じ）を合わせて数える（画面は `?project=all`）。security invoker（`0026_task_events_rpc.sql`、`0033_activity_counts_all_projects.sql`） |
 
 | `record_usage_events(events jsonb)` | 使用量 | API 応答ごとの使用量（配列。1 回 500 件まで）を usage_events に記録し `{inserted, updated, skipped}` を返す。必須は session_id / request_key / model / occurred_at。持ち主は `current_owner_id()`、task_id は持ち主のプロジェクトのタスクだけ受け付け（それ以外は null）、project_id はタスクから埋める。同じ (owner_id, request_key) は、cost_usd が null で新しい値があるときだけ埋め（updated）、ほかは skipped。呼び出し内の重複は先頭だけ使う。JWT が無い・ゲストは例外。security definer、execute は authenticated のみ（`0035_usage_events.sql`） |
+| `usage_totals(project uuid, story uuid)` | 使用量 | usage_events の累計を 1 行で返す（responses / input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens / cost_usd / uncosted_responses / first_at / last_at）。`story` が null ならプロジェクト（`usage_events.project_id`）の合計、渡せばそのストーリーと配下タスク（`parent_id`）にひも付いた分の合計。cost_usd は費用の分かる応答だけの合計（無ければ null）、uncosted_responses は費用が null の応答数。画面のプロジェクト詳細・ストーリー詳細の「AI の使用量」カードが使う。security invoker（usage_events の RLS＝持ち主だけ）、execute は authenticated のみ（`0037_usage_totals.sql`） |
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
 - AI・UI が同じ RPC を使い、計算結果を一致させる。
 

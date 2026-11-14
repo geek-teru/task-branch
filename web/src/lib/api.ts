@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType } from "./types";
+import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
 
 // Guest limits (0031_guest_limits.sql) reject inserts with message 'guest_limit_exceeded'
 // and detail '<projects|stories|tasks|comments>:<limit>'. Turn that into a Japanese message.
@@ -443,4 +443,24 @@ export async function getActivityCounts(
     tasks_created: Number(r.tasks_created),
     tasks_done: Number(r.tasks_done),
   }));
+}
+
+// AI usage totals (RPC usage_totals): the project's, or with storyId the story's and its tasks'.
+// Only the owner's usage_events are counted (RLS).
+export async function getUsageTotals(projectId: string, storyId: string | null = null): Promise<UsageTotals> {
+  const { data, error } = await supabase.rpc("usage_totals", { project: projectId, story: storyId });
+  if (error) throw error;
+  const r = (((data ?? []) as Record<string, unknown>[])[0] ?? {}) as Record<string, unknown>;
+  // bigint / numeric columns may come back as strings; normalise to numbers.
+  return {
+    responses: Number(r.responses ?? 0),
+    input_tokens: Number(r.input_tokens ?? 0),
+    output_tokens: Number(r.output_tokens ?? 0),
+    cache_read_input_tokens: Number(r.cache_read_input_tokens ?? 0),
+    cache_creation_input_tokens: Number(r.cache_creation_input_tokens ?? 0),
+    cost_usd: r.cost_usd == null ? null : Number(r.cost_usd),
+    uncosted_responses: Number(r.uncosted_responses ?? 0),
+    first_at: (r.first_at as string | null) ?? null,
+    last_at: (r.last_at as string | null) ?? null,
+  };
 }

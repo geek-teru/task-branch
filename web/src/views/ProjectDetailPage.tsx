@@ -5,6 +5,7 @@ import { cn } from "../lib/cn";
 import { ProjectForm } from "../components/ProjectForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
+import { UsageSummary } from "../components/UsageSummary";
 import { Badge } from "../components/ui/Badge";
 import { IconButton } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -100,6 +101,8 @@ export function ProjectDetailPage({
             <Field label="更新日時">{fmt(project.updated_at)}</Field>
           </dl>
         </Card>
+
+        <UsageSummary projectId={project.id} className="mt-6 max-w-[720px]" />
       </div>
 
       {editing && (
