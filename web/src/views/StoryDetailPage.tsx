@@ -15,6 +15,7 @@ import { AttachmentList } from "../components/AttachmentList";
 import { AttachmentTextarea } from "../components/AttachmentTextarea";
 import { IdBadge } from "../components/IdBadge";
 import { Markdown } from "../components/Markdown";
+import { UsageSummary } from "../components/UsageSummary";
 import { EditIcon } from "../components/Icons";
 import { Badge } from "../components/ui/Badge";
 import { Button, IconButton } from "../components/ui/Button";
@@ -196,6 +197,8 @@ export function StoryDetailPage({
             </Card>
           )}
         />
+
+        <UsageSummary projectId={story.project_id} storyId={story.id} className="mt-6" />
 
         {/* @container: the description column is dropped when the card is narrow. */}
         <Card className="@container mt-6 overflow-hidden">

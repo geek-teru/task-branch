@@ -283,3 +283,16 @@ export interface ActivityCount {
 }
 
 export type ActivityBucket = "day" | "week";
+
+// AI usage totals of a project or a story (RPC usage_totals). Tokens are summed over API responses.
+export interface UsageTotals {
+  responses: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  cost_usd: number | null; // sum over responses whose cost is known; null when none is
+  uncosted_responses: number; // responses recorded without a cost
+  first_at: string | null;
+  last_at: string | null;
+}
