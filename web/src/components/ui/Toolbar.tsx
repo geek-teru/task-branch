@@ -3,7 +3,7 @@ import { cn } from "../../lib/cn";
 
 const VARIANT = {
   // Work screens (バックログ, ガント, カンバン): right under the <PageHeader>, with a bottom border.
-  bar: "shrink-0 border-b border-border px-6 pb-3",
+  bar: "shrink-0 border-b border-border px-4 pb-3 md:px-6",
   // Inside a page's body, under its heading (プロジェクト一覧): no bar.
   inline: "",
 };
