@@ -41,7 +41,7 @@ export function ProjectForm({
     <Dialog
       title={initial ? "プロジェクトを変更" : "新規プロジェクト"}
       onClose={onCancel}
-      className="w-[440px]"
+      className="md:w-[440px]"
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>

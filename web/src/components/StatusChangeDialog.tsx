@@ -25,7 +25,7 @@ export function StatusChangeDialog({
   return (
     <Dialog
       onClose={onCancel}
-      className={withComment ? "w-[440px]" : "w-[380px]"}
+      className={withComment ? "md:w-[440px]" : "md:w-[380px]"}
       footer={
         <>
           <Button onClick={onCancel}>キャンセル</Button>
