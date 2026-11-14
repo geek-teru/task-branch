@@ -4,7 +4,8 @@ import type { BacklogStory, Status } from "../lib/types";
 import { STATUS_ORDER, STORY_STATUSES, isFinished } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useResizableWidth } from "../lib/useResizableWidth";
-import { useTableSort, type SortValue } from "../lib/useTableSort";
+import { useTableSort, type SortState, type SortValue } from "../lib/useTableSort";
+import { useIsMobile } from "../lib/useIsMobile";
 import { StatusPicker } from "../components/StatusPicker";
 import { IdBadge } from "../components/IdBadge";
 import { AddIcon } from "../components/Icons";
@@ -15,6 +16,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Toolbar } from "../components/ui/Toolbar";
 import { Textarea } from "../components/ui/Textarea";
 import { Dialog } from "../components/ui/Dialog";
+import { Select, type SelectOption } from "../components/ui/Select";
 import { SortableTh } from "../components/ui/SortableTh";
 
 // 「完了・クローズも表示」の状態。ブラウザごとに覚える（カンバンの「クローズしたタスクも表示」と同じ扱い）。
@@ -27,6 +29,26 @@ const SORT_COLUMNS = {
   due_date: (s) => s.due_date,
   status: (s) => STATUS_ORDER.indexOf(s.status),
 } satisfies Record<string, (s: BacklogStory) => SortValue>;
+type SortKey = keyof typeof SORT_COLUMNS;
+
+// The phone has no column headers, so the sort is picked from a Select ("<key>:<dir>", or the rows' own order).
+const MOBILE_SORT_OPTIONS: SelectOption<string>[] = [
+  { value: "none", label: "既定の並び" },
+  { value: "title:asc", label: "名前（昇順）" },
+  { value: "title:desc", label: "名前（降順）" },
+  { value: "start_date:asc", label: "開始日が早い順" },
+  { value: "start_date:desc", label: "開始日が遅い順" },
+  { value: "due_date:asc", label: "期限が早い順" },
+  { value: "due_date:desc", label: "期限が遅い順" },
+  { value: "status:asc", label: "ステータス順" },
+  { value: "status:desc", label: "ステータス逆順" },
+];
+const sortToValue = (sort: SortState<SortKey>) => (sort ? `${sort.key}:${sort.dir}` : "none");
+const valueToSort = (value: string): SortState<SortKey> => {
+  if (value === "none") return null;
+  const [key, dir] = value.split(":");
+  return { key: key as SortKey, dir: dir === "desc" ? "desc" : "asc" };
+};
 
 // Stories of one project, from planning (バックログ) to closed. Done / closed ones are hidden by default.
 // Only name / period / status are shown; the description and the document (context) are read on the detail page.
@@ -45,6 +67,8 @@ export function BacklogView({
   onChangeStatus: (storyId: string, status: Status) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  // Under 768px the table becomes a list of cards (the columns would be too narrow to read).
+  const isMobile = useIsMobile();
   // ステータスはドラッグで幅を変えられる。名前は残り幅を使う。
   const status = useResizableWidth("backlog.statusWidth", 112, 72, 240, { invert: true });
   const [showFinished, setShowFinished] = useState(() => {
@@ -69,7 +93,7 @@ export function BacklogView({
     if (showFinished) return stories;
     return stories.filter((s) => !isFinished(s.status));
   }, [stories, showFinished]);
-  const { sorted, sort, toggle } = useTableSort(visible ?? [], SORT_COLUMNS);
+  const { sorted, sort, toggle, setSort } = useTableSort(visible ?? [], SORT_COLUMNS);
 
   return (
     <div className="flex h-full flex-col">
@@ -84,10 +108,19 @@ export function BacklogView({
       />
       <Toolbar>
         {projectSelect}
+        {isMobile && (
+          <Select
+            value={sortToValue(sort)}
+            onChange={(v) => setSort(valueToSort(v))}
+            options={MOBILE_SORT_OPTIONS}
+            aria-label="並び替え"
+            className="w-40"
+          />
+        )}
         <Switch checked={showFinished} onChange={toggleShowFinished} label="完了・クローズも表示" />
       </Toolbar>
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6">
         <div className="max-w-[960px]">
           {!visible ? (
             <div className="text-[13px] text-fg-muted">読み込み中…</div>
@@ -97,6 +130,12 @@ export function BacklogView({
             <div className="text-[13px] text-fg-muted">
               完了・クローズ以外のストーリーはありません。完了・クローズは「完了・クローズも表示」で出せます。
             </div>
+          ) : isMobile ? (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {sorted.map((s) => (
+                <BacklogCard key={s.id} story={s} onChangeStatus={(next) => onChangeStatus(s.id, next)} />
+              ))}
+            </ul>
           ) : (
             <div className="overflow-hidden rounded-md border border-border bg-surface">
               <table className="w-full table-fixed border-collapse text-[13px]">
@@ -156,6 +195,33 @@ export function BacklogView({
         />
       )}
     </div>
+  );
+}
+
+// One story on the phone: tapping the card opens the story; the status badge opens its own menu.
+// The link and the badge are siblings (a menu button inside a link is not valid HTML).
+function BacklogCard({ story: s, onChangeStatus }: { story: BacklogStory; onChangeStatus: (status: Status) => void }) {
+  const dim = isFinished(s.status) && "opacity-60";
+  const period = s.start_date || s.due_date ? `${s.start_date ?? "—"} 〜 ${s.due_date ?? "—"}` : "期間未設定";
+  return (
+    <li className="flex items-start gap-2 rounded-md border border-border bg-surface pr-3">
+      <Link
+        to={`/stories/${s.id}`}
+        aria-label={`${s.title} の詳細を開く`}
+        className={cn("block min-w-0 flex-1 py-3 pl-3 text-fg no-underline active:bg-surface-muted", dim)}
+      >
+        <div className="break-words text-[14px] font-medium leading-snug">{s.title}</div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-muted">
+          <span className="whitespace-nowrap">{period}</span>
+          <span className="whitespace-nowrap">
+            完了 {s.done_count} / {s.task_count}
+          </span>
+        </div>
+      </Link>
+      <div className="shrink-0 pt-1.5">
+        <StatusPicker status={s.status} statuses={STORY_STATUSES} onPick={onChangeStatus} />
+      </div>
+    </li>
   );
 }
 

@@ -25,7 +25,8 @@ export function useTableSort<T, K extends string>(rows: T[], columns: Record<K, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sort]);
 
-  return { sorted, sort, toggle };
+  // setSort picks a column and direction directly (the phone's sort Select, which has no headers).
+  return { sorted, sort, toggle, setSort };
 }
 
 function compareValues(a: SortValue, b: SortValue, sign: number): number {

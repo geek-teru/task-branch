@@ -160,7 +160,11 @@ export interface StoryGroup {
 export type BacklogStory = Pick<
   Task,
   "id" | "title" | "description" | "status" | "sort_order" | "start_date" | "due_date"
->;
+> & {
+  // Child tasks of the story, and how many of them are done or closed (progress on the phone cards).
+  task_count: number;
+  done_count: number;
+};
 
 // Latest saved version of a story's context document (story_context_revisions).
 export interface ContextRevision {
