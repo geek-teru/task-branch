@@ -9,6 +9,7 @@ import { GroupForm } from "../components/GroupForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailPanel } from "../components/DetailPanel";
 import { useResizableWidth } from "../lib/useResizableWidth";
+import { useIsMobile } from "../lib/useIsMobile";
 import { AddIcon, DeleteIcon, EditIcon } from "../components/Icons";
 import { Button, IconButton } from "../components/ui/Button";
 import { Switch } from "../components/ui/Switch";
@@ -22,6 +23,8 @@ const PX_PER_DAY = 8;
 const ROW_H = 26;
 const HEADER_H = 34;
 const MS_DAY = 86_400_000;
+// スマホ（768px 未満）の名前の列。狭めの固定幅で、幅は変えられない。
+const MOBILE_LABEL_W = 140;
 
 // バーの塗り。STATUS_CLASS の bg は淡い色なので、枠線の色で塗る。
 const BAR_BG: Record<Status, string> = {
@@ -193,20 +196,20 @@ export function GanttView({
   project,
   graph,
   projectSelect,
-  onAddStory,
-  onAddTask,
+  onAddStory: onAddStoryProp,
+  onAddTask: onAddTaskProp,
   onUpdateTask,
   onDeleteTask,
   onStartStory,
   onCompleteStory,
   onChangeStatus,
-  onResizeStory,
-  onShiftStory,
-  onMoveTask,
-  onAddGroup,
-  onRenameGroup,
-  onDeleteGroup,
-  onMoveStoryToGroup,
+  onResizeStory: onResizeStoryProp,
+  onShiftStory: onShiftStoryProp,
+  onMoveTask: onMoveTaskProp,
+  onAddGroup: onAddGroupProp,
+  onRenameGroup: onRenameGroupProp,
+  onDeleteGroup: onDeleteGroupProp,
+  onMoveStoryToGroup: onMoveStoryToGroupProp,
   assignees,
 }: {
   project: Project;
@@ -234,7 +237,25 @@ export function GanttView({
   // Candidates for a task's 担当者 (the form and the detail panel).
   assignees?: Assignees;
 }) {
-  const { width: LABEL_W, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
+  // スマホでは閲覧だけにする。タッチでの誤操作を防ぐため、バーの移動・伸縮、ストーリー行のドラッグ、
+  // グループの追加・改名・削除のハンドラを渡さない（ボタンとドラッグが出なくなる）。狭い名前の列を
+  // 名前に使うため、行の「＋」（ストーリー・タスクの追加）も出さない。
+  // ステータス変更・コメントは、バーのタップで開く詳細パネルで行える。
+  const isMobile = useIsMobile();
+  const onAddStory = isMobile ? undefined : onAddStoryProp;
+  const onAddTask = isMobile ? undefined : onAddTaskProp;
+  const onResizeStory = isMobile ? undefined : onResizeStoryProp;
+  const onShiftStory = isMobile ? undefined : onShiftStoryProp;
+  const onMoveTask = isMobile ? undefined : onMoveTaskProp;
+  const onAddGroup = isMobile ? undefined : onAddGroupProp;
+  const onRenameGroup = isMobile ? undefined : onRenameGroupProp;
+  const onDeleteGroup = isMobile ? undefined : onDeleteGroupProp;
+  const onMoveStoryToGroup = isMobile ? undefined : onMoveStoryToGroupProp;
+  const { width: savedLabelW, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
+  const LABEL_W = isMobile ? MOBILE_LABEL_W : savedLabelW;
+  // タイムラインの横スクロールの入れ物。スマホでは最初に今日の位置までスクロールする。
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrolledFor = useRef<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [form, setForm] = useState<
     | { mode: "create"; prevEnd: Date | null }
@@ -327,6 +348,16 @@ export function GanttView({
   // プロジェクトはヘッダーの切替かツールバーの選択欄で選ぶ。プロジェクトが変わったら詳細パネルを閉じる。
   useEffect(() => setSelectedKey(null), [project.id]);
 
+  // スマホの初期表示: 今日の線がタイムラインの見えている幅の左から 1/4 に来るように横スクロールする。
+  // プロジェクトごとに1回だけ（ステータス変更などで描き直しても、ユーザーのスクロールを戻さない）。
+  const todayX = model?.todayX ?? null;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!isMobile || !el || todayX == null || scrolledFor.current === project.id) return;
+    scrolledFor.current = project.id;
+    el.scrollLeft = Math.max(0, todayX - (el.clientWidth - LABEL_W) / 4);
+  }, [isMobile, project.id, todayX, LABEL_W]);
+
   const storyCount = filtered[0].graph.nodes.filter((n) => n.level === "story").length;
   const toolbar = (
     <>
@@ -347,7 +378,7 @@ export function GanttView({
     );
   }
 
-  const { rows, timelineStart, timelineW, months, weeks, weekends, todayX } = model;
+  const { rows, timelineStart, timelineW, months, weeks, weekends } = model;
 
   // 配下のタスクの数。0 件のストーリーには開閉のトグルを出さない。
   const childCount = new Map<string, number>();
@@ -401,7 +432,12 @@ export function GanttView({
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">
       {toolbar}
-      <div className="min-h-0 flex-1 overflow-auto bg-surface">
+      {isMobile && (
+        <div className="shrink-0 border-b border-border px-4 py-1.5 text-xs text-fg-muted">
+          閲覧のみ。期間の変更は PC で行えます
+        </div>
+      )}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto bg-surface">
         <div className="relative" style={{ width: totalW }}>
         {/* header */}
         <div className="sticky top-0 z-[3] flex" style={{ height: HEADER_H }}>
@@ -409,8 +445,8 @@ export function GanttView({
             className="sticky left-0 z-[4] flex shrink-0 items-center border-b border-r border-border bg-surface px-3 text-xs font-medium text-fg-muted"
             style={{ width: LABEL_W }}
           >
-            プロジェクト / ストーリー
-            <ResizeHandle onMouseDown={startResize} />
+            {isMobile ? "ストーリー" : "プロジェクト / ストーリー"}
+            {!isMobile && <ResizeHandle onMouseDown={startResize} />}
           </div>
           <div className="relative border-b border-border bg-surface text-xs text-fg-muted" style={{ width: timelineW }}>
             {months.map((mo) => (
@@ -622,7 +658,7 @@ export function GanttView({
                     className={cn(rowBtn, "size-5! px-0")}
                   />
                 )}
-                <ResizeHandle onMouseDown={startResize} />
+                {!isMobile && <ResizeHandle onMouseDown={startResize} />}
               </div>
               <div className="relative border-b border-border/60" style={{ width: timelineW }}>
                 {r.kind === "group" && r.start && r.end && <GroupBar row={r} timelineStart={timelineStart} />}
