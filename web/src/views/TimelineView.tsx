@@ -141,7 +141,7 @@ export function TimelineView({
       <Toolbar>
         {projectSelect}
         <Select
-          className="w-56"
+          className="w-56 max-md:w-full"
           aria-label="ストーリーで絞り込む"
           value={story ?? ALL_STORIES}
           onChange={(v) => updateFilter({ story: v === ALL_STORIES ? null : v })}
@@ -152,16 +152,17 @@ export function TimelineView({
         />
       </Toolbar>
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+      {/* On phones the feed runs edge to edge (no side padding, no rounded frame), like a phone SNS feed. */}
+      <div className="min-h-0 flex-1 overflow-auto md:px-6 md:py-4">
         <div className="max-w-[960px]">
-          {error && <div className="mb-3 text-[13px] text-danger">{error}</div>}
+          {error && <div className="mb-3 text-[13px] text-danger max-md:mb-0 max-md:px-4 max-md:py-3">{error}</div>}
           {!events ? (
-            !error && <div className="text-[13px] text-fg-muted">読み込み中…</div>
+            !error && <div className="text-[13px] text-fg-muted max-md:px-4 max-md:py-3">読み込み中…</div>
           ) : events.length === 0 ? (
-            <div className="text-[13px] text-fg-muted">まだ操作の履歴がありません。</div>
+            <div className="text-[13px] text-fg-muted max-md:px-4 max-md:py-3">まだ操作の履歴がありません。</div>
           ) : (
             <>
-              <ul className="m-0 list-none overflow-hidden rounded-md border border-b-0 border-border bg-surface p-0">
+              <ul className="m-0 list-none overflow-hidden rounded-md border border-b-0 border-border bg-surface p-0 max-md:rounded-none max-md:border-x-0 max-md:border-t-0">
                 {events.map((e) => (
                   <TimelinePost key={e.id} event={e} projectName={projectName} assignees={assignees} selected={e.task_id === selectedId} onSelect={select} />
                 ))}
