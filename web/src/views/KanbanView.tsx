@@ -443,7 +443,7 @@ export function KanbanView({
           title="カンバン"
           meta={`進行中のストーリー ${visibleProjects.reduce((n, p) => n + (lanesByProject.get(p.id)?.length ?? 0), 0)} 件`}
         />
-        <Toolbar>
+        <Toolbar className="max-md:border-b-0">
           {projectSelect}
           <div className={cn("flex items-center gap-1.5", effectiveFilter !== FILTER_ALL && "[&_button]:border-brand")}>
             <span className="text-xs text-fg-muted">担当者</span>
@@ -456,7 +456,10 @@ export function KanbanView({
             />
           </div>
           <Switch checked={showClosed} onChange={toggleShowClosed} label="クローズしたタスクも表示" />
-          {isMobile && (
+        </Toolbar>
+        {isMobile && (
+          // Kept outside the toolbar: the toolbar is folded on the phone, but this is how the phone board is read.
+          <div className="shrink-0 border-b border-border px-4 pb-3">
             <SegmentedControl<Status>
               value={effectiveMobileStatus}
               onChange={changeMobileStatus}
@@ -477,8 +480,8 @@ export function KanbanView({
               })}
               className="h-11 w-full [&>button]:h-[38px] [&>button]:w-auto [&>button]:flex-1 [&>button]:px-0 [&>button]:text-[11px]"
             />
-          )}
-        </Toolbar>
+          </div>
+        )}
 
         <div
           ref={boardRef}
