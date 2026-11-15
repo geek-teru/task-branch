@@ -56,7 +56,7 @@ export function AgentSettings() {
 
   return (
     <div className="flex max-w-[640px] flex-col gap-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="m-0 text-[13px] font-medium text-fg">接続中のエージェント</h3>
         <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
           エージェントを追加
@@ -77,7 +77,7 @@ export function AgentSettings() {
           {grants.map((g) => {
             const provider = findAgentProvider({ name: g.client.name });
             return (
-              <li key={g.client.id} className="flex items-center gap-3 px-4 py-3">
+              <li key={g.client.id} className="flex items-center gap-3 px-3 py-3 md:px-4">
                 <ProviderIcon provider={provider} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-medium text-fg">{agentClientLabel(g.client)}</span>

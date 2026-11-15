@@ -103,7 +103,7 @@ export function ProfileSettings({ session, onSaved }: { session: Session; onSave
         <div className="flex items-center gap-4">
           <Avatar url={shownUrl} name={displayName.trim() || googleName} className="size-20 text-2xl" />
           <div className="flex flex-col items-start gap-2">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => fileRef.current?.click()} disabled={saving}>
                 画像を選ぶ
               </Button>
@@ -150,7 +150,7 @@ export function ProfileSettings({ session, onSaved }: { session: Session; onSave
         <span className="text-[13px] text-fg">{session.user.email}</span>
       </Field>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="primary" onClick={handleSave} disabled={saving || nameTooLong}>
           {saving ? "保存中…" : "保存"}
         </Button>
