@@ -106,10 +106,10 @@ export function OAuthConsentPage({ session }: { session: Session | null }) {
           </InfoRow>
         </dl>
         <div className="flex gap-2">
-          <Button onClick={() => decide(denyAuthorization)} disabled={pending} className="h-9 flex-1">
+          <Button onClick={() => decide(denyAuthorization)} disabled={pending} className="h-10 flex-1 md:h-9">
             拒否
           </Button>
-          <Button variant="primary" onClick={() => decide(approveAuthorization)} disabled={pending} className="h-9 flex-1">
+          <Button variant="primary" onClick={() => decide(approveAuthorization)} disabled={pending} className="h-10 flex-1 md:h-9">
             許可
           </Button>
         </div>
