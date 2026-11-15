@@ -147,23 +147,24 @@ export function PerformanceView({
         )}
       </Toolbar>
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6">
         {invalid ? (
           <div className="text-[13px] text-danger">開始日は終了日以前にしてください。</div>
         ) : !counts ? (
           <div className="text-[13px] text-fg-muted">読み込み中…</div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {SERIES.map((s) => (
               <StatWidget key={s.key} label={s.label} color={s.color} value={totals[s.key]} counts={counts} dataKey={s.key} />
             ))}
 
-            <Widget title="件数の推移" aside={`${period} ・ ${bucketLabel}`} className="sm:col-span-3">
+            <Widget title="件数の推移" aside={`${period} ・ ${bucketLabel}`} className="md:col-span-3">
               <ActivityChart counts={counts} bucket={bucket} />
             </Widget>
 
-            <Widget title="区間ごとの件数" aside={`${counts.length} 区間`} className="sm:col-span-3" bodyClassName="overflow-hidden rounded-b-md">
-              <table className="w-full border-collapse text-[13px]">
+            <Widget title="区間ごとの件数" aside={`${counts.length} 区間`} className="md:col-span-3" bodyClassName="overflow-x-auto rounded-b-md">
+              {/* Only the table scrolls sideways when the columns don't fit (phones). */}
+              <table className="w-full min-w-max border-collapse whitespace-nowrap text-[13px]">
                 <thead>
                   <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
                     <th className="px-3 py-2 font-medium">{bucket === "week" ? "週の開始日" : "日付"}</th>

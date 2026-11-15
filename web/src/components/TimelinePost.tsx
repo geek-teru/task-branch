@@ -124,8 +124,9 @@ function TargetPath({ e, projectName }: { e: TaskEvent; projectName: string }) {
   const fullPath = [projectName, storyTitle, e.level === "task" ? e.task_title : null].filter(Boolean).join(" > ");
   return (
     <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-fg-muted" data-tooltip={fullPath}>
-      {projectName && <span className="min-w-0 max-w-[30%] shrink truncate">{projectName}</span>}
-      {projectName && story && sep}
+      {/* On phones the project is left out (it is the one picked in the header) to keep room for the story and task. */}
+      {projectName && <span className="min-w-0 max-w-[30%] shrink truncate max-md:hidden">{projectName}</span>}
+      {projectName && story && <span className="contents max-md:hidden">{sep}</span>}
       {story}
       {e.level === "task" && (
         <>

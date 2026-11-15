@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ActivityBucket, ActivityCount } from "../lib/types";
+import { useIsMobile } from "../lib/useIsMobile";
 
 export type SeriesKey = "stories_created" | "tasks_created" | "tasks_done";
 
@@ -58,6 +59,7 @@ function ChartTooltip({ active, payload, bucket, hidden }: TipProps) {
 // 枠は持たない（ui/Widget の本文に置く）。
 export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; bucket: ActivityBucket }) {
   const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
+  const isMobile = useIsMobile();
 
   // 全部は消せない: 最後の 1 系列は押しても何も起きない。
   const toggle = (key: SeriesKey) =>
@@ -76,8 +78,8 @@ export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; buc
   const step = Math.ceil(yMax / 4);
   const top = Math.ceil(yMax / step) * step;
   const yTicks = Array.from({ length: top / step + 1 }, (_, i) => i * step);
-  // ラベルが重ならないよう、区間が多いときは間引く。
-  const interval = Math.max(0, Math.ceil(counts.length / 12) - 1);
+  // ラベルが重ならないよう、区間が多いときは間引く（スマホは幅が狭いので 6 本程度まで）。
+  const interval = Math.max(0, Math.ceil(counts.length / (isMobile ? 6 : 12)) - 1);
 
   return (
     <div>
@@ -100,9 +102,9 @@ export function ActivityChart({ counts, bucket }: { counts: ActivityCount[]; buc
           );
         })}
       </div>
-      <div role="img" aria-label="件数の推移" className="h-60 w-full">
+      <div role="img" aria-label="件数の推移" className="h-48 w-full md:h-60">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={counts} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <BarChart data={counts} margin={{ top: 8, right: isMobile ? 0 : 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.6} />
             <XAxis
               dataKey="bucket_start"
