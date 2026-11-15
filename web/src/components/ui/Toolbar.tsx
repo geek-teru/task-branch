@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
+import { useMobileHeaderExpanded, useRegisterToolbar } from "../../lib/useMobileHeader";
 
 const VARIANT = {
   // Work screens (バックログ, ガント, カンバン): right under the <PageHeader>, with a bottom border.
@@ -10,6 +11,8 @@ const VARIANT = {
 
 // Order on the left: search → filter Select → sort Select → Switch. Put the view switch and
 // the primary add button in <ToolbarEnd> on the right. Every part is h-8.
+// On phones (< 768px) the bar stays hidden until the <PageHeader>'s toggle opens it. Keep
+// anything the phone layout can't do without (カンバンのステータス切り替え) outside the bar.
 export function Toolbar({
   variant = "bar",
   className,
@@ -19,7 +22,13 @@ export function Toolbar({
   className?: string;
   children: ReactNode;
 }) {
-  return <div className={cn("flex flex-wrap items-center gap-2", VARIANT[variant], className)}>{children}</div>;
+  useRegisterToolbar();
+  const expanded = useMobileHeaderExpanded();
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2", VARIANT[variant], className, !expanded && "max-md:hidden")}>
+      {children}
+    </div>
+  );
 }
 
 export function ToolbarEnd({ children }: { children: ReactNode }) {
