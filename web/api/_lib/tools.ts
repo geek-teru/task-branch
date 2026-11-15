@@ -85,21 +85,6 @@ const planStory = z.object({
   tasks: z.array(planTask).optional().describe("ストーリー配下に作るタスク"),
 });
 
-type PlanRow = { id: string; external_id: string | null; title: string; created: boolean };
-type ExistingRow = { id: string; project_id: string; level: "story" | "task"; title: string; metadata: { external_id?: string } };
-
-// 末尾の sort_order。無ければ fallback（画面の addRootStory / addChild と同じ並べ方）。
-async function lastSortOrder(db: SupabaseClient, column: "project_id" | "parent_id", value: string, level: "story" | "task") {
-  const { data, error } = await db
-    .from("tasks")
-    .select("sort_order")
-    .eq(column, value)
-    .eq("level", level)
-    .order("sort_order", { ascending: false })
-    .limit(1);
-  return { last: (data?.[0]?.sort_order as number | undefined) ?? null, error };
-}
-
 // list_projects / create_project で返すプロジェクトの列。
 const PROJECT_COLUMNS = "id, name, description, url, repository_url";
 
@@ -431,141 +416,11 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       },
     },
     async ({ project_id, stories }) => {
-      for (const s of stories) {
-        if (!s.id && !s.title) return toolError("stories[] には id（既存のストーリー）か title（新規）のどちらかが要ります");
-      }
-
-      // 入力の中の external_id の重複は、どちらを正とするか決められないので弾く。
-      const inputIds = stories.flatMap((s) => [...(s.id ? [] : [s.external_id]), ...(s.tasks ?? []).map((t) => t.external_id)]);
-      const externalIds = inputIds.filter((v): v is string => v !== undefined);
-      const duplicated = externalIds.filter((v, i) => externalIds.indexOf(v) !== i);
-      if (duplicated.length > 0) return toolError(`external_id が入力の中で重複しています: ${[...new Set(duplicated)].join(", ")}`);
-
-      const { data: project, error: projectError } = await db.from("projects").select("id, owner_id").eq("id", project_id).maybeSingle();
-      if (projectError) return restError(projectError);
-      if (!project) return toolError(`プロジェクトが見つかりません: ${project_id}`);
-
-      const columns = "id, project_id, level, title, metadata";
-      const byExternalId = new Map<string, ExistingRow>();
-      if (externalIds.length > 0) {
-        const { data, error } = await db
-          .from("tasks")
-          .select(columns)
-          .eq("project_id", project_id)
-          .in("metadata->>external_id", externalIds);
-        if (error) return restError(error);
-        for (const row of data as ExistingRow[]) byExternalId.set(row.metadata.external_id!, row);
-      }
-
-      const storyIds = stories.flatMap((s) => (s.id ? [s.id] : []));
-      const byId = new Map<string, ExistingRow>();
-      if (storyIds.length > 0) {
-        const { data, error } = await db.from("tasks").select(columns).in("id", storyIds);
-        if (error) return restError(error);
-        for (const row of data as ExistingRow[]) byId.set(row.id, row);
-      }
-
-      // 既存の行と level が食い違うものは、作り直しも流用もできないので何も作らずに弾く。
-      for (const s of stories) {
-        if (s.id) {
-          const row = byId.get(s.id);
-          if (!row || row.project_id !== project_id || row.level !== "story") {
-            return toolError(`このプロジェクトのストーリーが見つかりません: ${s.id}`);
-          }
-        } else if (s.external_id && byExternalId.get(s.external_id)?.level === "task") {
-          return toolError(`external_id ${s.external_id} は既存のタスクに使われています（ストーリーには使えません）`);
-        }
-        for (const t of s.tasks ?? []) {
-          if (t.external_id && byExternalId.get(t.external_id)?.level === "story") {
-            return toolError(`external_id ${t.external_id} は既存のストーリーに使われています（タスクには使えません）`);
-          }
-        }
-      }
-
-      // ストーリーを一括で作る。並びはプロジェクトのストーリーの末尾に続ける。
-      const newStories = stories.filter((s) => !s.id && !(s.external_id && byExternalId.has(s.external_id)));
-      const storyRows = new Map<(typeof stories)[number], PlanRow>();
-      if (newStories.length > 0) {
-        const { last, error: lastError } = await lastSortOrder(db, "project_id", project_id, "story");
-        if (lastError) return restError(lastError);
-        const { data, error } = await db
-          .from("tasks")
-          .insert(
-            newStories.map((s, i) => ({
-              project_id,
-              level: "story",
-              title: s.title,
-              description: s.description ?? null,
-              context: s.context ?? null,
-              start_date: s.start_date ?? null,
-              due_date: s.due_date ?? null,
-              status: s.status ?? "todo",
-              sort_order: (last ?? 0) + 1 + i,
-              metadata: s.external_id ? { external_id: s.external_id } : {},
-            })),
-          )
-          .select("id, title");
-        if (error) return restError(error);
-        newStories.forEach((s, i) => storyRows.set(s, { id: data[i].id, external_id: s.external_id ?? null, title: data[i].title, created: true }));
-      }
-      for (const s of stories) {
-        if (storyRows.has(s)) continue;
-        const row = s.id ? byId.get(s.id)! : byExternalId.get(s.external_id!)!;
-        storyRows.set(s, { id: row.id, external_id: row.metadata.external_id ?? null, title: row.title, created: false });
-      }
-
-      // タスクを一括で作る。並びはストーリーごとに、配下のタスクの末尾に続ける。
-      const taskInserts: Record<string, unknown>[] = [];
-      const taskRows = new Map<(typeof stories)[number], (PlanRow | number)[]>();
-      for (const s of stories) {
-        const story = storyRows.get(s)!;
-        let next: number | null = null;
-        const rows: (PlanRow | number)[] = [];
-        for (const t of s.tasks ?? []) {
-          const existing = t.external_id ? byExternalId.get(t.external_id) : undefined;
-          if (existing) {
-            rows.push({ id: existing.id, external_id: t.external_id!, title: existing.title, created: false });
-            continue;
-          }
-          if (next === null) {
-            const { last, error } = story.created ? { last: null, error: null } : await lastSortOrder(db, "parent_id", story.id, "task");
-            if (error) return restError(error);
-            next = (last ?? -1) + 1;
-          }
-          rows.push(taskInserts.length);
-          taskInserts.push({
-            project_id,
-            parent_id: story.id,
-            level: "task",
-            title: t.title,
-            description: t.description ?? null,
-            start_date: t.start_date ?? null,
-            due_date: t.due_date ?? null,
-            ...assigneeColumns(t.assignee ?? "none", project.owner_id, clientId),
-            sort_order: next++,
-            metadata: t.external_id ? { external_id: t.external_id } : {},
-          });
-        }
-        taskRows.set(s, rows);
-      }
-      let inserted: { id: string; title: string; metadata: { external_id?: string } }[] = [];
-      if (taskInserts.length > 0) {
-        const { data, error } = await db.from("tasks").insert(taskInserts).select("id, title, metadata");
-        if (error) return restError(error);
-        inserted = data;
-      }
-
-      return json({
-        project_id,
-        stories: stories.map((s) => ({
-          ...storyRows.get(s)!,
-          tasks: taskRows.get(s)!.map((r) =>
-            typeof r === "number"
-              ? { id: inserted[r].id, external_id: inserted[r].metadata.external_id ?? null, title: inserted[r].title, created: true }
-              : r,
-          ),
-        })),
-      });
+      // 登録の処理は RPC create_plan（0038_create_plan.sql）に一本化している。1 トランザクションで、
+      // 入力の誤りは errcode 22023 の日本語のメッセージで返る。
+      const { data, error } = await db.rpc("create_plan", { project: project_id, stories });
+      if (error) return error.code === "22023" ? toolError(error.message) : restError(error);
+      return json(data);
     },
   );
 
