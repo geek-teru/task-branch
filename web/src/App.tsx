@@ -858,6 +858,7 @@ export default function App() {
                     <StoryDetailPage
                       storyId={storyMatch.params.storyId}
                       projects={projects}
+                      assignees={assignees}
                       onError={setError}
                       onLoadProject={selectProject}
                     />

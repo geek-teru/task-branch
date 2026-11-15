@@ -6,11 +6,16 @@ import {
   listStoryTasks,
   updateStoryContext,
   updateStoryInfo,
+  updateTaskStatus,
 } from "../lib/api";
-import type { ContextRevision, Project, Task } from "../lib/types";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/types";
+import type { Assignees, ContextRevision, Project, Status, Task } from "../lib/types";
+import { STATUS_LABEL, STATUS_ORDER, TASK_STATUSES, assigneeOf, isFinished } from "../lib/types";
 import { cn } from "../lib/cn";
-import { useTableSort, type SortValue } from "../lib/useTableSort";
+import { useIsMobile } from "../lib/useIsMobile";
+import { useTableSort, type SortState, type SortValue } from "../lib/useTableSort";
+import { AssigneeLabel } from "../components/AssigneeLabel";
+import { DetailPanel } from "../components/DetailPanel";
+import { StatusPicker } from "../components/StatusPicker";
 import { AttachmentList } from "../components/AttachmentList";
 import { AttachmentTextarea } from "../components/AttachmentTextarea";
 import { IdBadge } from "../components/IdBadge";
@@ -23,6 +28,7 @@ import { Card } from "../components/ui/Card";
 import { Dialog } from "../components/ui/Dialog";
 import { Input } from "../components/ui/Input";
 import { PageHeader } from "../components/ui/PageHeader";
+import { Select, type SelectOption } from "../components/ui/Select";
 import { SortableTh } from "../components/ui/SortableTh";
 import { Textarea } from "../components/ui/Textarea";
 
@@ -33,17 +39,38 @@ const SORT_COLUMNS = {
   status: (t) => STATUS_ORDER.indexOf(t.status),
   period: (t) => (t.start_date || t.due_date ? [t.start_date, t.due_date] : null),
 } satisfies Record<string, (t: Task) => SortValue>;
+type SortKey = keyof typeof SORT_COLUMNS;
+
+// The phone has no column headers, so the sort is picked from a Select ("<key>:<dir>", or the rows' own order).
+const MOBILE_SORT_OPTIONS: SelectOption<string>[] = [
+  { value: "none", label: "既定の並び" },
+  { value: "title:asc", label: "名前（昇順）" },
+  { value: "title:desc", label: "名前（降順）" },
+  { value: "status:asc", label: "ステータス順" },
+  { value: "status:desc", label: "ステータス逆順" },
+  { value: "period:asc", label: "期間が早い順" },
+  { value: "period:desc", label: "期間が遅い順" },
+];
+const sortToValue = (sort: SortState<SortKey>) => (sort ? `${sort.key}:${sort.dir}` : "none");
+const valueToSort = (value: string): SortState<SortKey> => {
+  if (value === "none") return null;
+  const [key, dir] = value.split(":");
+  return { key: key as SortKey, dir: dir === "desc" ? "desc" : "asc" };
+};
 
 // Story detail: name / description, status, the context document and the story's tasks.
 // Loads its own data through the api layer (the story's context is only needed here).
 export function StoryDetailPage({
   storyId,
   projects,
+  assignees,
   onError,
   onLoadProject,
 }: {
   storyId: string;
   projects: Project[];
+  // For the task cards' 担当 and the detail panel on the phone.
+  assignees?: Assignees;
   onError: (message: string) => void;
   // Called with the story's project once loaded, so it becomes the app-wide selection.
   onLoadProject?: (projectId: string) => void;
@@ -55,7 +82,11 @@ export function StoryDetailPage({
   const [saving, setSaving] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [uploading, setUploading] = useState(false); // images being attached to the context
-  const { sorted: sortedTasks, sort, toggle } = useTableSort(tasks, SORT_COLUMNS);
+  const { sorted: sortedTasks, sort, toggle, setSort } = useTableSort(tasks, SORT_COLUMNS);
+  // Under 768px the task table becomes a list of cards, and a tapped card opens the full-screen detail panel.
+  const isMobile = useIsMobile();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [commentsVersion, setCommentsVersion] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -79,6 +110,19 @@ export function StoryDetailPage({
   if (story === null) return <div className="p-6 text-[13px] text-fg-muted">ストーリーが見つかりません。</div>;
 
   const project = projects.find((p) => p.id === story.project_id);
+  const selectedTask = isMobile ? tasks.find((t) => t.id === selectedTaskId) ?? null : null;
+  const doneCount = tasks.filter((t) => isFinished(t.status)).length;
+
+  // From a card's badge or the detail panel. Reloads so the badge, the order and the panel agree.
+  const changeTaskStatus = async (t: Task, status: Status) => {
+    try {
+      await updateTaskStatus(t.id, status);
+      setCommentsVersion((v) => v + 1);
+      await load();
+    } catch (err: any) {
+      onError(String(err.message ?? err));
+    }
+  };
   const editing = draft !== null;
   const dirty = editing && draft !== (story.context ?? "");
 
@@ -121,12 +165,15 @@ export function StoryDetailPage({
           </Link>
         }
         title={story.title}
+        // On the phone the attributes are stacked under the description instead.
         meta={
-          <>
-            <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
-            <span className="text-[11px]">{period(story)}</span>
-            <IdBadge id={story.id} />
-          </>
+          isMobile ? undefined : (
+            <>
+              <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
+              <span className="text-[11px]">{period(story)}</span>
+              <IdBadge id={story.id} />
+            </>
+          )
         }
         actions={
           <IconButton label="変更" size="md" onClick={() => setEditingInfo(true)}>
@@ -134,10 +181,25 @@ export function StoryDetailPage({
           </IconButton>
         }
       />
-      <div className="max-w-[960px] px-6 pb-6">
+      <div className="max-w-[960px] px-4 pb-6 md:px-6">
         <p className={cn("m-0 text-sm", story.description ? "text-fg" : "text-fg-muted")}>
           {story.description ?? "（説明なし）"}
         </p>
+
+        {isMobile && (
+          <dl className="m-0 mt-4 flex flex-col gap-2 text-[13px]">
+            <Attribute label="ステータス">
+              <Badge tone={story.status}>{STATUS_LABEL[story.status]}</Badge>
+            </Attribute>
+            <Attribute label="期間">{period(story)}</Attribute>
+            <Attribute label="進捗">
+              完了 {doneCount} / {tasks.length}
+            </Attribute>
+            <Attribute label="ID">
+              <IdBadge id={story.id} />
+            </Attribute>
+          </dl>
+        )}
 
         <Card className="mt-6">
           <CardHeader
@@ -202,9 +264,31 @@ export function StoryDetailPage({
 
         {/* @container: the description column is dropped when the card is narrow. */}
         <Card className="@container mt-6 overflow-hidden">
-          <CardHeader title="タスク" meta={`${tasks.length} 件`} />
+          <CardHeader title="タスク" meta={`${tasks.length} 件`}>
+            {isMobile && tasks.length > 1 && (
+              <Select
+                value={sortToValue(sort)}
+                onChange={(v) => setSort(valueToSort(v))}
+                options={MOBILE_SORT_OPTIONS}
+                aria-label="並び替え"
+                className="w-36"
+              />
+            )}
+          </CardHeader>
           {tasks.length === 0 ? (
             <div className="px-5 py-4 text-[13px] text-fg-muted">タスクはまだありません。</div>
+          ) : isMobile ? (
+            <ul className="m-0 list-none p-0">
+              {sortedTasks.map((t) => (
+                <TaskCard
+                  key={t.id}
+                  task={t}
+                  assignees={assignees}
+                  onOpen={() => setSelectedTaskId(t.id)}
+                  onChangeStatus={(next) => changeTaskStatus(t, next)}
+                />
+              ))}
+            </ul>
           ) : (
             <table className="w-full table-fixed border-collapse text-[13px]">
               <thead>
@@ -240,6 +324,22 @@ export function StoryDetailPage({
         </Card>
       </div>
 
+      {selectedTask && (
+        <DetailPanel
+          title={selectedTask.title}
+          node={selectedTask}
+          start={selectedTask.start_date ? new Date(`${selectedTask.start_date}T00:00:00`) : null}
+          end={selectedTask.due_date ? new Date(`${selectedTask.due_date}T00:00:00`) : null}
+          place={{ story: story.title }}
+          onClose={() => setSelectedTaskId(null)}
+          onStart={(t) => changeTaskStatus(t, "in_progress")}
+          onComplete={(t) => changeTaskStatus(t, "done")}
+          onChangeStatus={changeTaskStatus}
+          commentsVersion={commentsVersion}
+          assignees={assignees}
+        />
+      )}
+
       {editingInfo && (
         <StoryInfoForm
           initial={story}
@@ -253,6 +353,54 @@ export function StoryDetailPage({
 
 function period(t: Task): string {
   return t.start_date || t.due_date ? `${t.start_date ?? "—"} 〜 ${t.due_date ?? "—"}` : "—";
+}
+
+// One attribute row of the story on the phone (label on the left, value on the right).
+function Attribute({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-7 items-center gap-3">
+      <dt className="w-20 shrink-0 text-xs text-fg-muted">{label}</dt>
+      <dd className="m-0 min-w-0 text-fg">{children}</dd>
+    </div>
+  );
+}
+
+// One task on the phone: tapping the card opens the detail panel; the status badge opens its own menu.
+// The open button and the badge are siblings (a menu button inside a button is not valid HTML).
+function TaskCard({
+  task: t,
+  assignees,
+  onOpen,
+  onChangeStatus,
+}: {
+  task: Task;
+  assignees?: Assignees;
+  onOpen: () => void;
+  onChangeStatus: (status: Status) => void;
+}) {
+  const dim = isFinished(t.status) && "opacity-60";
+  return (
+    <li className="flex items-start gap-2 border-b border-border pr-3 last:border-b-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${t.title} の詳細を開く`}
+        className={cn(
+          "block min-w-0 flex-1 cursor-pointer border-0 bg-transparent py-3 pl-4 text-left text-fg active:bg-surface-muted",
+          dim,
+        )}
+      >
+        <div className="break-words text-[14px] font-medium leading-snug">{t.title}</div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-muted">
+          {assignees && <AssigneeLabel assignee={assigneeOf(t, assignees)} />}
+          <span className="whitespace-nowrap">{t.start_date || t.due_date ? period(t) : "期間未設定"}</span>
+        </div>
+      </button>
+      <div className="shrink-0 pt-1.5">
+        <StatusPicker status={t.status} statuses={TASK_STATUSES} onPick={onChangeStatus} />
+      </div>
+    </li>
+  );
 }
 
 // Card title row: title, a muted note next to it and buttons on the right.
