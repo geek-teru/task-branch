@@ -617,7 +617,7 @@ export function KanbanView({
 
       {pendingMove && (
         <StatusChangeDialog
-          message={moveMessage(pendingMove)}
+          message={moveMessage(pendingMove, openTaskCount(lanes, pendingMove))}
           confirmLabel={pendingMove.targetStory ? "移動する" : undefined}
           withComment={acceptsComment(pendingMove)}
           onConfirm={(comment) => {
@@ -643,15 +643,31 @@ function acceptsComment({ task, status }: { task: Task; status: Status }): boole
   return task.level === "task" && status !== task.status && (status === "in_progress" || status === "done");
 }
 
+// ストーリーを完了・クローズにするときだけ、そのレーンの未完了のタスクを数える（それ以外は 0）。
+function openTaskCount(lanes: KanbanLane[], { task, status, targetStory }: { task: Task; status: Status; targetStory?: Task }): number {
+  if (targetStory || task.level !== "story" || !isFinished(status)) return 0;
+  const lane = lanes.find((l) => l.story.id === task.id);
+  return lane ? lane.tasks.filter((t) => !isFinished(t.status)).length : 0;
+}
+
 // 確認モーダルの文面。ステータスが変わらない移動ではその一文を省き、
 // 進行中でないストーリーへ移すときはカンバンから消えることを添える。
-function moveMessage({ task, status, targetStory }: { task: Task; status: Status; targetStory?: Task }): string {
+// openTasks: ストーリーを完了・クローズにするときの、配下の未完了（完了・クローズ以外）のタスク数。
+// 配下のタスクのステータスは変えず、警告だけ出す。
+function moveMessage(
+  { task, status, targetStory }: { task: Task; status: Status; targetStory?: Task },
+  openTasks = 0,
+): string {
   if (!targetStory) {
     const warn =
       task.level === "story" && status !== "in_progress"
         ? `\nカンバンには進行中のストーリーだけが出るため、変更するとカンバンには出なくなります。`
         : "";
-    return `「${task.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。${warn}\nよろしいですか？`;
+    const openWarn =
+      openTasks > 0
+        ? `\n未完了のタスクが ${openTasks} 件残っています（タスクのステータスは変わりません）。`
+        : "";
+    return `「${task.title}」のステータスを『${STATUS_LABEL[status]}』に変更します。${warn}${openWarn}\nよろしいですか？`;
   }
   const head =
     status === task.status
