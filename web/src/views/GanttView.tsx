@@ -210,6 +210,7 @@ export function GanttView({
   onRenameGroup: onRenameGroupProp,
   onDeleteGroup: onDeleteGroupProp,
   onMoveStoryToGroup: onMoveStoryToGroupProp,
+  onMoveTaskToStory: onMoveTaskToStoryProp,
   assignees,
 }: {
   project: Project;
@@ -234,6 +235,8 @@ export function GanttView({
   onDeleteGroup?: (id: string) => void;
   // Put a story into a group, or take it out of its group (null).
   onMoveStoryToGroup?: (storyId: string, groupId: string | null) => void;
+  // Move a task under another story (its dates and status stay the same).
+  onMoveTaskToStory?: (taskId: string, storyId: string) => void;
   // Candidates for a task's 担当者 (the form and the detail panel).
   assignees?: Assignees;
 }) {
@@ -251,6 +254,7 @@ export function GanttView({
   const onRenameGroup = isMobile ? undefined : onRenameGroupProp;
   const onDeleteGroup = isMobile ? undefined : onDeleteGroupProp;
   const onMoveStoryToGroup = isMobile ? undefined : onMoveStoryToGroupProp;
+  const onMoveTaskToStory = isMobile ? undefined : onMoveTaskToStoryProp;
   const { width: savedLabelW, startResize } = useResizableWidth("gantt.labelWidth", 320, 160, 720);
   const LABEL_W = isMobile ? MOBILE_LABEL_W : savedLabelW;
   // タイムラインの横スクロールの入れ物。スマホでは最初に今日の位置までスクロールする。
@@ -275,6 +279,8 @@ export function GanttView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   // ドラッグ中のストーリーと今いるグループ、ドラッグが重なっているドロップ先の行の key。
   const [dragStory, setDragStory] = useState<{ id: string; groupId: string | null } | null>(null);
+  // ドラッグ中のタスクと今の親ストーリー。ストーリー行（今の親以外）にドロップすると、そのストーリーへ移る。
+  const [dragTask, setDragTask] = useState<{ id: string; storyId: string } | null>(null);
   const [dropKey, setDropKey] = useState<string | null>(null);
   useEffect(() => {
     setCollapsed(new Set(graph.nodes.filter((n) => n.level === "story").map((n) => n.id)));
@@ -511,9 +517,18 @@ export function GanttView({
             // ストーリーはグループ行（そのグループへ）とプロジェクト行（グループから出す）にドロップできる。
             // 今いるグループへのドロップは何もしないので、ドロップ先にもしない。
             const dropGroupId = r.kind === "group" ? r.groupId : r.kind === "project" ? null : undefined;
-            const canDrop = !!dragStory && dropGroupId !== undefined && dropGroupId !== dragStory.groupId;
+            const canDropStory = !!dragStory && dropGroupId !== undefined && dropGroupId !== dragStory.groupId;
+            // タスクは今の親以外のストーリー行にドロップできる（グループの内外・畳まれているストーリーも可）。
+            const canDropTask = !!dragTask && r.kind === "story" && !!r.node && r.node.id !== dragTask.storyId;
+            const canDrop = canDropStory || canDropTask;
             const isOver = canDrop && dropKey === r.key;
             const draggableStory = r.kind === "story" && !!r.node && !!onMoveStoryToGroup;
+            const draggableTask = r.kind === "task" && !!r.node?.parent_id && !!onMoveTaskToStory;
+            const endDrag = () => {
+              setDragStory(null);
+              setDragTask(null);
+              setDropKey(null);
+            };
             return (
             <div
               key={r.key}
@@ -528,27 +543,29 @@ export function GanttView({
               onDragLeave={() => setDropKey((cur) => (cur === r.key ? null : cur))}
               onDrop={(e) => {
                 e.preventDefault();
-                if (canDrop && dragStory) onMoveStoryToGroup?.(dragStory.id, dropGroupId ?? null);
-                setDragStory(null);
-                setDropKey(null);
+                if (canDropStory && dragStory) onMoveStoryToGroup?.(dragStory.id, dropGroupId ?? null);
+                if (canDropTask && dragTask) onMoveTaskToStory?.(dragTask.id, r.node!.id);
+                endDrag();
               }}
               className="relative flex"
               style={{ height: ROW_H }}
             >
               <div
-                draggable={draggableStory}
+                draggable={draggableStory || draggableTask}
                 onDragStart={
                   draggableStory
                     ? (e) => {
                         e.dataTransfer.effectAllowed = "move";
                         setDragStory({ id: r.node!.id, groupId: r.groupId });
                       }
-                    : undefined
+                    : draggableTask
+                      ? (e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          setDragTask({ id: r.node!.id, storyId: r.node!.parent_id! });
+                        }
+                      : undefined
                 }
-                onDragEnd={() => {
-                  setDragStory(null);
-                  setDropKey(null);
-                }}
+                onDragEnd={endDrag}
                 className={cn(
                   "sticky left-0 z-[2] flex shrink-0 items-center gap-1 border-b border-r border-b-border/60 border-r-border pr-2 text-fg",
                   isOver
@@ -565,8 +582,8 @@ export function GanttView({
                       : r.kind === "story"
                         ? "text-xs"
                         : "text-[11px]",
-                  draggableStory && "cursor-grab",
-                  dragStory && r.node?.id === dragStory.id && "opacity-50",
+                  (draggableStory || draggableTask) && "cursor-grab",
+                  ((dragStory && r.node?.id === dragStory.id) || (dragTask && r.node?.id === dragTask.id)) && "opacity-50",
                 )}
                 style={{ width: LABEL_W, paddingLeft: indent }}
                 data-tooltip={r.label}

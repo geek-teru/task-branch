@@ -24,6 +24,7 @@ import {
   getProjectGraph,
   listProjects,
   moveTask,
+  moveTaskToStory,
   setProjectActive,
   updateProject,
   updateTask,
@@ -468,6 +469,18 @@ export default function App() {
     [refreshGraph]
   );
 
+  const handleMoveTaskToStory = useCallback(
+    async (taskId: string, storyId: string) => {
+      try {
+        await moveTaskToStory(taskId, storyId);
+        await refreshGraph();
+      } catch (e: any) {
+        setError(String(e.message ?? e));
+      }
+    },
+    [refreshGraph]
+  );
+
   const handleCreateProject = useCallback(async (input: ProjectInput) => {
     try {
       const p = await createProject(input);
@@ -672,6 +685,7 @@ export default function App() {
           onRenameGroup={handleRenameGroup}
           onDeleteGroup={handleDeleteGroup}
           onMoveStoryToGroup={handleMoveStoryToGroup}
+          onMoveTaskToStory={handleMoveTaskToStory}
           assignees={assignees}
         />
       )}

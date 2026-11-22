@@ -370,22 +370,32 @@ export async function shiftStoryDates(storyId: string, days: number): Promise<vo
   if (error) throw error;
 }
 
-// Move a task to another story. The column it was dropped on decides the status.
-// Tasks with dependencies are rejected by the DB trigger (dependencies are per story).
-export async function moveTask(taskId: string, targetStoryId: string, status: Status): Promise<void> {
-  const { data: last, error: lastError } = await supabase
+// The sort_order that puts a task after the existing tasks of the story.
+async function nextTaskOrder(storyId: string): Promise<number> {
+  const { data: last, error } = await supabase
     .from("tasks")
     .select("sort_order")
-    .eq("parent_id", targetStoryId)
+    .eq("parent_id", storyId)
     .eq("level", "task")
     .order("sort_order", { ascending: false })
     .limit(1);
-  if (lastError) throw lastError;
+  if (error) throw error;
+  return (last?.[0]?.sort_order ?? 0) + 1;
+}
 
-  const { error } = await supabase
-    .from("tasks")
-    .update({ parent_id: targetStoryId, sort_order: (last?.[0]?.sort_order ?? 0) + 1, status })
-    .eq("id", taskId);
+// Move a task to another story. The column it was dropped on decides the status.
+// Tasks with dependencies are rejected by the DB trigger (dependencies are per story).
+export async function moveTask(taskId: string, targetStoryId: string, status: Status): Promise<void> {
+  const sort_order = await nextTaskOrder(targetStoryId);
+  const { error } = await supabase.from("tasks").update({ parent_id: targetStoryId, sort_order, status }).eq("id", taskId);
+  if (error) throw error;
+}
+
+// Move a task to the end of another story, keeping its status and dates (gantt drag & drop).
+// The DB trigger (check_task_hierarchy) checks that the target is a story of the same project.
+export async function moveTaskToStory(taskId: string, storyId: string): Promise<void> {
+  const sort_order = await nextTaskOrder(storyId);
+  const { error } = await supabase.from("tasks").update({ parent_id: storyId, sort_order }).eq("id", taskId);
   if (error) throw error;
 }
 
