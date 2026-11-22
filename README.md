@@ -161,6 +161,18 @@ export TASK_BRANCH_KEY="<anon key>"
 
 将来ビュー（カレンダー / カンバン）は、コアモデルへの読み取り射影として追加できます（DESIGN.md §8）。
 
+## 開発プロセス
+
+![task-branch の開発プロセス（planning → do → review のループ）](./docs/dev-process.drawio.png)
+
+- 人が作りたいものを渡すと、Claude Code の planning スキルが壁打ちしてストーリー・タスクに分け、MCP（`create_plan`）でカンバンに登録する。人が計画をレビューし、ストーリーを進行中にする
+- do スキルが `get_next_task` でタスクを取り、`start_task` で進行中にして実装・ローカルの動作確認・PR 作成まで行い、`request_task_review` でレビュー中にする
+- review スキルが PR をレビューし、致命的・要判断の指摘が無ければマージして `complete_task` で完了にする。判断が要るものは担当を人に替えて渡す
+- main へのマージで、Vercel が画面と関数をデプロイし、GitHub Actions の release.yml がマイグレーションを本番に適用する
+- 申し送りは人の承認後にカンバンへ、スキルの改善案は SKILL.md へ戻して次の周に入る
+- 人にしかできない作業（本人のログイン・シークレットの登録など）は、do が手順書を書いて担当を人に替え、人が実施して完了にする
+- 図は PNG に draw.io の XML を埋め込んだ形式。draw.io でそのまま開いて編集できる
+
 ## 本番（将来）
 
 ```bash
