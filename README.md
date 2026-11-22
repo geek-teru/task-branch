@@ -166,10 +166,11 @@ export TASK_BRANCH_KEY="<anon key>"
 ![task-branch の開発プロセス（planning → do → review のループ）](./docs/dev-process.drawio.png)
 
 - 人と Claude Code の planning スキルが壁打ちで要件を決め、planning がストーリー・タスクに分けて MCP（`create_plan`）でカンバンに登録する
+- do と review のスキルは、手動でもスケジュールでも実行できる
 - do スキルが `get_next_task` でタスクを取り、`start_task` で進行中にして実装・ローカルの動作確認・PR 作成まで行い、`request_task_review` でレビュー中にする
 - レビュー中のタスクは分かれる。AI ができるレビューは review スキルが行い、致命的・要判断の指摘が無ければマージして `complete_task` で完了にする。人にしかできない確認・作業は人に依頼する
 - main へのマージで、Vercel が画面と関数をデプロイし、GitHub Actions の release.yml がマイグレーションを本番に適用する
-- 申し送りは人の承認後にカンバンへ、スキルの改善案は SKILL.md へ戻して次の周に入る
+- 申し送りは人の承認後にカンバンへ戻し、次の周に入る
 - 人にしかできない作業（本人のログイン・シークレットの登録など）は、do が手順書を書いて担当を人に替え、人が実施して完了にする
 - 図は PNG に draw.io の XML を埋め込んだ形式。draw.io でそのまま開いて編集できる
 
