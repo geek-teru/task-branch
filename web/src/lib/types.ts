@@ -254,7 +254,7 @@ export const LEVEL_LABEL: Record<Level, string> = {
 };
 
 // task_events (操作履歴)。list_project_events RPC の1行。
-export type EventType = "created" | "status_changed" | "activated" | "deactivated" | "commented" | "context_updated";
+export type EventType = "created" | "status_changed" | "activated" | "deactivated" | "commented" | "context_updated" | "moved";
 
 export interface TaskEvent {
   id: string;
@@ -267,6 +267,11 @@ export interface TaskEvent {
   story_title: string | null;
   from_status: Status | null;
   to_status: Status | null;
+  // moved のときの移動元・移動先のストーリー（それ以外は null）。ストーリーが消えていたら null
+  from_story_id: string | null;
+  from_story_title: string | null;
+  to_story_id: string | null;
+  to_story_title: string | null;
   actor_type: AssigneeType | null; // null = 不明（過去分の補完）
   actor_id: string | null;
   actor_client_id: string | null; // AI の操作のときのエージェント（OAuth の client_id）。null = 人 / 記録前

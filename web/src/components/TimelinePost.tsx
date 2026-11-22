@@ -44,6 +44,16 @@ function actorOf(e: TaskEvent, assignees: Assignees): { icon: ReactNode; name: s
   return { icon: <AssigneeIcon assignee={actor} size={32} />, name: actor.name };
 }
 
+// A story named in a moved event, linking to its page. 「—」 when the story is gone.
+function StoryName({ id, title }: { id: string | null; title: string | null }) {
+  if (!id || !title) return <span className="text-fg-muted">—</span>;
+  return (
+    <Link to={`/stories/${id}`} onClick={(ev) => ev.stopPropagation()} className="font-medium text-fg hover:underline">
+      {title}
+    </Link>
+  );
+}
+
 // The action as a sentence. Comments show their body instead (CommentBody).
 function Action({ e }: { e: TaskEvent }): ReactNode {
   switch (e.event_type) {
@@ -64,6 +74,15 @@ function Action({ e }: { e: TaskEvent }): ReactNode {
       return "棚上げ";
     case "context_updated":
       return "コンテキストを更新";
+    case "moved":
+      return (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          ストーリーを移動
+          <StoryName id={e.from_story_id} title={e.from_story_title} />
+          <span className="text-fg-muted">→</span>
+          <StoryName id={e.to_story_id} title={e.to_story_title} />
+        </span>
+      );
     case "commented":
       return null;
   }
