@@ -294,10 +294,12 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | project_id  | uuid        | FK→projects.id, not null, on delete cascade     | 属するプロジェクト                                                                           |
 | task_id     | uuid        | FK→tasks.id, not null, on delete cascade        | 対象のストーリー / タスク                                                                    |
 | level       | text        | not null, check in ('story','task')             | 記録した時点の level                                                                         |
-| event_type  | text        | not null                                        | `created` / `status_changed` / `activated` / `deactivated` / `commented` / `context_updated` |
+| event_type  | text        | not null                                        | `created` / `status_changed` / `activated` / `deactivated` / `commented` / `context_updated` / `moved`（`0040_task_moved_events.sql`） |
 | from_status | text        | null可                                          | `status_changed` のときだけ                                                                  |
 | to_status   | text        | null可                                          | `status_changed` のときだけ                                                                  |
 | comment_id  | uuid        | FK→task_comments.id, null可, on delete set null | `commented` のときだけ                                                                       |
+| from_story_id | uuid      | FK→tasks.id, null可, on delete set null         | `moved` のときだけ。移動元のストーリー（消えたら null）                                       |
+| to_story_id | uuid        | FK→tasks.id, null可, on delete set null         | `moved` のときだけ。移動先のストーリー（消えたら null）                                       |
 | actor_type  | text        | null可, check in ('human','ai')                 | 操作者の種別。補完分で不明なものは null                                                      |
 | actor_id    | uuid        | null可                                          | 操作者（ユーザー）                                                                           |
 | actor_client_id | text    | null可, default current_actor_client_id(), check (null or actor_type = 'ai') | AI の操作のとき、操作したエージェント（OAuth の client_id）。FK なし。人の操作と記録前の AI の操作は null（コメントのイベントだけ `task_comments.author_client_id` から補完済み） |
@@ -311,6 +313,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
     - `task_comments` after insert → `commented`（操作者はコメントの `author_*`。エージェントも `author_client_id` から取る）
     - それ以外のイベントの `actor_client_id` は既定値（JWT の `client_id`）で入る（`0030_task_events_actor_client.sql`）
     - `story_context_revisions` after insert → `context_updated`（操作者は `edited_by_*`）
+    - `tasks` after update of parent_id（task のみ。親が変わったときだけ）→ `moved`（from_story_id / to_story_id に移動元・移動先。`0040_task_moved_events.sql`）
 - 操作者は `current_actor_type()` / `current_actor_id()`（§3.5）。
 - コメントの編集・削除、タイトル・期間の変更は記録しない。
 - RLS は所有者の select だけ（§3.5）。insert / update / delete のポリシーは作らない。
@@ -850,7 +853,7 @@ node scripts/attachments-access-check.mjs   # 期待と違う結果が1つでも
 | `get_progress(project uuid)`    | 進捗集約 | story の進捗率（0〜1）を `table(id, level, progress)` で返す。`done` と `closed` を完了として数える（§3.4） |
 | `shift_story_dates(story uuid, days int)` | 日付移動 | ストーリーと配下のタスクの開始日・期限を同じ日数ずらす（null は null のまま）。1 トランザクションで更新し、ストーリー以外を渡すと例外。ガントのバー移動で使う |
 | `create_guest_sample_project()` | ゲスト | 匿名ユーザー（JWT の `is_anonymous` が true）だけが呼べる。ゲストの初回ログイン時にサンプルのプロジェクト（ストーリー 4・タスク 11）を作り、その id を返す。日付は呼び出した日を起点にずらす。すでにプロジェクトを持っていれば作らず最古のプロジェクトの id を返す（冪等）。security invoker、execute は authenticated のみ（`0029_guest_sample_project.sql`） |
-| `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int, actor text)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を、`actor`（`human` / `ai`。それ以外は例外）で actor_type を絞る。task_title / story_title / actor_id / actor_client_id / comment_excerpt（本文の先頭 80 文字）/ comment_body（本文の全文。コメントが消えていたらどちらも null）込み。security invoker（`0026_task_events_rpc.sql`、`0030_task_events_actor_client.sql`） |
+| `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int, actor text)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を、`actor`（`human` / `ai`。それ以外は例外）で actor_type を絞る。task_title / story_title / actor_id / actor_client_id / comment_excerpt（本文の先頭 80 文字）/ comment_body（本文の全文。コメントが消えていたらどちらも null）/ from_story_id・from_story_title・to_story_id・to_story_title（`moved` のときの移動元・移動先。他は null）込み。`story` で絞ると、移動元・移動先がそのストーリーの `moved` も出る。security invoker（`0026_task_events_rpc.sql`、`0030_task_events_actor_client.sql`、`0040_task_moved_events.sql`） |
 | `project_activity_counts(project uuid, bucket text, from_date date, to_date date)` | パフォーマンス | `bucket`（`day` / `week`＝月曜始まり、Asia/Tokyo）ごとに stories_created / tasks_created / tasks_done を返す。空の区間も 0。`project` が null なら、呼び出したユーザーが見えるすべてのプロジェクト（RLS の範囲。アーカイブ済みも含む。カンバンの「すべてのプロジェクト」と同じ）を合わせて数える（画面は `?project=all`）。security invoker（`0026_task_events_rpc.sql`、`0033_activity_counts_all_projects.sql`） |
 
 | `record_usage_events(events jsonb)` | 使用量 | API 応答ごとの使用量（配列。1 回 500 件まで）を usage_events に記録し `{inserted, updated, skipped}` を返す。必須は session_id / request_key / model / occurred_at。持ち主は `current_owner_id()`、task_id は持ち主のプロジェクトのタスクだけ受け付け（それ以外は null）、project_id はタスクから埋める。同じ (owner_id, request_key) は、cost_usd が null で新しい値があるときだけ埋め（updated）、ほかは skipped。呼び出し内の重複は先頭だけ使う。JWT が無い・ゲストは例外。security definer、execute は authenticated のみ（`0035_usage_events.sql`） |
