@@ -372,7 +372,7 @@ AI エージェントの使用量（トークン・費用）。API 応答 1 件 
 | mime_type     | text        | not null, check in ('image/png','image/jpeg','image/webp','image/gif') | SVG は許さない（スクリプトを含められるため）               |
 | size_bytes    | integer     | not null, check between 1 and 5242880                                | 5MB まで                                                     |
 | original_name | text        | null可, check (char_length <= 255)                                   | 元のファイル名（表示用。パスには使わない）                   |
-| created_by    | uuid        | not null, default auth.uid()                                         | アップロードした人                                           |
+| created_by    | uuid        | not null, default auth.uid()                                         | アップロードした人（AI のときも持ち主の人の uid）            |
 | created_at    | timestamptz | not null, default now()                                              |                                                              |
 
 - check `task_attachments_storage_path`: `storage_path = project_id || '/' || id || '.' || <拡張子>`。拡張子は mime_type から決まる（png / jpg / webp / gif）。別のプロジェクトのパス、`../` を含むパス、mime と違う拡張子は入らない。
@@ -380,7 +380,8 @@ AI エージェントの使用量（トークン・費用）。API 応答 1 件 
 - インデックス：(task_id)。update はポリシーを作らない（変えられない）。
 - 手順: 先に行を作り、その storage_path と同じ名前でだけ Storage にアップロードできる（§3.5）。削除は Storage のファイル → 行の順（行を先に消すと、Storage の delete のポリシーが通らない）。
 - 行が消えると Storage の select が通らなくなり、署名付き URL を作れない（ファイルが残っても読めない）。タスク・プロジェクト・ゲストの削除で Storage に残るファイルの掃除は今はしない。
-- `0036_task_attachments.sql` で入れた。
+- AI（MCP）も、呼び出した人の JWT のまま行の作成とアップロードができる（署名付きアップロード URL を使う。§3.5）。削除は人だけ。
+- `0036_task_attachments.sql` で入れ、`0039_ai_attachments.sql` で AI の作成を許した。
 
 ### 3.3 派生概念（計算で導出）
 
@@ -494,8 +495,8 @@ $$ language sql stable;
 | task_events            | 不可（トリガだけ）                              | 所有者 | 不可                                | 不可       |
 | profiles               | 本人の人                                        | 本人   | 本人の人                            | 不可       |
 | storage.objects（avatars） | 本人の人（自分の uid のフォルダ。ゲスト不可） | 本人（自分の uid のフォルダ） | 本人の人（自分の uid のフォルダ。ゲスト不可） | 本人の人（自分の uid のフォルダ） |
-| task_attachments       | 所有者の人（ゲスト不可。`created_by` は自分）   | 所有者 | 不可                                | 所有者の人 |
-| storage.objects（attachments） | 所有者の人（task_attachments に行のあるパスだけ。ゲスト不可） | 所有者（行のあるパスだけ） | 不可（上書き不可） | 所有者の人（行のあるパスだけ） |
+| task_attachments       | 所有者（人・AI。ゲスト不可。`created_by` は自分） | 所有者 | 不可                                | 所有者の人 |
+| storage.objects（attachments） | 所有者（人・AI。task_attachments に行のあるパスだけ。ゲスト不可） | 所有者（行のあるパスだけ） | 不可（上書き不可） | 所有者の人（行のあるパスだけ） |
 
 - 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
 - 「書いた本人」は `author_id = auth.uid() and author_type = current_actor_type()`。人と AI は uid が同じなので、種別も合わせて別の投稿者として扱う（AI は人のコメントを、人は AI のコメントを編集・削除できない）。
@@ -723,7 +724,7 @@ create policy avatars_insert on storage.objects
 
 ##### task_attachments
 
-所有者（人・AI）が読める。作れるのは所有者の人だけで、AI とゲスト（JWT の `is_anonymous` が true）は作れない。消せるのは所有者の人だけ。update はポリシーを作らない。
+所有者（人・AI）が読める。作れるのも所有者（人・AI）で、ゲスト（JWT の `is_anonymous` が true）は作れない（AI は `0039_ai_attachments.sql` から。MCP のツールが呼び出した人の JWT で行を作るため）。消せるのは所有者の人だけ。update はポリシーを作らない。
 
 ```sql
 alter table task_attachments enable row level security;
@@ -737,7 +738,7 @@ create policy task_attachments_insert on task_attachments
   for insert to authenticated
   with check (
     created_by = auth.uid()
-    and current_actor_type() = 'human'
+    and current_actor_type() in ('human', 'ai')
     and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) is not true
     and exists (select 1 from projects p
                  where p.id = task_attachments.project_id and p.owner_id = current_owner_id())
@@ -767,18 +768,19 @@ create policy attachments_select on storage.objects
 create policy attachments_insert on storage.objects
   for insert to authenticated
   with check (bucket_id = 'attachments'
-              and current_actor_type() = 'human'
+              and current_actor_type() in ('human', 'ai')
               and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) is not true
               and exists (select 1 from public.task_attachments a where a.storage_path = objects.name));
 
 -- delete は select と同じ exists に current_actor_type() = 'human' を足す
 ```
 
-- 行の無いパス、行と違うパス（別のプロジェクト・拡張子違い）、AI・ゲスト・他人のアップロードは insert のポリシーで止まる。種類とサイズはバケットの設定と task_attachments の check の両方で止まる。
+- 行の無いパス、行と違うパス（別のプロジェクト・拡張子違い）、ゲスト・他人のアップロードは insert のポリシーで止まる。種類とサイズはバケットの設定と task_attachments の check の両方で止まる。
+- 署名付きアップロード URL（`createSignedUploadUrl`。MCP のツールが使う）では、insert のポリシーは **URL の発行時** に発行した人の JWT で評価される。PUT は URL のトークンだけで行い、ポリシーは見直されない（発行後に行を消しても PUT は通る。そのファイルは行が無いので読めない）。バケットの種類・サイズの制限は PUT のときに効く。
 
 ##### 添付のアクセス制御の検証
 
-画面を通さず REST / Storage API を直接たたき、画面の検査を迂回されてもバケットの設定と RLS で止まることを確かめた（ローカル、Supabase CLI 2.117.0）。
+画面を通さず REST / Storage API を直接たたき、画面の検査を迂回されてもバケットの設定と RLS で止まることを確かめた（ローカル、Supabase CLI 2.117.0。AI の作成と署名付きアップロード URL の行は `0039` のあと Supabase CLI 3.2.0 で確かめた）。
 スクリプトは `scripts/attachments-access-check.mjs`（依存なし。毎回ユーザー・プロジェクトを作り、終わったら消すので繰り返し実行できる。ローカル専用）。
 
 ```bash
@@ -803,10 +805,15 @@ node scripts/attachments-access-check.mjs   # 期待と違う結果が1つでも
 | A | 5MB を超える（5242881 バイト）アップロード | 拒否 | 400 `The object exceeded the maximum allowed size` |
 | A | 既存のパスへの `x-upsert: true`・PUT での上書き | 拒否 | 400 `new row violates row-level security policy`（update のポリシーが無い） |
 | A | 既存のパスへ同じ名前で再アップロード | 拒否 | 400 `The resource already exists` |
-| AI | 行の作成・アップロード | 拒否 | 403 / 400（RLS） |
-| AI | A の添付の Storage・行の削除 | 拒否 | 200 `[]`（消えない） |
+| AI | A のプロジェクトに行の作成 → アップロード → 署名付き URL の作成・取得 | 許可（`0039`） | 201 / 200（取得した中身が一致） |
+| AI | 行の作成 → 署名付きアップロード URL の作成 → トークンだけで PUT → 取得 | 許可 | 201 / 200 / 200 / 200 |
+| AI | 署名付きアップロード URL へ image/svg+xml・5MB 超を PUT | 拒否 | 400 `mime type ... is not supported` / `The object exceeded the maximum allowed size` |
+| AI | 行の無いパス・B の行のあるパスの署名付きアップロード URL の作成、B のパスへのアップロード | 拒否 | 400 `new row violates row-level security policy` |
+| AI | B のプロジェクトに行を作る、created_by を他人にした行を作る | 拒否 | 400 `attachment project_id must match its task` / 403（RLS） |
+| AI | 既存のパスへ `x-upsert: true` で上書き | 拒否 | 400（RLS） |
+| AI | 自分で上げた添付・A の添付の Storage・行の削除 | 拒否 | 200 `[]`（消えない） |
 | ゲスト | 自分のプロジェクトに行を作る | 拒否 | 403（RLS） |
-| ゲスト | 自分の行のあるパスへアップロード（行は service role で用意） | 拒否 | 400（RLS） |
+| ゲスト | 自分の行のあるパスへアップロード・署名付きアップロード URL の作成（行は service role で用意） | 拒否 | 400（RLS） |
 | トークン無し | 公開 URL（`/object/public/attachments/...`）・認証付きの取得（`/object/attachments/...`） | 拒否 | 400 `Bucket not found` / `Object not found` |
 | A | 行だけ消したあと（ファイルは残る）の署名付き URL の作成 | 拒否 | 400 `Object not found`（一覧にも出ない） |
 

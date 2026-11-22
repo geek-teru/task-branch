@@ -151,6 +151,10 @@ const list = (token, prefix) => request('POST', `/storage/v1/object/list/${BUCKE
 const removeObjects = (token, paths) => request('DELETE', `/storage/v1/object/${BUCKET}`, { token, body: { prefixes: paths } })
 const getPublic = (path) => request('GET', `/storage/v1/object/public/${BUCKET}/${path}`)
 const getSigned = (signedURL) => request('GET', `/storage/v1${signedURL}`)
+// 署名付きアップロード URL（createSignedUploadUrl と同じ API）。PUT は JWT を付けず、URL のトークンだけで行う
+const signUpload = (token, path) => request('POST', `/storage/v1/object/upload/sign/${BUCKET}/${path}`, { token })
+const putSigned = (url, body, contentType = 'image/png') =>
+  request('PUT', `/storage/v1${url}`, { body, headers: { 'Content-Type': contentType } })
 
 // 1x1 の透明 PNG
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
@@ -275,12 +279,64 @@ async function main() {
   r = await upload(A.token, main1.storage_path, PNG)
   check('A', '既存のパスへ同じ名前で再アップロード', 'deny', is2xx(r), r)
 
-  console.log('\n== AI（A のトークン + client_id）')
-  r = await insertRow(AI.token, newRow(projA, storyA, A.id))
-  check('AI', 'A のプロジェクトに行を作る', 'deny', r.status === 201, r)
-  r = await upload(AI.token, free1.storage_path, PNG)
-  check('AI', 'A の行のあるパスへアップロード', 'deny', is2xx(r), r)
-  if (is2xx(r)) cleanup.objects.push(free1.storage_path)
+  console.log('\n== AI（A のトークン + client_id。0039 で作成を許可）')
+  const aiRow = newRow(projA, storyA, A.id)
+  r = await insertRow(AI.token, aiRow)
+  check('AI', 'A のプロジェクトに行を作る', 'allow', r.status === 201, r)
+  r = await upload(AI.token, aiRow.storage_path, PNG)
+  check('AI', '行のあるパスへ PNG をアップロード', 'allow', is2xx(r), r)
+  cleanup.objects.push(aiRow.storage_path)
+  r = await sign(AI.token, aiRow.storage_path)
+  check('AI', '自分で上げた添付の署名付き URL を作る', 'allow', is2xx(r) && !!r.json?.signedURL, r)
+  if (r.json?.signedURL) {
+    r = await getSigned(r.json.signedURL)
+    check('AI', '署名付き URL で取得', 'allow', r.status === 200 && r.raw.equals(PNG), r)
+  }
+  // MCP のツールが使う形: 署名付きアップロード URL を AI の JWT で発行し、トークンだけで PUT する
+  const aiSignedRow = newRow(projA, storyA, A.id)
+  r = await insertRow(AI.token, aiSignedRow)
+  check('AI', 'A のプロジェクトに行を作る（署名付きアップロード用）', 'allow', r.status === 201, r)
+  r = await signUpload(AI.token, aiSignedRow.storage_path)
+  check('AI', '行のあるパスの署名付きアップロード URL を作る', 'allow', is2xx(r) && !!r.json?.url, r)
+  if (r.json?.url) {
+    r = await putSigned(r.json.url, PNG)
+    check('AI', '署名付きアップロード URL へ PUT（JWT なし）', 'allow', is2xx(r), r)
+    if (is2xx(r)) cleanup.objects.push(aiSignedRow.storage_path)
+    r = await sign(AI.token, aiSignedRow.storage_path)
+    if (r.json?.signedURL) r = await getSigned(r.json.signedURL)
+    check('AI', '署名付きアップロードで上げた画像を取得', 'allow', r.status === 200 && r.raw.equals(PNG), r)
+  }
+  // 署名付きアップロードでもバケットの種類・サイズの制限が効くこと
+  const aiBadRow = newRow(projA, storyA, A.id)
+  await insertRow(AI.token, aiBadRow)
+  r = await signUpload(AI.token, aiBadRow.storage_path)
+  if (!r.json?.url) throw new Error(`準備の署名付きアップロード URL の作成に失敗: ${short(r)}`)
+  const badUrl = r.json.url
+  r = await putSigned(badUrl, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'image/svg+xml')
+  check('AI', '署名付きアップロード URL へ Content-Type image/svg+xml で PUT', 'deny', is2xx(r), r)
+  if (is2xx(r)) cleanup.objects.push(aiBadRow.storage_path)
+  r = await putSigned(badUrl, Buffer.alloc(MAX_BYTES + 1, 0))
+  check('AI', `署名付きアップロード URL へ 5MB を超える（${MAX_BYTES + 1} バイト）PUT`, 'deny', is2xx(r), r)
+  if (is2xx(r)) cleanup.objects.push(aiBadRow.storage_path)
+  r = await signUpload(AI.token, `${projA}/${crypto.randomUUID()}.png`)
+  check('AI', '行の無いパスの署名付きアップロード URL を作る', 'deny', is2xx(r) && !!r.json?.url, r)
+  r = await insertRow(AI.token, newRow(projB, storyB, A.id))
+  check('AI', 'B のプロジェクトに行を作る', 'deny', r.status === 201, r)
+  const freeB = newRow(projB, storyB, B.id) // B が行だけ作ったパス
+  await insertRow(B.token, freeB)
+  r = await upload(AI.token, freeB.storage_path, PNG)
+  check('AI', 'B の行のあるパスへアップロード', 'deny', is2xx(r), r)
+  if (is2xx(r)) cleanup.objects.push(freeB.storage_path)
+  r = await signUpload(AI.token, freeB.storage_path)
+  check('AI', 'B の行のあるパスの署名付きアップロード URL を作る', 'deny', is2xx(r) && !!r.json?.url, r)
+  r = await insertRow(AI.token, { ...newRow(projA, storyA, A.id), created_by: B.id })
+  check('AI', 'created_by を他人にした行を作る', 'deny', r.status === 201, r)
+  r = await upload(AI.token, aiRow.storage_path, PNG, 'image/png', { 'x-upsert': 'true' })
+  check('AI', '既存のパスへ x-upsert: true で上書き', 'deny', is2xx(r), r)
+  r = await removeObjects(AI.token, [aiRow.storage_path])
+  check('AI', '自分で上げた添付を Storage から消す', 'deny', is2xx(r) && Array.isArray(r.json) && r.json.length > 0, r)
+  r = await deleteRow(AI.token, aiRow.id)
+  check('AI', '自分で上げた添付の行を消す', 'deny', r.status === 200 && r.json.length > 0, r)
   r = await removeObjects(AI.token, [main1.storage_path])
   check('AI', 'A の添付を Storage から消す', 'deny', is2xx(r) && Array.isArray(r.json) && r.json.length > 0, r)
   r = await deleteRow(AI.token, main1.id)
@@ -296,6 +352,12 @@ async function main() {
   r = await upload(G.token, gRow.storage_path, PNG)
   check('ゲスト', '自分の行のあるパスへアップロード（行は service role で用意）', 'deny', is2xx(r), r)
   if (is2xx(r)) cleanup.objects.push(gRow.storage_path)
+  r = await signUpload(G.token, gRow.storage_path)
+  check('ゲスト', '自分の行のあるパスの署名付きアップロード URL を作る', 'deny', is2xx(r) && !!r.json?.url, r)
+  if (r.json?.url) {
+    r = await putSigned(r.json.url, PNG)
+    if (is2xx(r)) cleanup.objects.push(gRow.storage_path)
+  }
 
   console.log('\n== 公開 URL・行の削除後')
   r = await getPublic(main1.storage_path)
