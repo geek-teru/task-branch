@@ -133,7 +133,7 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 
 ## 2. アーキテクチャ
 
-![task-branch の構成（MCP サーバーとバックエンド）](architecture.drawio.png)
+![task-branch の構成（画面・MCP サーバー・バックエンド・リリース）](architecture.drawio.png)
 
 - **バックエンドは自作しない**。Supabase が REST API・認証・ホスティングを提供。自前のコードは MCP サーバー（Vercel の関数）だけで、利用者の JWT をそのまま Supabase の REST に渡す薄い層にとどめる（§7.3）。
 - 経路は2つ。画面は supabase-js で Supabase を直接呼ぶ。Claude Code は MCP サーバー（`/api/mcp`）を呼び、MCP サーバーが同じ JWT で Supabase の REST を呼ぶ。認可はどちらも Supabase Auth が行い、データは RLS で本人の範囲に絞る。

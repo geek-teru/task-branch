@@ -5,6 +5,14 @@ AI がプランニングしたタスクを **ストーリー → タスク** の
 
 設計の詳細は [DESIGN.md](./DESIGN.md) を参照。
 
+## アーキテクチャ
+
+![task-branch の構成（画面・MCP サーバー・バックエンド・リリース）](./docs/architecture.drawio.png)
+
+- 画面（Vercel の SPA）は supabase-js で Supabase を直接呼ぶ。MCP クライアントはリモート MCP サーバー（`/api/mcp`）を呼び、MCP サーバーが同じ JWT で Supabase の REST を呼ぶ（service_role は持たない）
+- main へのマージで、Vercel が画面と関数をデプロイし、GitHub Actions の release.yml がマイグレーションを本番に適用する
+- 図は PNG に draw.io の XML を埋め込んだ形式。draw.io でそのまま開いて編集できる
+
 ## 構成
 
 ```
