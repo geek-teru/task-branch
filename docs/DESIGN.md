@@ -380,7 +380,7 @@ AI エージェントの使用量（トークン・費用）。API 応答 1 件 
 - インデックス：(task_id)。update はポリシーを作らない（変えられない）。
 - 手順: 先に行を作り、その storage_path と同じ名前でだけ Storage にアップロードできる（§3.5）。削除は Storage のファイル → 行の順（行を先に消すと、Storage の delete のポリシーが通らない）。
 - 行が消えると Storage の select が通らなくなり、署名付き URL を作れない（ファイルが残っても読めない）。タスク・プロジェクト・ゲストの削除で Storage に残るファイルの掃除は今はしない。
-- AI（MCP）も、呼び出した人の JWT のまま行の作成とアップロードができる（署名付きアップロード URL を使う。§3.5）。削除は人だけ。
+- AI（MCP）も、呼び出した人の JWT のまま行の作成とアップロードができる（署名付きアップロード URL を使う。§3.5）。ツールは `create_attachment_upload` / `list_attachments`（§7.3「添付のツール」）。削除は人だけ。
 - `0036_task_attachments.sql` で入れ、`0039_ai_attachments.sql` で AI の作成を許した。
 
 ### 3.3 派生概念（計算で導出）
@@ -1097,6 +1097,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `add_task_comment`    | `task_id`, `body`        | 投稿したコメント（コメントの形）。投稿者は AI になる                                       |
 | `update_task_comment` | `comment_id`, `body`     | 更新後のコメント（コメントの形）。AI のコメントだけが対象                                  |
 | `delete_task_comment` | `comment_id`             | `{"deleted": "<コメントの id>"}`。物理削除で元に戻せない。AI のコメントだけが対象          |
+| `create_attachment_upload` | `task_id`, `mime_type`, `size_bytes`, `original_name`（任意） | `{ attachment_id, task_id, upload_url, token, method, headers, markdown, curl }`。添付の行を作り、署名付きアップロード URL を返す（下記「添付のツール」） |
+| `list_attachments`    | `task_id`                | 添付の配列（新しい順）。各要素は `id` / `original_name` / `mime_type` / `size_bytes` / `created_at` / `markdown` / `uploaded` / `signed_url`（下記「添付のツール」） |
 
 **プロジェクトの作成のツール**
 
@@ -1211,6 +1213,28 @@ AI がタスクに着手し、終えたら作業結果を残す。PR を作る�
 - `list_task_comments` は先にタスクを引き、見つからない（他人のものを含む）ときと、ストーリーの id を渡したときは `isError` にする。コメントが 0 件のタスクと区別するため。
 - `update_task_comment` / `delete_task_comment` は、RLS で弾かれた行がエラーにならず 0 行になるため、0 行を失敗として `isError`（「コメントが見つからないか、編集・削除できません（AI が書いたコメントだけが対象）」）にする。人のコメントの本文と `updated_at` は変わらない。
 - `updated_at` はトリガ `check_task_comment()` が now() にする。
+
+**添付のツール**
+
+`task_attachments`（§3.2）と非公開バケット `attachments` を AI から使う。動作確認のスクリーンショットなどをコメント・説明・コンテキストに差し込むのに使う。画像のファイルはツールの引数に入れず（トークンが大きくなり、Vercel 関数の 4.5MB の上限にも当たる）、署名付きアップロード URL へ AI が直接 PUT する。
+
+- `create_attachment_upload`: `task_id`（タスクかストーリー）の行から `project_id` を引き、id を作って `task_attachments` に行を入れ（`storage_path` は `<project_id>/<id>.<拡張子>`、`created_by` は DB の既定値 `auth.uid()`）、Storage の `createSignedUploadUrl` で URL を発行する。
+  - 入力の検査: `mime_type` は png / jpeg / webp / gif の4つ、`size_bytes` は 1〜5242880、`original_name` は 255 文字まで（前後の空白を落とし、空なら null）。最終の守りは task_attachments の check とバケットの MIME・サイズ制限（PUT のときに効く）。
+  - 返り値の `curl` は `curl -sS -X PUT --data-binary @<ファイルのパス> -H 'Content-Type: <mime_type>' '<upload_url>'`。PUT には JWT は要らず、URL のトークンだけで通る。同じ URL への2回目の PUT は上書きにならず 400。
+  - `markdown` は `![名前](attachment:<id>)`。名前の `[` `]` `\` はエスケープし、改行は空白にする（画面の `attachmentMarkdown` と同じ規則。名前が無ければ「画像」）。
+  - 見えない（他人のものを含む）タスクの id は「タスクが見つかりません」の `isError`。ゲストの持ち主のタスクは RLS（42501）で拒否され、理由が分かる文言で `isError` にする。行を作ったあとに URL の発行に失敗したら、ファイルの無い添付として残ることを伝える。
+- `list_attachments`: 先にタスクを引き（0 件と見えないタスクを区別するため）、添付を新しい順に返す。`signed_url` は `createSignedUrls`（600 秒）で、ファイルの無いパスは要素ごとのエラーになるため `uploaded: false`・`signed_url: null` にする。追加の問い合わせはしない。
+- ファイルの無い行（行を作ったあと PUT しなかった・失敗した添付）は、`uploaded: false` で見分けるだけにする。AI は task_attachments を消せない（delete は人だけ、§3.5）ので、完了確認・削除のツールは持たない。消すのは画面の添付一覧から人が行う。
+- 実装は `web/api/_lib/attachments.ts`（制限・パス・Markdown）と `web/api/_lib/tools.ts`。`web/src/lib/attachments.ts` は window / document を使うので API 側からは import しない。
+
+**ローカルでの確認（添付のツール、2026-11-22）**
+
+ローカルの Supabase に、`/api/mcp` の `POST` を直接呼ぶ使い捨てのスクリプト（A のトークンに client_id を足して署名し直した AI のトークン）で確かめた。22 件すべて期待どおり。
+
+- 作成 → 返った `curl` で PUT（200）→ `list_attachments` で `uploaded: true`・`signed_url` から上げた画像そのものが取れる → `markdown` を `add_task_comment` に入れられる。ストーリーの id にも作れる。
+- PUT しなかった添付は `uploaded: false`・`signed_url: null`。一覧は新しい順。
+- SVG の `mime_type`・5MB 超・256 文字の名前は入力エラー。Content-Type を `image/svg+xml` にした PUT はバケットが 400。同じ URL への2回目の PUT は 400。
+- A の AI は B のストーリーに作れず、一覧も「見つかりません」。ゲストの AI は 42501 で拒否。AI のトークンでは添付の行を消せない（0 行）。
 
 **本番での確認（2026-10-20）**
 

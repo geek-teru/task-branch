@@ -3,6 +3,16 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as z from "zod";
+import {
+  ATTACHMENT_BUCKET,
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MIME_TYPES,
+  SIGNED_URL_SECONDS,
+  attachmentMarkdown,
+  attachmentPath,
+  originalName,
+  shellQuote,
+} from "./attachments.js";
 
 function json(value: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
@@ -753,6 +763,119 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       if (error) return restError(error);
       if (data.length === 0) return toolError(COMMENT_NOT_EDITABLE);
       return json({ deleted: data[0].id });
+    },
+  );
+
+  server.registerTool(
+    "create_attachment_upload",
+    {
+      title: "画像の添付の作成（署名付きアップロード URL の発行）",
+      description:
+        "タスクかストーリーに画像を添付するため、添付の行を作り、画像を上げる署名付きアップロード URL を返す。" +
+        "返り値は { attachment_id, upload_url, token, method, headers, markdown, curl }。" +
+        "続けてすぐに、返った upload_url へ curl -X PUT --data-binary @<ファイル> -H 'Content-Type: <mime_type>' で画像を上げ（curl に例がある）、" +
+        "成功したら markdown（![名前](attachment:<id>)）を add_task_comment・update_task の description・update_story の context などの本文に入れる。" +
+        "画像は png / jpeg / webp / gif だけで 5MB まで（SVG 不可。バケットが PUT のときに拒否する）。同じ添付への上書きはできない。" +
+        "持ち主のプロジェクトのタスクだけが対象で、ゲストのユーザーは添付できない。AI は添付を削除できない（上げ損ねた添付は list_attachments で uploaded: false になる）",
+      inputSchema: {
+        task_id: z.uuid().describe("添付先のタスクかストーリーの id"),
+        mime_type: z.enum(ATTACHMENT_MIME_TYPES).describe("画像の種類（image/png / image/jpeg / image/webp / image/gif）。PUT の Content-Type と同じにする"),
+        size_bytes: z.number().int().min(1).max(ATTACHMENT_MAX_BYTES).describe(`画像のバイト数（1〜${ATTACHMENT_MAX_BYTES}）`),
+        original_name: z.string().max(255).optional().describe("表示用の名前（ファイル名など。255 文字まで）。Markdown の代替テキストになる。省略したら「画像」"),
+      },
+    },
+    async ({ task_id, mime_type, size_bytes, original_name }) => {
+      const { data: task, error: taskError } = await db.from("tasks").select("id, project_id").eq("id", task_id).maybeSingle();
+      if (taskError) return restError(taskError);
+      if (!task) return toolError(`タスクが見つかりません: ${task_id}`);
+
+      const id = crypto.randomUUID();
+      const storagePath = attachmentPath(task.project_id as string, id, mime_type);
+      const name = originalName(original_name);
+      // created_by は送らず、DB の既定値 auth.uid() に任せる（ポリシーが created_by = auth.uid() を求める）。
+      const { error: insertError } = await db.from("task_attachments").insert({
+        id,
+        project_id: task.project_id,
+        task_id,
+        storage_path: storagePath,
+        mime_type,
+        size_bytes,
+        original_name: name,
+      });
+      if (insertError) {
+        if (insertError.code === "42501") {
+          return toolError(
+            `添付を作れません（プロジェクトの持ち主ではないか、ゲストのユーザーは添付できません）。Supabase のエラー: ${insertError.message} (42501)`,
+          );
+        }
+        return restError(insertError);
+      }
+
+      const { data: upload, error: uploadError } = await db.storage.from(ATTACHMENT_BUCKET).createSignedUploadUrl(storagePath);
+      if (uploadError || !upload) {
+        return toolError(
+          `添付の行（${id}）は作りましたが、アップロード URL を発行できませんでした。ファイルの無い添付として残ります（list_attachments で uploaded: false）。` +
+            `Storage のエラー: ${uploadError?.message ?? "不明"}`,
+        );
+      }
+
+      return json({
+        attachment_id: id,
+        task_id,
+        upload_url: upload.signedUrl,
+        token: upload.token,
+        method: "PUT",
+        headers: { "Content-Type": mime_type },
+        markdown: attachmentMarkdown({ id, original_name: name }),
+        curl: `curl -sS -X PUT --data-binary @<ファイルのパス> -H ${shellQuote(`Content-Type: ${mime_type}`)} ${shellQuote(upload.signedUrl)}`,
+      });
+    },
+  );
+
+  server.registerTool(
+    "list_attachments",
+    {
+      title: "添付の一覧",
+      description:
+        "タスクかストーリーの添付画像を新しい順に返す。各要素は id / original_name / mime_type / size_bytes / created_at / markdown / uploaded / signed_url。" +
+        `signed_url は画像を読むための署名付き URL（${SIGNED_URL_SECONDS} 秒で切れる。curl などで取得する）。` +
+        "uploaded が false の添付は、行だけあってファイルが上がっていない（create_attachment_upload のあと PUT していない・失敗した）もので、signed_url は null。" +
+        "見つからない（他人のものを含む）タスクの id は isError",
+      inputSchema: { task_id: z.uuid().describe("タスクかストーリーの id") },
+    },
+    async ({ task_id }) => {
+      // 添付が 0 件のタスクと見えないタスクを区別するため、先にタスクを引く。
+      const { data: task, error: taskError } = await db.from("tasks").select("id").eq("id", task_id).maybeSingle();
+      if (taskError) return restError(taskError);
+      if (!task) return toolError(`タスクが見つかりません: ${task_id}`);
+
+      const { data, error } = await db
+        .from("task_attachments")
+        .select("id, storage_path, original_name, mime_type, size_bytes, created_at")
+        .eq("task_id", task_id)
+        .order("created_at", { ascending: false })
+        .order("id");
+      if (error) return restError(error);
+      type AttachmentRow = { id: string; storage_path: string; original_name: string | null; mime_type: string; size_bytes: number; created_at: string };
+      const rows = (data ?? []) as AttachmentRow[];
+      if (rows.length === 0) return json([]);
+
+      // ファイルの無いパスは要素ごとの error になり、signedUrl は null。
+      const { data: signed, error: signError } = await db.storage
+        .from(ATTACHMENT_BUCKET)
+        .createSignedUrls(rows.map((r) => r.storage_path), SIGNED_URL_SECONDS);
+      if (signError) return toolError(`署名付き URL を発行できませんでした。Storage のエラー: ${signError.message}`);
+      const urlByPath = new Map<string, string>();
+      for (const entry of signed ?? []) {
+        if (entry.path && !entry.error && entry.signedUrl) urlByPath.set(entry.path, entry.signedUrl);
+      }
+
+      return json(
+        rows.map(({ storage_path, ...row }) => {
+          const url = urlByPath.get(storage_path) ?? null;
+          return { ...row, markdown: attachmentMarkdown(row), uploaded: url !== null, signed_url: url };
+        }),
+      );
     },
   );
 }
