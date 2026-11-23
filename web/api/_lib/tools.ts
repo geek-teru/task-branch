@@ -520,6 +520,53 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
   );
 
   server.registerTool(
+    "move_task",
+    {
+      title: "タスクのストーリー移動",
+      description:
+        "タスクを同じプロジェクトの別のストーリーへ移し、{ task, from_story: { id, title }, to_story: { id, title } } を返す。" +
+        "移動先のタスクの末尾に並ぶ。ステータス・担当・期間は変えない。移せるのは同じプロジェクトのストーリーだけ。" +
+        "移動は操作履歴（タイムラインの「ストーリーを移動」）に記録される",
+      inputSchema: {
+        task_id: z.uuid().describe("移すタスクの id（ストーリーは不可）"),
+        story_id: z.uuid().describe("移動先のストーリーの id（タスクは不可）"),
+      },
+    },
+    async ({ task_id, story_id }) => {
+      const found = await findTask(db, task_id, "ストーリーは移せません。タスクの id を指定してください");
+      if ("error" in found) return found.error;
+
+      const { data: task, error: taskError } = await db.from("tasks").select("project_id, parent_id").eq("id", task_id).single();
+      if (taskError) return restError(taskError);
+      const { data: target, error: targetError } = await db.from("tasks").select("id, project_id, level, title").eq("id", story_id).maybeSingle();
+      if (targetError) return restError(targetError);
+      if (!target) return toolError(`ストーリーが見つかりません: ${story_id}`);
+      if (target.level === "task") return toolError(`タスクの id です。ストーリーの id を指定してください: ${story_id}`);
+      if (target.project_id !== task.project_id) return toolError(`同じプロジェクトのストーリーにだけ移せます: ${story_id}`);
+      if (task.parent_id === story_id) return toolError(`すでにそのストーリーにあります: ${story_id}`);
+
+      const { data: from, error: fromError } = await db.from("tasks").select("id, title").eq("id", task.parent_id).single();
+      if (fromError) return restError(fromError);
+
+      // 画面の moveTaskToStory と同じく、移動先の末尾（最大の sort_order + 1）に並べる。階層の最終確認は DB のトリガ check_task_hierarchy。
+      const { data: last, error: lastError } = await db
+        .from("tasks")
+        .select("sort_order")
+        .eq("parent_id", story_id)
+        .eq("level", "task")
+        .order("sort_order", { ascending: false })
+        .limit(1);
+      if (lastError) return restError(lastError);
+      const sort_order = ((last[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+      const { data, error } = await db.from("tasks").update({ parent_id: story_id, sort_order }).eq("id", task_id).select(TASK_COLUMNS);
+      if (error) return restError(error);
+      if (data.length === 0) return toolError(`タスクを移動できませんでした: ${task_id}`);
+      return json({ task: data[0], from_story: from, to_story: { id: target.id, title: target.title } });
+    },
+  );
+
+  server.registerTool(
     "list_task_comments",
     {
       title: "タスクのコメントの一覧",

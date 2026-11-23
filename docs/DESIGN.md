@@ -1038,7 +1038,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `request_task_review` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`move_task`（下記「タスクの移動のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `request_task_review` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -1091,6 +1091,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
 | `create_plan`         | `project_id`, `stories`（`stories[]` の `status`、`tasks[]` の `assignee` は任意） | `{ project_id, stories }`。ストーリーと配下のタスクを一括で登録する。新規のストーリーは `status`（`planning` / `todo`。既定 `todo`）、新規のタスクは `todo` で作る。`external_id` が既存の行と一致したら作らず、担当も書き換えない（`assignee` の値は下記「タスクの更新のツール」）。処理は RPC `create_plan`（§4.2）で、入力の誤りはその例外のメッセージを `isError` で返す |
 | `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date` / `assignee`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
+| `move_task`           | `task_id`, `story_id`    | `{ task, from_story, to_story }`。タスクを同じプロジェクトの別のストーリーの末尾へ移す。`task` は `update_task` と同じ形、`from_story` / `to_story` は `{ id, title }`。状態・担当・期間は変えない（下記「タスクの移動のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
 | `get_next_task`       | `project_id`（任意）     | `{ task, story, project }`。次に着手するタスクを1件返す。呼び出したエージェントの担当を優先する。候補が無ければ `{ task: null, message }`（下記「次のタスクのツール」） |
@@ -1168,6 +1169,17 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - `assignee`（`create_plan` の `tasks[]` も同じ）: `user` は `assignee_type = 'human'`、`assignee_id` に持ち主の id。`ai` は `assignee_type = 'ai'`、`assignee_client_id` に呼び出したトークンの `client_id`。`none` は3列とも null。
 - `ai` は呼び出したエージェントの担当になる。動的登録で環境ごとに `client_id` が変わるので、別の環境の同じエージェントでは `get_next_task` の候補から外れる。別のエージェントの指定は画面で行う（接続中のエージェントの一覧は画面のセッションでしか読めない）。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`（ストーリーには `update_story` を使うよう伝える）。`start_task` と同じ `findTask` で引く。
+
+**タスクの移動のツール**
+
+`move_task` は、計画の組み替えやタスクの置き場所の直しで、タスクを同じプロジェクトの別のストーリーへ移す。DB の変更は持たず、RLS（`tasks_owner`）の下で `tasks` の `parent_id` と `sort_order` を更新するだけ。挙動は画面のガントの `moveTaskToStory`（`web/src/lib/api.ts`）に揃える。
+
+- 移動先の並びは末尾（移動先の配下タスクの `sort_order` の最大 + 1。配下が無ければ 1）。
+- `status` / 担当 / 期間は変えない（カンバンのレーン間のドラッグ `moveTask` は落とした列でステータスを決めるが、MCP には列が無いので変えない）。
+- 移せるのは同じプロジェクトのストーリーだけ。ツールで先に確かめて `isError`（「同じプロジェクトのストーリーにだけ移せます」）にし、最終の守りは DB のトリガ `check_task_hierarchy`（その例外は `restError` で返す）。
+- `isError` になるもの: 見つからない（他人のものを含む）タスク・ストーリーの `task_id`（`findTask`）、見つからない移動先（「ストーリーが見つかりません」）、移動先にタスクの id（「タスクの id です。ストーリーの id を指定してください」）、すでにそのストーリーにある（「すでにそのストーリーにあります」。何も変えない）。
+- 完了・クローズのストーリーへの移動は拒否しない。
+- 移動は DB のトリガ（`0040_task_moved_events.sql`）が `task_events` に `moved` として記録し、タイムラインに出る。ツールでは何もしない（操作者は AI になる）。
 
 **タスクの文脈のツール**
 
