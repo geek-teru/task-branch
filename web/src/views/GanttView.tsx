@@ -305,11 +305,20 @@ export function GanttView({
   };
   // クローズしたストーリーは、配下のタスクごと既定で隠す。開いているストーリーのクローズしたタスクは出す。
   // 隠した行は期間の計算にも入れない（古いストーリーでタイムラインが伸びないように）。
+  // 中のストーリーがすべてクローズしたグループも行ごと隠す（名前だけのグループ行が下にたまらないように）。
+  // ストーリーが0件のグループ（作りたて）はドロップ先として残す。
   const filtered = useMemo(() => {
     if (showClosedStories) return [{ project, graph }];
-    const closedStoryIds = new Set(graph.nodes.filter((n) => n.level === "story" && n.status === "closed").map((n) => n.id));
+    const stories = graph.nodes.filter((n) => n.level === "story");
+    const closedStoryIds = new Set(stories.filter((n) => n.status === "closed").map((n) => n.id));
     const nodes = graph.nodes.filter((n) => !closedStoryIds.has(n.id) && !closedStoryIds.has(n.parent_id ?? ""));
-    return [{ project, graph: { ...graph, nodes } }];
+    const groupHasOpenStory = new Map<string, boolean>();
+    for (const s of stories) {
+      if (!s.group_id) continue;
+      groupHasOpenStory.set(s.group_id, (groupHasOpenStory.get(s.group_id) ?? false) || s.status !== "closed");
+    }
+    const groups = graph.groups.filter((g) => groupHasOpenStory.get(g.id) !== false);
+    return [{ project, graph: { ...graph, nodes, groups } }];
   }, [project, graph, showClosedStories]);
 
   const model = useMemo(() => {
