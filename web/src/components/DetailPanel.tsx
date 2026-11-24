@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
 import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf } from "../lib/types";
 import { useIsMobile } from "../lib/useIsMobile";
-import { useResizableWidth } from "../lib/useResizableWidth";
 import { AssigneeLabel } from "./AssigneeLabel";
 import { AttachmentList } from "./AttachmentList";
 import { IdBadge } from "./IdBadge";
@@ -26,6 +25,51 @@ export interface StoryOption {
 }
 
 const MS_DAY = 24 * 60 * 60 * 1000;
+
+// 詳細パネルの幅。最大 = min(800, 画面幅の半分)、ただし最小 280 を下回らない。
+const PANEL_MIN_W = 280;
+const PANEL_MAX_W = 800;
+function panelMaxWidth(): number {
+  return Math.max(PANEL_MIN_W, Math.min(PANEL_MAX_W, Math.floor(window.innerWidth / 2)));
+}
+
+// マウント時（パネルを開いたとき）に最大幅で始める。ドラッグした幅は開いている間だけ効き、
+// ブラウザには保存しない。画面幅が狭まって最大幅を超えたら縮める。
+function usePanelWidth() {
+  const [maxW, setMaxW] = useState(panelMaxWidth);
+  const [width, setWidth] = useState(maxW);
+  useEffect(() => {
+    const onResize = () => {
+      const m = panelMaxWidth();
+      setMaxW(m);
+      setWidth((w) => Math.min(w, m));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const startResize = useCallback(
+    (e: { clientX: number; preventDefault: () => void; stopPropagation: () => void }) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startWidth = width;
+      const clamp = (w: number) => Math.min(maxW, Math.max(PANEL_MIN_W, w));
+      // ハンドルは左端なので、右へドラッグすると狭くなる。
+      const onMove = (ev: MouseEvent) => setWidth(clamp(startWidth - (ev.clientX - startX)));
+      const onUp = (ev: MouseEvent) => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        setWidth(clamp(startWidth - (ev.clientX - startX)));
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [width, maxW]
+  );
+
+  return { width, startResize };
+}
 
 // Comment authors are looked up in the assignees; without them, every author shows as unknown.
 const NO_ASSIGNEES: Assignees = { options: [], agentsLoaded: false };
@@ -88,8 +132,8 @@ export function DetailPanel<T extends DetailNode>({
   // 進行中からも完了にできる（レビューが要らないタスクのため）。
   const canComplete = canEdit && node != null && (node.status === "in_progress" || node.status === "in_review");
   const DASH = <span className="text-fg-muted">-</span>;
-  // 左端のハンドルで幅を変える。右へドラッグすると狭くなる。
-  const { width, startResize } = useResizableWidth("detailPanel.width", 320, 280, 800, { invert: true });
+  // 左端のハンドルで幅を変える。右へドラッグすると狭くなる。開くたびに最大幅で始め、幅は覚えない。
+  const { width, startResize } = usePanelWidth();
   // スマホ（768px 未満）では右の横並びではなく、画面全体を覆うシートで開く。幅のドラッグは出さない。
   const isMobile = useIsMobile();
   const close = useBackToClose(isMobile && closeOnBack, onClose);
