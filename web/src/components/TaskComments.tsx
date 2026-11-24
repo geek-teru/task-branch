@@ -215,7 +215,7 @@ export function TaskComments({
         ))}
       </div>
 
-      {error && <div className="mb-2 text-xs text-danger">{error}</div>}
+      {error && <div className="mb-2 text-xs text-danger-fg">{error}</div>}
 
       <AttachmentTextarea
         value={draft}

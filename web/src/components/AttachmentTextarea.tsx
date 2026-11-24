@@ -195,7 +195,7 @@ export function AttachmentTextarea({
           {uploading > 0 ? `画像をアップロード中…（${uploading}）` : "画像は貼り付け・ドロップでも添付できます"}
         </span>
       </div>
-      {error && <div className="mt-0.5 text-xs text-danger">{error}</div>}
+      {error && <div className="mt-0.5 text-xs text-danger-fg">{error}</div>}
     </div>
   );
 }

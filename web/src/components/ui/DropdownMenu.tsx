@@ -23,7 +23,7 @@ export const menuItemClass = cn(
 
 // Left slot of a single-choice item: a check on the chosen one, blank on the rest, so labels line up.
 export function MenuCheck({ on }: { on: boolean }) {
-  return <span className="flex w-3.5 shrink-0 text-brand">{on && <CheckIcon size={14} />}</span>;
+  return <span className="flex w-3.5 shrink-0 text-brand-fg">{on && <CheckIcon size={14} />}</span>;
 }
 
 // Places the open list under the anchor with position: fixed, so it is not clipped by a table or a
@@ -186,7 +186,7 @@ export function DropdownMenuItem({
         close();
         onSelect();
       }}
-      className={cn(menuItemClass, danger ? "text-danger" : "text-fg")}
+      className={cn(menuItemClass, danger ? "text-danger-fg" : "text-fg")}
     >
       {choice && <MenuCheck on={selected} />}
       {icon}

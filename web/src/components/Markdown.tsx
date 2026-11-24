@@ -33,7 +33,7 @@ function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
   if (attachment) return <AttachmentImage id={attachment[1].toLowerCase()} alt={label} />;
   if (!src) return <span className="text-fg-muted">{label || "画像を表示できません"}</span>;
   return (
-    <a href={src} className="text-brand no-underline hover:underline" target="_blank" rel="noopener noreferrer">
+    <a href={src} className="text-brand-fg no-underline hover:underline" target="_blank" rel="noopener noreferrer">
       {label ? `${label}（${src}）` : src}
     </a>
   );
@@ -59,7 +59,7 @@ const components: Components = {
     <li className={cn(className, "my-0.5", className?.includes("task-list-item") && "list-none")} {...props} />
   ),
   a: ({ node: _node, ...props }) => (
-    <a className="text-brand no-underline hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
+    <a className="text-brand-fg no-underline hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
   ),
   blockquote: ({ node: _node, ...props }) => (
     <blockquote className={cn(block, "border-0 border-l-[3px] border-solid border-border-strong px-2.5 text-fg-muted")} {...props} />

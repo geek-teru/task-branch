@@ -7,7 +7,7 @@ export type BadgeTone = "neutral" | "brand" | Status;
 
 function toneClass(tone: BadgeTone): string {
   if (tone === "neutral") return "bg-surface-muted border-border-strong text-fg-muted";
-  if (tone === "brand") return "bg-accent/10 border-accent text-brand";
+  if (tone === "brand") return "bg-accent/10 border-accent text-brand-fg";
   const s = STATUS_CLASS[tone];
   return cn(s.bg, s.border, s.text);
 }

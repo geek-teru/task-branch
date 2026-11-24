@@ -44,7 +44,7 @@ export function BottomTabBar({
             type="button"
             onClick={() => onNavigate(m.key)}
             aria-current={isActive ? "page" : undefined}
-            className={cn(tabClass, isActive ? "font-medium text-brand" : "text-fg-muted hover:text-fg")}
+            className={cn(tabClass, isActive ? "font-medium text-brand-fg" : "text-fg-muted hover:text-fg")}
           >
             <TabIcon>{m.icon}</TabIcon>
             <span className="max-w-full truncate">{m.label}</span>
@@ -59,7 +59,7 @@ export function BottomTabBar({
         // ! overrides the Button's own height / padding / layout so it looks like the other tabs.
         triggerClassName={cn(
           "h-14! w-full! flex-col! gap-0.5! rounded-none! px-1! text-[11px]! hover:bg-transparent!",
-          moreActive ? "text-brand!" : "font-normal! text-fg-muted! hover:text-fg!",
+          moreActive ? "text-brand-fg!" : "font-normal! text-fg-muted! hover:text-fg!",
         )}
         menuClassName="min-w-[200px]"
         trigger={

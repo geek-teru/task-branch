@@ -62,7 +62,7 @@ export function AgentSettings() {
           エージェントを追加
         </Button>
       </div>
-      {error && <div className="text-[13px] text-danger">{error}</div>}
+      {error && <div className="text-[13px] text-danger-fg">{error}</div>}
       {grants === undefined ? (
         <div className="text-[13px] text-fg-muted">読み込み中…</div>
       ) : grants.length === 0 ? (

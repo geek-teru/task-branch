@@ -13,7 +13,7 @@ export function AuthCard({ error, children }: { error?: string | null; children:
           <h1 className="m-0 text-2xl font-medium text-fg">task-branch</h1>
         </div>
         {children}
-        {error && <div className="mt-3 text-[13px] text-danger">{error}</div>}
+        {error && <div className="mt-3 text-[13px] text-danger-fg">{error}</div>}
       </Card>
     </main>
   );

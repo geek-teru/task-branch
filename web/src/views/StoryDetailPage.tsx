@@ -493,7 +493,7 @@ function StoryInfoForm({
         </div>
       </div>
       {periodInvalid ? (
-        <div className="mt-1.5 text-[11px] text-danger">開始日が期限より後になっています。</div>
+        <div className="mt-1.5 text-[11px] text-danger-fg">開始日が期限より後になっています。</div>
       ) : (
         <div className="mt-1.5 text-[11px] text-fg-muted">配下のタスクの期間は変わりません。</div>
       )}

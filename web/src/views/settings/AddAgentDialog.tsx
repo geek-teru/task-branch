@@ -62,7 +62,7 @@ export function AddAgentDialog({ onClose }: { onClose: () => void }) {
                 <div>{s.text}</div>
                 {s.copy && <CopyBlock text={s.copy} />}
                 {s.link && (
-                  <a href={s.link.href} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[13px] text-brand hover:underline">
+                  <a href={s.link.href} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[13px] text-brand-fg hover:underline">
                     {s.link.label}
                   </a>
                 )}

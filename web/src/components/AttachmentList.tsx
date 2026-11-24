@@ -108,7 +108,7 @@ export function AttachmentList({
 
   const list = (
     <>
-      {error && <div className="mb-1.5 text-xs text-danger">{error}</div>}
+      {error && <div className="mb-1.5 text-xs text-danger-fg">{error}</div>}
       <ul className="m-0 list-none divide-y divide-border p-0">
         {items.map((a) => (
           <li key={a.id} className="flex items-center gap-2.5 py-2">

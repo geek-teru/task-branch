@@ -25,7 +25,7 @@ export function IdBadge({ id }: { id: string }) {
       className={cn(
         "m-0 inline-flex h-5 shrink-0 cursor-pointer items-center whitespace-nowrap rounded border px-1.5 text-[11px] leading-none transition-colors",
         copied
-          ? "border-accent bg-accent/10 font-sans text-brand"
+          ? "border-accent bg-accent/10 font-sans text-brand-fg"
           : "border-border bg-surface-muted font-mono text-fg-muted hover:border-border-strong hover:text-fg",
       )}
     >
