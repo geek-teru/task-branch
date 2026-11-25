@@ -35,7 +35,7 @@ export function SettingsPage({
               className={({ isActive }) =>
                 cn(
                   "flex h-8 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 text-sm no-underline transition-colors",
-                  isActive ? "bg-[#ededed] font-medium text-fg" : "text-fg-muted hover:bg-surface-muted hover:text-fg",
+                  isActive ? "bg-selected font-medium text-fg" : "text-fg-muted hover:bg-surface-muted hover:text-fg",
                 )
               }
             >

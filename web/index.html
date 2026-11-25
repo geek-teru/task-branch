@@ -14,7 +14,8 @@
     <script>
       // Apply the color theme before React renders so the page doesn't flash light (see src/lib/theme.ts).
       (function () {
-        var p = "system";
+        // Default is "light" until the theme switch UI lands (f88dfa6b); keep in sync with DEFAULT_PREFERENCE in theme.ts.
+        var p = "light";
         try {
           var v = localStorage.getItem("theme");
           if (v === "light" || v === "dark" || v === "system") p = v;

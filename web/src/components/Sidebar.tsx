@@ -67,7 +67,7 @@ export function Sidebar({
                 "m-0 flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-md border-0 font-sans text-sm transition-colors",
                 collapsed ? "justify-center px-0" : "justify-start px-2.5 text-left",
                 isActive
-                  ? "bg-[#ededed] font-medium text-fg"
+                  ? "bg-selected font-medium text-fg"
                   : "bg-transparent text-fg-muted hover:bg-surface-muted hover:text-fg",
               )}
             >
