@@ -159,7 +159,9 @@ main へのマージでマイグレーションと画面が同時に本番へデ
 ### 3.1 ER 概要
 
 ```
-所有者（ユーザー） 1 ──< projects
+所有者（ユーザー） 1 ──< projects（個人所有。owner_id）
+organizations 1 ──< projects（組織所有。org_id。owner_id とどちらか一方）
+organizations 1 ──< organization_members >── 1 ユーザー（role: owner / member）
 ユーザー 1 ── 0..1 profiles (表示名・アイコン画像のパス。画像は Storage の avatars バケット)
 projects 1 ──< tasks(自己参照ツリー parent_id)
 projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
@@ -181,12 +183,41 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 | id          | uuid        | PK, default gen_random_uuid()                          |                                                                                   |
 | name        | text        | not null                                               | プロジェクト名                                                                    |
 | description | text        |                                                        | 概要                                                                              |
-| owner_id    | uuid        | FK→auth.users.id, not null, default current_owner_id() | 所有者（人のユーザー）。AI が作っても持ち主の人になる。付け替えはできない（§3.5） |
+| owner_id    | uuid        | FK→auth.users.id, default current_owner_id()           | 個人所有のときの所有者（人のユーザー）。AI が作っても持ち主の人になる。組織所有なら null。付け替えはできない（§3.5） |
+| org_id      | uuid        | FK→organizations.id, on delete restrict                | 組織所有のときの組織。個人所有なら null。付け替えはできない                       |
 | created_at  | timestamptz | default now()                                          |                                                                                   |
 | updated_at  | timestamptz | default now()                                          |                                                                                   |
 
-- インデックス：(owner_id)。
+- インデックス：(owner_id)、(org_id)。
+- check (num_nonnulls(owner_id, org_id) = 1)：個人所有（owner_id）か組織所有（org_id）のちょうど一方（`0043_projects_org.sql`）。既存のプロジェクトはすべて個人所有。
+- insert で org_id を渡すと、before insert トリガ `trg_00_projects_org_owner` が owner_id（既定値で入る）を null にする。画面・MCP は owner_id を意識せず org_id だけ渡せばよい。ゲストの件数上限のトリガより先に動くよう、名前を `trg_00_` で始める（同じタイミングのトリガは名前順）。
+- owner_id / org_id の update は before update トリガ `trg_projects_owner_immutable` が拒否する（`errcode = 'P0001'`・`message = 'project_owner_immutable'`）。個人→組織の移管は後続で扱う。
+- 組織にプロジェクトが残っていると、organizations の delete は FK（on delete restrict）で失敗する。
 - 所有者の列を持つのは projects だけ。tasks・task_comments・story_context_revisions は、属するプロジェクトの所有者をたどって判定する（§3.5）。
+
+#### organizations
+
+| カラム     | 型          | 制約                                                     | 説明                                                         |
+| ---------- | ----------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| id         | uuid        | PK, default gen_random_uuid()                            |                                                              |
+| slug       | text        | not null, UNIQUE, check `^[a-z0-9][a-z0-9-]{1,38}$`      | URL に使う識別子（`/orgs/<slug>/settings`）                  |
+| name       | text        | not null, 1〜100 文字                                    | 表示名                                                       |
+| created_by | uuid        | FK→auth.users.id, default auth.uid(), on delete set null | 作った人。作成時に owner として organization_members に入る  |
+| created_at | timestamptz | default now()                                            |                                                              |
+| updated_at | timestamptz | default now()                                            |                                                              |
+
+#### organization_members
+
+| カラム     | 型          | 制約                                   | 説明           |
+| ---------- | ----------- | -------------------------------------- | -------------- |
+| org_id     | uuid        | FK→organizations.id, on delete cascade |                |
+| user_id    | uuid        | FK→auth.users.id, on delete cascade    | メンバー（人） |
+| role       | text        | not null, check in ('owner','member')  |                |
+| created_at | timestamptz | default now()                          |                |
+
+- PK (org_id, user_id)、インデックス (user_id)（`0041_organizations.sql`）。
+- 最後の owner の脱退・降格はトリガで拒否する（`message = 'org_last_owner'`）。組織ごとの削除（cascade）は通す。
+- 判定関数 `is_org_member(org)` / `is_org_owner(org)`（security definer）は `current_owner_id()`（AI なら持ち主の人）で判定する。
 
 #### tasks
 
@@ -506,6 +537,13 @@ $$ language sql stable;
 - 「本人」は `user_id = auth.uid()`（avatars はパスの先頭のフォルダが `auth.uid()`）。人と AI のどちらも含む。「本人の人」はそれに加えて `current_actor_type() = 'human'`（AI は書けない）。
 - 「所有者の人」は「所有者」に加えて `current_actor_type() = 'human'`（AI は書けない）。
 - 「不可」はポリシーを作らない。
+
+#### 組織所有のプロジェクト
+
+- projects は個人所有（`owner_id`）か組織所有（`org_id`）のどちらか一方（§3.2 projects）。
+- 今の RLS（`projects_owner` と、各テーブルの「所有者」= `p.owner_id = current_owner_id()`）は個人所有だけを対象にしている。組織所有のプロジェクト（owner_id が null）は、画面・MCP（authenticated）からは誰にも見えず、作ることもできない（with check で拒否）。
+- 組織のメンバー（`is_org_member(p.org_id)`）に開くのは「組織プロジェクトの RLS 拡張」で行う。organizations / organization_members のポリシーは `0042_organizations_rls.sql`。
+- 組織所有のプロジェクトは owner_id が null なので、ゲストの件数上限（下記）には数えない。
 
 #### ゲストの件数上限
 
