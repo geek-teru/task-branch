@@ -30,7 +30,7 @@ export function Dialog({
   }, [onClose]);
 
   return (
-    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60">
       <div
         role="dialog"
         aria-modal="true"

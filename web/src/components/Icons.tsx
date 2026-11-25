@@ -56,7 +56,8 @@ export function GoogleIcon({ size = 16 }: IconProps) {
 }
 
 // AI agent provider: the provider's image, or a colored tile with its letters when it has none.
-// Without a provider (その他) it is a gray tile with a plug.
+// Without a provider (その他) it is a muted tile with a plug (theme tokens, so it follows dark mode).
+// Brand tiles get a thin ring in dark mode so dark ones (#1f1f1f) don't sink into the background.
 export function ProviderIcon({
   provider,
   size = 28,
@@ -74,7 +75,7 @@ export function ProviderIcon({
         aria-hidden="true"
         width={size}
         height={size}
-        className="shrink-0 rounded-md"
+        className="shrink-0 rounded-md dark:ring-1 dark:ring-border-strong"
         style={{ width: size, height: size }}
       />
     );
@@ -82,12 +83,16 @@ export function ProviderIcon({
   return (
     <span
       aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center rounded-md font-semibold text-white"
+      className={
+        provider
+          ? "inline-flex shrink-0 items-center justify-center rounded-md font-semibold text-white dark:ring-1 dark:ring-border-strong"
+          : "inline-flex shrink-0 items-center justify-center rounded-md bg-surface-muted font-semibold text-fg-muted ring-1 ring-inset ring-border"
+      }
       style={{
         width: size,
         height: size,
         fontSize: Math.round(size * 0.4),
-        background: provider ? provider.icon.color : "#8d8d8d",
+        background: provider ? provider.icon.color : undefined,
       }}
     >
       {provider ? (
