@@ -1,11 +1,19 @@
 import type { ReactNode } from "react";
 import type { Project } from "../lib/types";
 import { Avatar } from "./Avatar";
-import { ChevronUpDownIcon, GitHubIcon, GlobeIcon, ServiceIcon } from "./Icons";
+import { useTheme, type ThemePreference } from "../lib/theme";
+import { ChevronUpDownIcon, GitHubIcon, GlobeIcon, MonitorIcon, MoonIcon, ServiceIcon, SunIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
 export const HEADER_H = 48;
+
+// Theme choices in the user menu (the settings page's 表示 tab has the same three).
+const THEME_ITEMS: { value: ThemePreference; label: string; icon: ReactNode }[] = [
+  { value: "light", label: "ライト", icon: <SunIcon size={14} /> },
+  { value: "dark", label: "ダーク", icon: <MoonIcon size={14} /> },
+  { value: "system", label: "システム", icon: <MonitorIcon size={14} /> },
+];
 
 // Full-width bar across the top of every signed-in page: breadcrumb with the project switcher on
 // the left, the user menu on the right.
@@ -46,6 +54,7 @@ export function GlobalHeader({
   onLinkGoogle?: () => void;
   onLogout: () => void;
 }) {
+  const theme = useTheme();
   const current = projects.find((p) => p.id === currentProjectId);
   // Active projects first; archived ones follow, greyed out.
   const ordered = [...projects.filter((p) => p.is_active), ...projects.filter((p) => !p.is_active)];
@@ -138,6 +147,18 @@ export function GlobalHeader({
           {!isGuest && userEmail && userEmail !== userName && <div className="truncate text-xs text-fg-muted">{userEmail}</div>}
         </div>
         {isGuest && onLinkGoogle && <DropdownMenuItem onSelect={onLinkGoogle}>Google で本登録</DropdownMenuItem>}
+        <DropdownMenuSeparator />
+        {THEME_ITEMS.map((t) => (
+          <DropdownMenuItem
+            key={t.value}
+            onSelect={() => theme.setPreference(t.value)}
+            selected={theme.preference === t.value}
+            icon={<span className="flex text-fg-muted">{t.icon}</span>}
+          >
+            {t.label}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onOpenSettings}>設定</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onLogout}>ログアウト</DropdownMenuItem>

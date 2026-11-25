@@ -922,6 +922,14 @@ export default function App() {
                 </main>
               }
             />
+            <Route
+              path="/settings/appearance"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  <SettingsPage tab="appearance" session={session} />
+                </main>
+              }
+            />
             <Route path="*" element={<Navigate to="/projects" replace />} />
           </Routes>
         </div>

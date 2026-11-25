@@ -8,9 +8,8 @@ export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-// Used when nothing (or an invalid value) is saved. "light" until the theme switch UI lands
-// (f88dfa6b), so OS-dark users aren't put on dark without a way back. Keep in sync with web/index.html.
-const DEFAULT_PREFERENCE: ThemePreference = "light";
+// Used when nothing (or an invalid value) is saved: follow the OS. Keep in sync with web/index.html.
+const DEFAULT_PREFERENCE: ThemePreference = "system";
 
 function isPreference(v: unknown): v is ThemePreference {
   return v === "light" || v === "dark" || v === "system";

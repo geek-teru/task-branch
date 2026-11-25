@@ -3,13 +3,15 @@ import type { Session } from "@supabase/supabase-js";
 import { cn } from "../lib/cn";
 import { PageHeader } from "../components/ui/PageHeader";
 import { AgentSettings } from "./settings/AgentSettings";
+import { AppearanceSettings } from "./settings/AppearanceSettings";
 import { ProfileSettings } from "./settings/ProfileSettings";
 
-export type SettingsTab = "profile" | "agents";
+export type SettingsTab = "profile" | "agents" | "appearance";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "profile", label: "プロフィール" },
   { key: "agents", label: "AI エージェント" },
+  { key: "appearance", label: "表示" },
 ];
 
 // /settings/:tab. The tabs are links in a left column (each tab has its own URL). On phones (< 768px)
@@ -47,8 +49,10 @@ export function SettingsPage({
           <h2 className="m-0 mb-4 text-base font-medium text-fg max-md:sr-only">{TABS.find((t) => t.key === tab)?.label}</h2>
           {tab === "profile" ? (
             <ProfileSettings session={session} onSaved={onProfileSaved} />
-          ) : (
+          ) : tab === "agents" ? (
             <AgentSettings />
+          ) : (
+            <AppearanceSettings />
           )}
         </section>
       </div>
