@@ -659,13 +659,13 @@ export default function App() {
   const ganttPage = (
     <main style={{ flex: 1, minHeight: 0 }}>
       {!projectsLoaded ? (
-        <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+        <div className="p-6 text-fg-muted">読み込み中…</div>
       ) : projects.length === 0 ? (
-        <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+        <div className="p-6 text-fg-muted">プロジェクトがありません。</div>
       ) : !ganttProject ? (
-        <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+        <div className="p-6 text-fg-muted">プロジェクトが見つかりません。</div>
       ) : graph?.projectId !== ganttProject.id ? (
-        <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+        <div className="p-6 text-fg-muted">読み込み中…</div>
       ) : (
         <GanttView
           project={ganttProject}
@@ -779,9 +779,9 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   {!projectsLoaded ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                    <div className="p-6 text-fg-muted">読み込み中…</div>
                   ) : !detailProject ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトが見つかりません。</div>
                   ) : (
                     <ProjectDetailPage
                       project={detailProject}
@@ -805,11 +805,11 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   {!projectsLoaded ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                    <div className="p-6 text-fg-muted">読み込み中…</div>
                   ) : projects.length === 0 ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトがありません。</div>
                   ) : performanceProjectId !== null && !projects.some((p) => p.id === performanceProjectId) ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトが見つかりません。</div>
                   ) : (
                     <PerformanceView
                       projectId={performanceProjectId ?? null}
@@ -827,11 +827,11 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   {!projectsLoaded ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                    <div className="p-6 text-fg-muted">読み込み中…</div>
                   ) : projects.length === 0 ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトがありません。</div>
                   ) : !projects.some((p) => p.id === backlogProjectId) ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトが見つかりません。</div>
                   ) : (
                     <BacklogView
                       stories={backlog && backlog.projectId === backlogProjectId ? backlog.stories : null}
@@ -848,11 +848,11 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   {!projectsLoaded ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                    <div className="p-6 text-fg-muted">読み込み中…</div>
                   ) : projects.length === 0 ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトがありません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトがありません。</div>
                   ) : !timelineProjectId || !projects.some((p) => p.id === timelineProjectId) ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>プロジェクトが見つかりません。</div>
+                    <div className="p-6 text-fg-muted">プロジェクトが見つかりません。</div>
                   ) : (
                     <TimelineView
                       projectId={timelineProjectId}
@@ -887,7 +887,7 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   {!lanes ? (
-                    <div style={{ padding: 24, color: "#5f6b7a" }}>読み込み中…</div>
+                    <div className="p-6 text-fg-muted">読み込み中…</div>
                   ) : (
                     <KanbanView
                       projects={pickerProjects(kanbanProjectId)}
