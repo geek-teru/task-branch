@@ -149,7 +149,7 @@ export function PerformanceView({
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4 md:px-6">
         {invalid ? (
-          <div className="text-[13px] text-danger">開始日は終了日以前にしてください。</div>
+          <div className="text-[13px] text-danger-fg">開始日は終了日以前にしてください。</div>
         ) : !counts ? (
           <div className="text-[13px] text-fg-muted">読み込み中…</div>
         ) : (

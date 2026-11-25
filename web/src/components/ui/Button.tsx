@@ -71,7 +71,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       className={cn(
         size === "sm" ? "w-7" : "w-8",
         "px-0",
-        danger ? "text-danger!" : "text-fg-muted! hover:text-fg!",
+        danger ? "text-danger-fg!" : "text-fg-muted! hover:text-fg!",
         className,
       )}
       {...props}

@@ -17,6 +17,12 @@
   --color-brand-hover: #18633e;
   --color-accent: #3ecf8e;
   --color-danger: #c4352b;
+  /* Text-colored brand / danger (links, selected text, checks, error text).
+     Same as the fill in light; lighter in dark so text on dark surfaces stays 4.5:1+. */
+  --color-brand-fg: #1f7a4d;
+  --color-danger-fg: #c4352b;
+  /* Selected row background in the side nav and settings tabs. */
+  --color-selected: #ededed;
 
   /* Status colors (DESIGN.md 5.2): same hues as before, lower saturation. */
   /* グラフ用の系列色（status の色とは別） */
@@ -45,6 +51,61 @@
 
   --font-sans: Inter, "Noto Sans JP", system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Class-based dark mode: <html data-theme="dark"> (set by index.html / lib/theme.ts).
+   Prefer overriding tokens below; use `dark:` only for the few spots tokens can't fix. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+:root {
+  color-scheme: light;
+}
+
+/* Dark theme: same token names, values after Supabase's dark dashboard.
+   Contrast (WCAG): fg/bg 16.0, fg-muted/surface 6.9, fg-muted/selected 5.5, brand-fg/surface 9.0,
+   danger-fg/surface 7.1, white/brand 5.3, white/danger 5.4, status fg/bg 8.6+. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #121212;
+  --color-surface: #171717;
+  --color-surface-muted: #1f1f1f;
+  --color-border: #2e2e2e;
+  --color-border-strong: #3e3e3e;
+  --color-fg: #ededed;
+  --color-fg-muted: #a0a0a0;
+  /* Fills keep white text at 5.3:1; text uses brand-fg / danger-fg. */
+  --color-brand: #1f7a4d;
+  --color-brand-hover: #18633e;
+  --color-accent: #3ecf8e;
+  --color-danger: #c4352b;
+  --color-brand-fg: #3ecf8e;
+  --color-danger-fg: #ff7a70;
+  --color-selected: #2a2a2a;
+
+  --color-chart-1: #b39ddb;
+  --color-chart-2: #7cc4ec;
+  --color-chart-3: #3ecf8e;
+
+  /* Same hues as light: darker bg, lighter fg, mid border. */
+  --color-status-planning-bg: #1e242c;
+  --color-status-planning-border: #64748b;
+  --color-status-planning-fg: #b8c4d4;
+  --color-status-todo-bg: #16262b;
+  --color-status-todo-border: #4a92a6;
+  --color-status-todo-fg: #8fd0e0;
+  --color-status-in_progress-bg: #18212d;
+  --color-status-in_progress-border: #4d84c0;
+  --color-status-in_progress-fg: #9cc3ee;
+  --color-status-in_review-bg: #221d2f;
+  --color-status-in_review-border: #8a74c8;
+  --color-status-in_review-fg: #c3b4ea;
+  --color-status-done-bg: #18261c;
+  --color-status-done-border: #4f9463;
+  --color-status-done-fg: #93cfa4;
+  --color-status-closed-bg: #232323;
+  --color-status-closed-border: #6e6e6e;
+  --color-status-closed-fg: #b5b5b5;
 }
 
 @layer base {

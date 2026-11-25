@@ -155,7 +155,7 @@ export function TimelineView({
       {/* On phones the feed runs edge to edge (no side padding, no rounded frame), like a phone SNS feed. */}
       <div className="min-h-0 flex-1 overflow-auto md:px-6 md:py-4">
         <div className="max-w-[960px]">
-          {error && <div className="mb-3 text-[13px] text-danger max-md:mb-0 max-md:px-4 max-md:py-3">{error}</div>}
+          {error && <div className="mb-3 text-[13px] text-danger-fg max-md:mb-0 max-md:px-4 max-md:py-3">{error}</div>}
           {!events ? (
             !error && <div className="text-[13px] text-fg-muted max-md:px-4 max-md:py-3">読み込み中…</div>
           ) : events.length === 0 ? (

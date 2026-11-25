@@ -4,6 +4,8 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { TooltipLayer } from "./components/ui/Tooltip";
 import "./index.css";
+// Starts following the OS theme / other tabs; index.html already set data-theme.
+import "./lib/theme";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

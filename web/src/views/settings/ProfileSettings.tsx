@@ -143,7 +143,7 @@ export function ProfileSettings({ session, onSaved }: { session: Session; onSave
           placeholder={googleName}
           maxLength={DISPLAY_NAME_MAX}
         />
-        {nameTooLong && <span className="text-[11px] text-danger">表示名は {DISPLAY_NAME_MAX} 文字までです。</span>}
+        {nameTooLong && <span className="text-[11px] text-danger-fg">表示名は {DISPLAY_NAME_MAX} 文字までです。</span>}
       </Field>
 
       <Field label="メールアドレス">
@@ -155,7 +155,7 @@ export function ProfileSettings({ session, onSaved }: { session: Session; onSave
           {saving ? "保存中…" : "保存"}
         </Button>
         {saved && <span className="text-[13px] text-fg-muted">保存しました</span>}
-        {error && <span className="text-[13px] text-danger">{error}</span>}
+        {error && <span className="text-[13px] text-danger-fg">{error}</span>}
       </div>
     </div>
   );

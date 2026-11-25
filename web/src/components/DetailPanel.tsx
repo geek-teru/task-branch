@@ -207,7 +207,7 @@ export function DetailPanel<T extends DetailNode>({
         )}
         {storyLink && (
           <Field label="ストーリー詳細">
-            <Link to={storyLink} className="text-brand hover:underline">
+            <Link to={storyLink} className="text-brand-fg hover:underline">
               ストーリー詳細を開く
             </Link>
           </Field>

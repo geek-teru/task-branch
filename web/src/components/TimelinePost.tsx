@@ -117,7 +117,7 @@ function CommentBody({ body }: { body: string | null }) {
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="m-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-brand hover:underline"
+          className="m-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-brand-fg hover:underline"
         >
           さらに表示
         </button>

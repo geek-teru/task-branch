@@ -161,7 +161,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function ExternalLink({ href }: { href: string }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="text-brand no-underline hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="text-brand-fg no-underline hover:underline">
       {href}
     </a>
   );

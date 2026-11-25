@@ -11,6 +11,19 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap"
     />
     <title>task-branch</title>
+    <script>
+      // Apply the color theme before React renders so the page doesn't flash light (see src/lib/theme.ts).
+      (function () {
+        // Default is "light" until the theme switch UI lands (f88dfa6b); keep in sync with DEFAULT_PREFERENCE in theme.ts.
+        var p = "light";
+        try {
+          var v = localStorage.getItem("theme");
+          if (v === "light" || v === "dark" || v === "system") p = v;
+        } catch (e) {}
+        if (p === "system") p = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = p;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
