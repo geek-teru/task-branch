@@ -14,6 +14,7 @@ import {
   addRootStory,
   addTaskComment,
   addTask,
+  createOrganization,
   createProject,
   deleteProject,
   deleteTask,
@@ -36,10 +37,11 @@ import {
   deleteStoryGroup,
   setStoryGroup,
 } from "./lib/api";
-import type { Assignees, BacklogStory, GraphNode, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import type { Assignees, BacklogStory, GraphNode, KanbanLane, OrganizationInput, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { agentAssigneeId } from "./lib/types";
 import { agentClientLabel, findAgentProvider } from "./lib/agentProviders";
 import { useAgentGrants } from "./lib/useAgentGrants";
+import { useOrgContext } from "./lib/useOrgContext";
 import { Sidebar, type MenuKey } from "./components/Sidebar";
 import { BottomTabBar } from "./components/BottomTabBar";
 import { useIsMobile } from "./lib/useIsMobile";
@@ -47,6 +49,7 @@ import { GlobalHeader } from "./components/GlobalHeader";
 import { GuestBanner } from "./components/GuestBanner";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ProjectSelect } from "./components/ProjectSelect";
+import { OrgForm } from "./components/OrgForm";
 import { CloseIcon } from "./components/Icons";
 import { Button, IconButton } from "./components/ui/Button";
 import { ProjectsListPage } from "./views/ProjectsListPage";
@@ -568,6 +571,40 @@ export default function App() {
   // Phone layout (< 768px): the bottom tab bar replaces the sidebar.
   const isMobile = useIsMobile();
 
+  // Owner (個人 / 組織) the project list is scoped to: ?org=<slug>, else the last choice.
+  const org = useOrgContext(isConfigured ? userId : undefined);
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const handleSelectOwner = useCallback(
+    (slug: string | null) => {
+      org.select(slug);
+      navigate(slug ? `/projects?org=${encodeURIComponent(slug)}` : "/projects");
+    },
+    [org.select, navigate]
+  );
+  // Throws on failure so the dialog can show the reason (duplicate slug etc.).
+  const handleCreateOrg = useCallback(
+    async (input: OrganizationInput) => {
+      const created = await createOrganization(input);
+      org.add(created);
+      setCreatingOrg(false);
+      handleSelectOwner(created.slug);
+    },
+    [org.add, handleSelectOwner]
+  );
+  // The project list without ?org= but with a remembered organization: put it in the URL.
+  const isProjectsList = pathname === "/projects";
+  const urlOrg = searchParams.get("org");
+  useEffect(() => {
+    if (isProjectsList && !urlOrg && org.current) {
+      navigate(`/projects?org=${encodeURIComponent(org.current.slug)}`, { replace: true });
+    }
+  }, [isProjectsList, urlOrg, org.current, navigate]);
+  // Projects of the selected owner (個人: no org_id; 組織: that org_id).
+  const ownerProjects = useMemo(
+    () => projects.filter((p) => (org.current ? p.org_id === org.current.id : !p.org_id)),
+    [projects, org.current]
+  );
+
   // The side nav opens each page on the selected project.
   const onNavigate = useCallback((key: MenuKey) => {
     if (key === "projects") navigate("/projects");
@@ -710,6 +747,10 @@ export default function App() {
     // dvh on phones: 100vh includes the area under Safari's toolbar, which would hide the tab bar.
     <div className="flex h-screen flex-col max-md:h-dvh">
       <GlobalHeader
+        orgs={org.orgs}
+        currentOrg={org.current}
+        onSelectOwner={handleSelectOwner}
+        onCreateOrg={session.user.is_anonymous ? undefined : () => setCreatingOrg(true)}
         projects={projects}
         currentProjectId={headerProjectId ?? null}
         allProjectsLabel={isKanban || isPerformance ? "すべてのプロジェクト" : undefined}
@@ -733,6 +774,9 @@ export default function App() {
             </Button>
           }
         />
+      )}
+      {creatingOrg && !session.user.is_anonymous && (
+        <OrgForm onSubmit={handleCreateOrg} onCancel={() => setCreatingOrg(false)} />
       )}
       {identityConflict && session.user.is_anonymous && (
         <ConfirmDialog
@@ -764,7 +808,8 @@ export default function App() {
               element={
                 <main style={{ flex: 1, minHeight: 0 }}>
                   <ProjectsListPage
-                    projects={projects}
+                    projects={ownerProjects}
+                    ownerName={org.current?.name ?? null}
                     onCreate={handleCreateProject}
                     onShowDetail={(projectId) => navigate(`/projects/${projectId}`)}
                     onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}

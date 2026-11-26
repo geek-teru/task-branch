@@ -44,13 +44,17 @@ const SORT_COLUMNS = {
 // Project list: navigate only. Editing / deleting / exporting lives on the detail page.
 export function ProjectsListPage({
   projects,
+  ownerName = null,
   onCreate,
   onShowDetail,
   onShowBacklog,
   onShowGantt,
   onShowKanban,
 }: {
+  // Projects of the owner picked in the header (個人 or an organization).
   projects: Project[];
+  // The organization's name; null = 個人.
+  ownerName?: string | null;
   onCreate: (input: ProjectInput) => void;
   onShowDetail: (projectId: string) => void;
   onShowBacklog: (projectId: string) => void;
@@ -107,7 +111,7 @@ export function ProjectsListPage({
     <div className="h-full overflow-auto">
       <PageHeader
         title="プロジェクト"
-        meta={`${visible.length} 件`}
+        meta={`${ownerName ?? "個人"} · ${visible.length} 件`}
         actions={
           <Button variant="primary" icon={<AddIcon size={14} />} onClick={() => setCreating(true)}>
             New Project
@@ -153,7 +157,9 @@ export function ProjectsListPage({
         {visible.length === 0 ? (
           <div className="rounded-md border border-dashed border-border-strong px-6 py-12 text-center text-[13px] text-fg-muted">
             {projects.length === 0
-              ? "プロジェクトがありません。「New Project」から作成してください。"
+              ? ownerName
+                ? `${ownerName} のプロジェクトはまだありません。`
+                : "プロジェクトがありません。「New Project」から作成してください。"
               : "条件に合うプロジェクトがありません。"}
           </div>
         ) : shownView === "grid" ? (

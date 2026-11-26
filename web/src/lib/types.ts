@@ -13,8 +13,31 @@ export interface Project {
   url: string | null; // related site (deployment etc.)
   repository_url: string | null; // GitHub etc.
   is_active: boolean; // false = archived: hidden from the gantt / kanban / backlog pickers
+  // Exactly one of the two is set: owner_id for a personal project, org_id for an organization's
+  // (0043_projects_org.sql). Older DBs return neither column; treat that as personal.
+  owner_id?: string | null;
+  org_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type OrgRole = "owner" | "member";
+
+// An organization the signed-in user belongs to (organizations + their organization_members row).
+export interface Organization {
+  id: string;
+  slug: string; // used in URLs (?org=<slug>, /orgs/<slug>/settings)
+  name: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  role: OrgRole; // the signed-in user's role
+}
+
+// Fields of the create-organization form.
+export interface OrganizationInput {
+  name: string;
+  slug: string;
 }
 
 export interface Task {

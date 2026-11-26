@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
+import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
 
 // Guest limits (0031_guest_limits.sql) reject inserts with message 'guest_limit_exceeded'
 // and detail '<projects|stories|tasks|comments>:<limit>'. Turn that into a Japanese message.
@@ -35,6 +35,42 @@ export async function listProjects(): Promise<Project[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+
+// Organizations the user is a member of, in creation order, with their role.
+// Read through organization_members (filtered to the user) rather than organizations: the latter's
+// select policy also returns organizations the user created and later left.
+export async function listMyOrganizations(userId: string): Promise<Organization[]> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("role, organizations(*)")
+    .eq("user_id", userId);
+  if (error) {
+    // Before 0041_organizations.sql there is no table: behave as "no organizations".
+    if (error.code === "42P01" || error.code === "PGRST205") return [];
+    throw error;
+  }
+  type Row = { role: Organization["role"]; organizations: Omit<Organization, "role"> | null };
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => r.organizations)
+    .map((r) => ({ ...r.organizations!, role: r.role }))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+// Same rule as the organizations.slug check (0041): lowercase letters, digits and hyphens,
+// 2〜39 characters, starting with a letter or digit.
+export const ORG_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,38}$/;
+
+// Create an organization; the DB adds the creator as its owner (trg_organizations_add_owner).
+export async function createOrganization(input: OrganizationInput): Promise<Organization> {
+  const { data, error } = await supabase.from("organizations").insert(input).select().single();
+  if (error) {
+    if (error.code === "23505") throw new Error("この slug はすでに使われています。別の slug にしてください");
+    if (error.code === "23514") throw new Error("slug は英小文字・数字・ハイフンで 2〜39 文字（先頭は英数字）にしてください");
+    if (error.code === "42501") throw new Error("組織を作成する権限がありません（ゲストは組織を作れません）");
+    throw error;
+  }
+  return { ...(data as Omit<Organization, "role">), role: "owner" };
 }
 
 // Create the guest's sample project (idempotent) and return its id. Anonymous users only.
