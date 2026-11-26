@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, OrgMember, OrgRole, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
+import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, OrgInvitation, OrgMember, OrgRole, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
 
 // Guest limits (0031_guest_limits.sql) reject inserts with message 'guest_limit_exceeded'
 // and detail '<projects|stories|tasks|comments>:<limit>'. Turn that into a Japanese message.
@@ -159,6 +159,65 @@ export async function removeOrgMember(orgId: string, userId: string): Promise<vo
     .select("user_id");
   if (error) throw orgError(error);
   requireRows(data);
+}
+
+// Error from the invitation RPCs / revoke, made readable. Messages come from 0046_org_invitations.sql.
+function orgInvitationError(error: { code?: string; message?: string }): Error {
+  switch (error.message) {
+    case "org_invitation_forbidden":
+      return new Error("招待リンクを扱えるのは組織の owner だけです");
+    case "org_invitation_invalid_role":
+      return new Error("ロールは owner か member を選んでください");
+    case "org_invitation_invalid_days":
+      return new Error("期限は 1〜30 日で選んでください");
+    case "org_invitation_already_revoked":
+      return new Error("この招待リンクはすでに失効しています");
+  }
+  if (error.code === "42501") return new Error("この操作の権限がありません");
+  return new Error(error.message ?? String(error));
+}
+
+// Issue an invitation link (owner only). The token is returned only here; the DB keeps its hash.
+export async function createOrgInvitation(
+  orgId: string,
+  role: OrgRole,
+  validDays: number,
+): Promise<OrgInvitation & { token: string }> {
+  const { data, error } = await supabase.rpc("create_org_invitation", { org: orgId, role, valid_days: validDays });
+  if (error) throw orgInvitationError(error);
+  const r = data as { id: string; token: string; role: OrgRole; expires_at: string };
+  return { id: r.id, role: r.role, expires_at: r.expires_at, token: r.token, created_by: null, accepted_count: 0, created_at: new Date().toISOString() };
+}
+
+// Invitations that can still be used (not revoked, not expired), newest first. Owners only (RLS);
+// a member gets an empty list.
+export async function listOrgInvitations(orgId: string): Promise<OrgInvitation[]> {
+  const { data, error } = await supabase
+    .from("organization_invitations")
+    .select("id, role, created_by, expires_at, accepted_count, created_at")
+    .eq("org_id", orgId)
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw orgInvitationError(error);
+  return (data ?? []) as OrgInvitation[];
+}
+
+// Revoke an invitation (owner only). The DB sets revoked_at to now() and refuses to undo it.
+export async function revokeOrgInvitation(invitationId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("organization_invitations")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", invitationId)
+    .is("revoked_at", null)
+    .select("id");
+  if (error) throw orgInvitationError(error);
+  if (!data || data.length === 0) throw new Error("失効できませんでした（すでに失効しているか、権限がありません）");
+}
+
+// The URL to hand to invitees: /invite/<token> on this origin.
+export function orgInvitationUrl(token: string): string {
+  return `${window.location.origin}/invite/${token}`;
 }
 
 // Create the guest's sample project (idempotent) and return its id. Anonymous users only.

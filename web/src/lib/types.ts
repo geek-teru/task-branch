@@ -43,6 +43,17 @@ export interface OrgMember {
   avatar_path: string | null; // path in the avatars bucket
 }
 
+// A row of the organization's invitation links (organization_invitations, owners only). The token is
+// never stored; it is shown once when the link is issued.
+export interface OrgInvitation {
+  id: string;
+  role: OrgRole;
+  created_by: string | null; // the owner who issued it (null if that user was deleted)
+  expires_at: string;
+  accepted_count: number; // people who joined through this link
+  created_at: string;
+}
+
 // Fields of the create-organization form.
 export interface OrganizationInput {
   name: string;
