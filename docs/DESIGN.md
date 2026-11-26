@@ -218,6 +218,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 - PK (org_id, user_id)、インデックス (user_id)（`0041_organizations.sql`）。
 - 最後の owner の脱退・降格はトリガで拒否する（`message = 'org_last_owner'`）。組織ごとの削除（cascade）は通す。
 - 判定関数 `is_org_member(org)` / `is_org_owner(org)`（security definer）は `current_owner_id()`（AI なら持ち主の人）で判定する。
+- メンバーの行が消えると（脱退・削除・ユーザーの削除）、after delete トリガ `trg_organization_members_unassign`（security definer）が、その組織のプロジェクトでその人が担当のタスクを未割り当て（`assignee_type` / `assignee_id` を null）に戻す（`0045_org_project_functions.sql`）。
 
 #### tasks
 
@@ -255,6 +256,7 @@ projects 1 ──< story_groups 1 ──< tasks(story のみ。group_id)
 - 見積り（`estimate`）は未導入。導入時は `estimate_value numeric` + `estimate_unit text` を追加する想定（§10）。
 - `context` は長文になるため、一覧系の取得（カンバン・ガントチャート・`get_task_graph` など）では読み込まない。詳細・バックログの画面と、AI にストーリーの文脈を渡すときだけ取得する。
 - `group_id` を持てるのは `level = 'story'` の行だけで、グループはストーリーと同じプロジェクトに属すること（トリガ `check_task_group()`）。
+- `assignee_id` は、個人プロジェクトなら持ち主、組織プロジェクトならその組織のメンバーだけ（トリガ `check_task_assignee()`、security definer。`0045_org_project_functions.sql`）。違反は `the assignee must be the owner of the project` / `the assignee must be a member of the organization`。
 
 #### story_groups
 
@@ -895,7 +897,7 @@ node scripts/attachments-access-check.mjs   # 期待と違う結果が1つでも
 | `list_project_events(project uuid, before timestamptz, story uuid, types text[], max_rows int, actor text)` | タイムライン | task_events を `occurred_at` の新しい順に `max_rows`（既定 50）件、jsonb の配列で返す。`before` 未満がカーソル。`story` を渡すとそのストーリーと配下タスクだけ、`types` で event_type を、`actor`（`human` / `ai`。それ以外は例外）で actor_type を絞る。task_title / story_title / actor_id / actor_client_id / comment_excerpt（本文の先頭 80 文字）/ comment_body（本文の全文。コメントが消えていたらどちらも null）/ from_story_id・from_story_title・to_story_id・to_story_title（`moved` のときの移動元・移動先。他は null）込み。`story` で絞ると、移動元・移動先がそのストーリーの `moved` も出る。security invoker（`0026_task_events_rpc.sql`、`0030_task_events_actor_client.sql`、`0040_task_moved_events.sql`） |
 | `project_activity_counts(project uuid, bucket text, from_date date, to_date date)` | パフォーマンス | `bucket`（`day` / `week`＝月曜始まり、Asia/Tokyo）ごとに stories_created / tasks_created / tasks_done を返す。空の区間も 0。`project` が null なら、呼び出したユーザーが見えるすべてのプロジェクト（RLS の範囲。アーカイブ済みも含む。カンバンの「すべてのプロジェクト」と同じ）を合わせて数える（画面は `?project=all`）。security invoker（`0026_task_events_rpc.sql`、`0033_activity_counts_all_projects.sql`） |
 
-| `record_usage_events(events jsonb)` | 使用量 | API 応答ごとの使用量（配列。1 回 500 件まで）を usage_events に記録し `{inserted, updated, skipped}` を返す。必須は session_id / request_key / model / occurred_at。持ち主は `current_owner_id()`、task_id は持ち主のプロジェクトのタスクだけ受け付け（それ以外は null）、project_id はタスクから埋める。同じ (owner_id, request_key) は、cost_usd が null で新しい値があるときだけ埋め（updated）、ほかは skipped。呼び出し内の重複は先頭だけ使う。JWT が無い・ゲストは例外。security definer、execute は authenticated のみ（`0035_usage_events.sql`） |
+| `record_usage_events(events jsonb)` | 使用量 | API 応答ごとの使用量（配列。1 回 500 件まで）を usage_events に記録し `{inserted, updated, skipped}` を返す。必須は session_id / request_key / model / occurred_at。持ち主は `current_owner_id()`、task_id は自分が触れるプロジェクト（`can_access_project()`。組織プロジェクトはメンバーなら可）のタスクだけ受け付け（それ以外は null。`0045_org_project_functions.sql`）、project_id はタスクから埋める。同じ (owner_id, request_key) は、cost_usd が null で新しい値があるときだけ埋め（updated）、ほかは skipped。呼び出し内の重複は先頭だけ使う。JWT が無い・ゲストは例外。security definer、execute は authenticated のみ（`0035_usage_events.sql`） |
 | `usage_totals(project uuid, story uuid)` | 使用量 | usage_events の累計を 1 行で返す（responses / input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens / cost_usd / uncosted_responses / first_at / last_at）。`story` が null ならプロジェクト（`usage_events.project_id`）の合計、渡せばそのストーリーと配下タスク（`parent_id`）にひも付いた分の合計。cost_usd は費用の分かる応答だけの合計（無ければ null）、uncosted_responses は費用が null の応答数。画面のプロジェクト詳細・ストーリー詳細の「AI の使用量」カードが使う。security invoker（usage_events の RLS＝持ち主だけ）、execute は authenticated のみ（`0037_usage_totals.sql`） |
 | `create_plan(project uuid, stories jsonb)` | 計画の登録 | ストーリーと配下のタスクを一括で登録し `{project_id, stories}` を返す（入力・返り値は MCP の `create_plan` と同じ）。1 トランザクションで、途中で失敗（ゲストの件数上限など）しても半端に作られない。`external_id` が既存の行と一致したら作らず `created: false`。入力の誤り（external_id の重複、level の食い違い、他プロジェクトのストーリー、status・assignee の値）は何も作らずに errcode 22023 の例外。ストーリーはプロジェクトの末尾（無ければ 1 から）、タスクはストーリーの末尾（無ければ 0 から）に並ぶ。`assignee` の `ai` は JWT の `client_id` のエージェント（画面の人のセッションからは AI（未指定））。MCP の `create_plan` はこの RPC を呼ぶだけ。security invoker（RLS の範囲。他人のプロジェクトは「見つかりません」）、execute は authenticated のみ（`0038_create_plan.sql`） |
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
