@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import {
   ORG_SLUG_PATTERN,
+  createOrgInvitation,
   deleteOrganization,
+  listOrgInvitations,
   listOrgMembers,
+  orgInvitationUrl,
   removeOrgMember,
+  revokeOrgInvitation,
   updateOrgMemberRole,
   updateOrganization,
 } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { avatarUrl } from "../../lib/profile";
 import { useIsMobile } from "../../lib/useIsMobile";
-import type { OrgMember, OrgRole, Organization } from "../../lib/types";
+import type { OrgInvitation, OrgMember, OrgRole, Organization } from "../../lib/types";
 import { Avatar } from "../../components/Avatar";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Badge } from "../../components/ui/Badge";
@@ -429,15 +433,10 @@ function MembersSettings({
         </div>
       )}
 
-      {/* 招待リンク: the issue / revoke UI comes with 「招待リンクによるメンバー招待の実装」 (S4). */}
-      {isOwner && (
-        <section aria-labelledby="org-invitations-heading" className="flex flex-col gap-2">
-          <h3 id="org-invitations-heading" className="m-0 text-sm font-medium text-fg">
-            招待リンク
-          </h3>
-          <p className="m-0 text-[13px] text-fg-muted">招待リンクの発行は準備中です。</p>
-        </section>
-      )}
+      {isOwner && <InvitationsSection org={org} nameOfUser={(id) => {
+        const m = members.find((x) => x.user_id === id);
+        return m ? nameOf(m) : "元のメンバー";
+      }} />}
 
       {me && (
         <Card className="flex flex-col gap-3 p-4 md:p-5">
@@ -473,6 +472,211 @@ function MembersSettings({
           onCancel={() => setPending(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 招待リンク (owner only): issue with a role and a validity, show the link once, list the usable
+// links, revoke. Expired and revoked links drop out of the list.
+// ---------------------------------------------------------------------------
+type ValidDays = "1" | "7" | "30";
+const VALID_DAYS_OPTIONS: { value: ValidDays; label: string }[] = [
+  { value: "1", label: "1日" },
+  { value: "7", label: "7日" },
+  { value: "30", label: "30日" },
+];
+
+function InvitationsSection({ org, nameOfUser }: { org: Organization; nameOfUser: (userId: string | null) => string }) {
+  const isMobile = useIsMobile();
+  const [invitations, setInvitations] = useState<OrgInvitation[] | null>(null);
+  const [role, setRole] = useState<OrgRole>("member");
+  const [days, setDays] = useState<ValidDays>("7");
+  const [issuing, setIssuing] = useState(false);
+  const [issued, setIssued] = useState<{ url: string; role: OrgRole; expires_at: string } | null>(null);
+  const [revoking, setRevoking] = useState<OrgInvitation | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    listOrgInvitations(org.id)
+      .then(setInvitations)
+      .catch((e) => {
+        setInvitations([]);
+        setError(String(e?.message ?? e));
+      });
+  }, [org.id]);
+  useEffect(load, [load]);
+
+  const issue = async () => {
+    setIssuing(true);
+    setError(null);
+    try {
+      const inv = await createOrgInvitation(org.id, role, Number(days));
+      setIssued({ url: orgInvitationUrl(inv.token), role: inv.role, expires_at: inv.expires_at });
+      load();
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (!revoking) return;
+    const target = revoking;
+    setRevoking(null);
+    setError(null);
+    try {
+      await revokeOrgInvitation(target.id);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    }
+    load();
+  };
+
+  const expires = (iso: string) =>
+    new Date(iso).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const roleBadge = (r: OrgRole) => <Badge tone={r === "owner" ? "brand" : "neutral"}>{ROLE_LABEL[r]}</Badge>;
+  const revokeButton = (inv: OrgInvitation) => (
+    <Button size="sm" onClick={() => setRevoking(inv)}>
+      失効
+    </Button>
+  );
+
+  return (
+    <section aria-labelledby="org-invitations-heading" className="flex flex-col gap-3">
+      <div>
+        <h3 id="org-invitations-heading" className="m-0 text-sm font-medium text-fg">
+          招待リンク
+        </h3>
+        <p className="m-0 mt-1 text-[13px] text-fg-muted">
+          リンクを開いて Google でログインした人が、選んだロールで組織に参加します。期限内なら何人でも使えます。
+        </p>
+      </div>
+
+      <Card className="flex flex-col gap-3 p-4 md:p-5">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-fg-muted">ロール</span>
+            <Select<OrgRole> value={role} options={ROLE_OPTIONS} aria-label="招待するロール" className="w-32" onChange={setRole} />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-fg-muted">期限</span>
+            <Select<ValidDays> value={days} options={VALID_DAYS_OPTIONS} aria-label="招待リンクの期限" className="w-28" onChange={setDays} />
+          </label>
+          <Button variant="primary" disabled={issuing} onClick={() => void issue()}>
+            {issuing ? "発行中…" : "招待リンクを発行"}
+          </Button>
+        </div>
+        {issued && <IssuedLink {...issued} expiresLabel={expires(issued.expires_at)} onClose={() => setIssued(null)} />}
+      </Card>
+
+      {error && <ErrorBox>{error}</ErrorBox>}
+
+      {invitations === null ? (
+        <div className="text-[13px] text-fg-muted">読み込み中…</div>
+      ) : invitations.length === 0 ? (
+        <p className="m-0 text-[13px] text-fg-muted">有効な招待リンクはありません。</p>
+      ) : isMobile ? (
+        <div className="flex flex-col gap-2">
+          {invitations.map((inv) => (
+            <Card key={inv.id} className="flex items-center justify-between gap-3 p-3">
+              <div className="min-w-0 flex-1 text-xs text-fg-muted">
+                <div className="mb-1">{roleBadge(inv.role)}</div>
+                <div className="truncate">発行者 {nameOfUser(inv.created_by)}</div>
+                <div>期限 {expires(inv.expires_at)}・参加 {inv.accepted_count} 人</div>
+              </div>
+              {revokeButton(inv)}
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-border bg-surface">
+          <table className="w-full table-fixed border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">
+                <th className="w-28 px-4 py-2 font-normal">ロール</th>
+                <th className="px-4 py-2 font-normal">発行者</th>
+                <th className="w-40 px-4 py-2 font-normal">期限</th>
+                <th className="w-20 px-4 py-2 font-normal">参加人数</th>
+                <th className="w-20 px-4 py-2 font-normal">
+                  <span className="sr-only">操作</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {invitations.map((inv) => (
+                <tr key={inv.id} className="border-b border-border last:border-b-0">
+                  <td className="px-4 py-2.5">{roleBadge(inv.role)}</td>
+                  <td className="truncate px-4 py-2.5 text-fg">{nameOfUser(inv.created_by)}</td>
+                  <td className="px-4 py-2.5 text-fg-muted">{expires(inv.expires_at)}</td>
+                  <td className="px-4 py-2.5 text-fg-muted">{inv.accepted_count} 人</td>
+                  <td className="px-4 py-2.5 text-right">{revokeButton(inv)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {revoking && (
+        <ConfirmDialog
+          message={`この招待リンク（${ROLE_LABEL[revoking.role]}・期限 ${expires(revoking.expires_at)}）を失効します。リンクは使えなくなり、元に戻せません。すでに参加した人はそのまま残ります。よろしいですか？`}
+          confirmLabel="失効する"
+          danger
+          onConfirm={() => void revoke()}
+          onCancel={() => setRevoking(null)}
+        />
+      )}
+    </section>
+  );
+}
+
+// The link just issued, with a copy button. The token is not stored, so it cannot be shown again.
+function IssuedLink({
+  url,
+  role,
+  expiresLabel,
+  onClose,
+}: {
+  url: string;
+  role: OrgRole;
+  expires_at: string;
+  expiresLabel: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div role="status" className="flex flex-col gap-2 rounded-md border border-brand/40 bg-brand/5 p-3">
+      <p className="m-0 text-[13px] text-fg">
+        招待リンクを発行しました（{ROLE_LABEL[role]}・期限 {expiresLabel}）。
+        <span className="font-medium">このリンクは今だけ表示されます。あとから再表示できないので、ここでコピーしてください。</span>
+      </p>
+      <div className="flex items-start gap-2 rounded-md border border-border bg-surface p-2">
+        <code className="min-w-0 flex-1 break-all font-mono text-xs text-fg">{url}</code>
+        <Button size="sm" onClick={() => void copy()}>
+          {copied ? "コピーしました" : "コピー"}
+        </Button>
+      </div>
+      <div>
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          閉じる
+        </Button>
+      </div>
     </div>
   );
 }
