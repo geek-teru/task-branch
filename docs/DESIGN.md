@@ -521,7 +521,7 @@ $$ language sql stable;
 
 | テーブル               | insert                                          | select | update                              | delete     |
 | ---------------------- | ----------------------------------------------- | ------ | ----------------------------------- | ---------- |
-| projects               | ログイン済みなら誰でも。`owner_id` は自分に固定 | 所有者 | 所有者。`owner_id` の付け替えは不可 | 所有者     |
+| projects               | 個人は自分名義（`owner_id` は自分に固定）。組織はその組織のメンバー | 所有者 | 所有者。`owner_id` / `org_id` の付け替えは不可 | 所有者（組織プロジェクトは組織の owner） |
 | tasks                  | 所有者                                          | 所有者 | 所有者                              | 所有者     |
 | story_groups           | 所有者                                          | 所有者 | 所有者                              | 所有者     |
 | story_context_revisions | 所有者                                         | 所有者 | 不可                                | 不可       |
@@ -532,7 +532,7 @@ $$ language sql stable;
 | task_attachments       | 所有者（人・AI。ゲスト不可。`created_by` は自分） | 所有者 | 不可                                | 所有者の人 |
 | storage.objects（attachments） | 所有者（人・AI。task_attachments に行のあるパスだけ。ゲスト不可） | 所有者（行のあるパスだけ） | 不可（上書き不可） | 所有者の人（行のあるパスだけ） |
 
-- 「所有者」は、行が属するプロジェクトの `owner_id = current_owner_id()`。人なら本人、AI なら持ち主の人のプロジェクトが対象になる（本人と本人の AI が同じ範囲を触れる）。
+- 「所有者」は、行が属するプロジェクトに `can_access_project(project_id)` で触れる人。個人プロジェクトなら `owner_id = current_owner_id()`、組織プロジェクトならその組織のメンバー（`is_org_member(org_id)`）。人なら本人、AI なら持ち主の人が対象になる（本人と本人の AI が同じ範囲を触れる）。
 - 「書いた本人」は `author_id = auth.uid() and author_type = current_actor_type()`。人と AI は uid が同じなので、種別も合わせて別の投稿者として扱う（AI は人のコメントを、人は AI のコメントを編集・削除できない）。
 - 「本人」は `user_id = auth.uid()`（avatars はパスの先頭のフォルダが `auth.uid()`）。人と AI のどちらも含む。「本人の人」はそれに加えて `current_actor_type() = 'human'`（AI は書けない）。
 - 「所有者の人」は「所有者」に加えて `current_actor_type() = 'human'`（AI は書けない）。
@@ -541,8 +541,12 @@ $$ language sql stable;
 #### 組織所有のプロジェクト
 
 - projects は個人所有（`owner_id`）か組織所有（`org_id`）のどちらか一方（§3.2 projects）。
-- 今の RLS（`projects_owner` と、各テーブルの「所有者」= `p.owner_id = current_owner_id()`）は個人所有だけを対象にしている。組織所有のプロジェクト（owner_id が null）は、画面・MCP（authenticated）からは誰にも見えず、作ることもできない（with check で拒否）。
-- 組織のメンバー（`is_org_member(p.org_id)`）に開くのは「組織プロジェクトの RLS 拡張」で行う。organizations / organization_members のポリシーは `0042_organizations_rls.sql`。
+- プロジェクトに触れるかの判定は `can_access_project(project uuid)`（security definer、stable。`0044_org_project_rls.sql`）に集約する: 個人プロジェクトは `owner_id = current_owner_id()`、組織プロジェクトは `is_org_member(org_id)`。tasks / story_groups / story_context_revisions / task_comments（select・insert）/ task_events / task_attachments の各ポリシーはこれを呼ぶ。
+- 組織のメンバーの AI は、`current_owner_id()` がメンバー本人になるので本人と同じ範囲を触れる。
+- projects の削除は、個人プロジェクトなら持ち主、組織プロジェクトなら組織の owner（`is_org_owner(org_id)`）だけ。
+- task_comments の編集・削除は組織でも書いた本人だけ（組織の owner でも他人のコメントは消せない）。
+- storage.objects（attachments）は task_attachments の行の存在で判定するので、task_attachments のポリシーに追従する。
+- organizations / organization_members のポリシーは `0042_organizations_rls.sql`。
 - 組織所有のプロジェクトは owner_id が null なので、ゲストの件数上限（下記）には数えない。
 
 #### ゲストの件数上限
@@ -570,15 +574,39 @@ $$ language sql stable;
 
 ##### projects
 
-所有者だけが読み書きできる。どの操作も条件が同じなので `for all` の1本にする。`with check` にも同じ条件を書き、他人名義での作成と所有者の付け替えを弾く。
+持ち主か組織のメンバーが読み書きできる。削除だけ条件が違うので操作ごとに分ける（`0044_org_project_rls.sql`。それまでは `for all` の `projects_owner` 1本）。insert の with check は before insert トリガ（org_id があれば owner_id を null にする）のあとに検査される。所有者の付け替えはトリガ（`project_owner_immutable`）で止める。
 
 ```sql
 alter table projects enable row level security;
 
-create policy projects_owner on projects
-  for all to authenticated
-  using      (owner_id = current_owner_id())
-  with check (owner_id = current_owner_id());
+create policy projects_select on projects
+  for select to authenticated
+  using (owner_id = current_owner_id() or is_org_member(org_id));
+
+create policy projects_insert on projects
+  for insert to authenticated
+  with check (
+    (org_id is null and owner_id = current_owner_id())
+    or (org_id is not null and is_org_member(org_id))
+  );
+
+create policy projects_update on projects
+  for update to authenticated
+  using      (owner_id = current_owner_id() or is_org_member(org_id))
+  with check (owner_id = current_owner_id() or is_org_member(org_id));
+
+create policy projects_delete on projects
+  for delete to authenticated
+  using (owner_id = current_owner_id() or is_org_owner(org_id));
+
+-- ほかのテーブルが呼ぶ判定（security definer。projects の RLS に左右されない）
+create function can_access_project(project uuid) returns boolean as $$
+  select exists (
+    select 1 from projects p
+     where p.id = project
+       and (p.owner_id = current_owner_id() or (p.org_id is not null and is_org_member(p.org_id)))
+  );
+$$ language sql stable security definer set search_path = public;
 ```
 
 ##### tasks
@@ -590,16 +618,8 @@ alter table tasks enable row level security;
 
 create policy tasks_owner on tasks
   for all to authenticated
-  using (exists (
-    select 1 from projects p
-     where p.id = tasks.project_id
-       and p.owner_id = current_owner_id()
-  ))
-  with check (exists (
-    select 1 from projects p
-     where p.id = tasks.project_id
-       and p.owner_id = current_owner_id()
-  ));
+  using (can_access_project(tasks.project_id))
+  with check (can_access_project(tasks.project_id));
 ```
 
 ##### story_groups
@@ -611,16 +631,8 @@ alter table story_groups enable row level security;
 
 create policy story_groups_owner on story_groups
   for all to authenticated
-  using (exists (
-    select 1 from projects p
-     where p.id = story_groups.project_id
-       and p.owner_id = current_owner_id()
-  ))
-  with check (exists (
-    select 1 from projects p
-     where p.id = story_groups.project_id
-       and p.owner_id = current_owner_id()
-  ));
+  using (can_access_project(story_groups.project_id))
+  with check (can_access_project(story_groups.project_id));
 ```
 
 ##### story_context_revisions
@@ -634,9 +646,8 @@ create policy story_context_revisions_select on story_context_revisions
   for select to authenticated
   using (exists (
     select 1 from tasks t
-      join projects p on p.id = t.project_id
      where t.id = story_context_revisions.story_id
-       and p.owner_id = current_owner_id()
+       and can_access_project(t.project_id)
   ));
 
 create policy story_context_revisions_insert on story_context_revisions
@@ -646,9 +657,8 @@ create policy story_context_revisions_insert on story_context_revisions
     and edited_by_type = current_actor_type()
     and exists (
       select 1 from tasks t
-        join projects p on p.id = t.project_id
        where t.id = story_context_revisions.story_id
-         and p.owner_id = current_owner_id()
+         and can_access_project(t.project_id)
     )
   );
 ```
@@ -664,9 +674,8 @@ create policy task_comments_select on task_comments
   for select to authenticated
   using (exists (
     select 1 from tasks t
-      join projects p on p.id = t.project_id
      where t.id = task_comments.task_id
-       and p.owner_id = current_owner_id()
+       and can_access_project(t.project_id)
   ));
 
 create policy task_comments_insert on task_comments
@@ -676,9 +685,8 @@ create policy task_comments_insert on task_comments
     and author_type = current_actor_type()
     and exists (
       select 1 from tasks t
-        join projects p on p.id = t.project_id
        where t.id = task_comments.task_id
-         and p.owner_id = current_owner_id()
+         and can_access_project(t.project_id)
     )
   );
 
@@ -694,18 +702,14 @@ create policy task_comments_delete on task_comments
 
 ##### task_events
 
-所有者（プロジェクトの `owner_id = current_owner_id()`）だけが読める。insert / update / delete のポリシーは作らない。書き込みは記録トリガ（security definer）だけが行う。
+所有者（`can_access_project(project_id)`）だけが読める。insert / update / delete のポリシーは作らない。書き込みは記録トリガ（security definer）だけが行う。
 
 ```sql
 alter table task_events enable row level security;
 
 create policy task_events_select on task_events
   for select to authenticated
-  using (exists (
-    select 1 from projects p
-     where p.id = task_events.project_id
-       and p.owner_id = current_owner_id()
-  ));
+  using (can_access_project(task_events.project_id));
 ```
 
 ##### profiles
@@ -772,8 +776,7 @@ alter table task_attachments enable row level security;
 
 create policy task_attachments_select on task_attachments
   for select to authenticated
-  using (exists (select 1 from projects p
-                  where p.id = task_attachments.project_id and p.owner_id = current_owner_id()));
+  using (can_access_project(task_attachments.project_id));
 
 create policy task_attachments_insert on task_attachments
   for insert to authenticated
@@ -781,15 +784,13 @@ create policy task_attachments_insert on task_attachments
     created_by = auth.uid()
     and current_actor_type() in ('human', 'ai')
     and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) is not true
-    and exists (select 1 from projects p
-                 where p.id = task_attachments.project_id and p.owner_id = current_owner_id())
+    and can_access_project(task_attachments.project_id)
   );
 
 create policy task_attachments_delete on task_attachments
   for delete to authenticated
   using (current_actor_type() = 'human'
-         and exists (select 1 from projects p
-                      where p.id = task_attachments.project_id and p.owner_id = current_owner_id()));
+         and can_access_project(task_attachments.project_id));
 ```
 
 ##### storage.objects（attachments バケット）
