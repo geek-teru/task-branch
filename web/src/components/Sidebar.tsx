@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { useResizableWidth } from "../lib/useResizableWidth";
-import { BacklogIcon, GanttIcon, KanbanIcon, PerformanceIcon, ProjectIcon, TimelineIcon } from "./Icons";
+import { BacklogIcon, GanttIcon, KanbanIcon, OrgIcon, PerformanceIcon, ProjectIcon, TimelineIcon } from "./Icons";
 import { Button } from "./ui/Button";
 
 export type MenuKey = "projects" | "backlog" | "gantt" | "kanban" | "timeline" | "performance";
@@ -23,9 +23,14 @@ const COLLAPSE_KEY = "sidebar.collapsed";
 export function Sidebar({
   active,
   onNavigate,
+  onOpenOrgSettings,
+  orgSettingsActive,
 }: {
   active: MenuKey | null;
   onNavigate: (key: MenuKey) => void;
+  // Set while an organization is picked in the header: shows 「組織の設定」 under the menu.
+  onOpenOrgSettings?: () => void;
+  orgSettingsActive?: boolean;
 }) {
   const { width, startResize } = useResizableWidth("sidebar.width", 220, 160, 480);
   const [collapsed, setCollapsed] = useState(() => {
@@ -55,27 +60,28 @@ export function Sidebar({
       style={{ width: collapsed ? COLLAPSED_W : width }}
     >
       <nav className="flex flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto p-2">
-        {MENU.map((m) => {
-          const isActive = m.key === active;
-          return (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => onNavigate(m.key)}
-              data-tooltip={m.label}
-              className={cn(
-                "m-0 flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-md border-0 font-sans text-sm transition-colors",
-                collapsed ? "justify-center px-0" : "justify-start px-2.5 text-left",
-                isActive
-                  ? "bg-selected font-medium text-fg"
-                  : "bg-transparent text-fg-muted hover:bg-surface-muted hover:text-fg",
-              )}
-            >
-              {m.icon}
-              {!collapsed && m.label}
-            </button>
-          );
-        })}
+        {MENU.map((m) => (
+          <NavButton
+            key={m.key}
+            label={m.label}
+            icon={m.icon}
+            active={m.key === active}
+            collapsed={collapsed}
+            onClick={() => onNavigate(m.key)}
+          />
+        ))}
+        {onOpenOrgSettings && (
+          <>
+            <div className="mx-1 my-1.5 h-px shrink-0 bg-border" role="separator" />
+            <NavButton
+              label="組織の設定"
+              icon={<OrgIcon />}
+              active={!!orgSettingsActive}
+              collapsed={collapsed}
+              onClick={onOpenOrgSettings}
+            />
+          </>
+        )}
       </nav>
 
       <div className={cn("flex items-center border-t border-border py-2", collapsed ? "justify-center" : "justify-end px-2")}>
@@ -92,5 +98,36 @@ export function Sidebar({
         />
       )}
     </aside>
+  );
+}
+
+function NavButton({
+  label,
+  icon,
+  active,
+  collapsed,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+  collapsed: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-tooltip={label}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "m-0 flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-md border-0 font-sans text-sm transition-colors",
+        collapsed ? "justify-center px-0" : "justify-start px-2.5 text-left",
+        active ? "bg-selected font-medium text-fg" : "bg-transparent text-fg-muted hover:bg-surface-muted hover:text-fg",
+      )}
+    >
+      {icon}
+      {!collapsed && label}
+    </button>
   );
 }

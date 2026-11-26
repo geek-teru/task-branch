@@ -34,6 +34,15 @@ export interface Organization {
   role: OrgRole; // the signed-in user's role
 }
 
+// A row of the organization's member list (organization_members + the member's profiles row).
+export interface OrgMember {
+  user_id: string;
+  role: OrgRole;
+  joined_at: string; // organization_members.created_at
+  display_name: string | null; // null = no profile saved (others' Google names are not readable)
+  avatar_path: string | null; // path in the avatars bucket
+}
+
 // Fields of the create-organization form.
 export interface OrganizationInput {
   name: string;

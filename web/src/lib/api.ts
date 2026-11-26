@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
+import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, OrgMember, OrgRole, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
 
 // Guest limits (0031_guest_limits.sql) reject inserts with message 'guest_limit_exceeded'
 // and detail '<projects|stories|tasks|comments>:<limit>'. Turn that into a Japanese message.
@@ -71,6 +71,94 @@ export async function createOrganization(input: OrganizationInput): Promise<Orga
     throw error;
   }
   return { ...(data as Omit<Organization, "role">), role: "owner" };
+}
+
+// Error from organizations update / delete and organization_members changes, made readable.
+// 'org_last_owner' comes from trg_organization_members_last_owner (0041).
+function orgError(error: { code?: string; message?: string }): Error {
+  if (error.message === "org_last_owner") {
+    return new Error("最後の owner は降格・脱退できません。先にほかのメンバーを owner にしてください");
+  }
+  if (error.code === "23505") return new Error("この slug はすでに使われています。別の slug にしてください");
+  if (error.code === "23514") return new Error("slug は英小文字・数字・ハイフンで 2〜39 文字（先頭は英数字）にしてください");
+  // projects.org_id is on delete restrict (0043): a project left under the organization.
+  if (error.code === "23503") return new Error("プロジェクトが残っているため削除できません。先にプロジェクトを削除してください");
+  if (error.code === "42501") return new Error("この操作の権限がありません");
+  return new Error(error.message ?? String(error));
+}
+
+// An update / delete that RLS filtered out returns no error and no rows.
+function requireRows(data: unknown[] | null): void {
+  if (!data || data.length === 0) throw new Error("この操作の権限がありません（owner だけが行えます）");
+}
+
+// Rename an organization or change its slug (owner only, organizations_update). Keeps the caller's role.
+export async function updateOrganization(org: Organization, input: OrganizationInput): Promise<Organization> {
+  const { data, error } = await supabase.from("organizations").update(input).eq("id", org.id).select();
+  if (error) throw orgError(error);
+  requireRows(data);
+  return { ...(data![0] as Omit<Organization, "role">), role: org.role };
+}
+
+// Delete an organization (owner only). Fails while projects remain (FK on delete restrict).
+export async function deleteOrganization(orgId: string): Promise<void> {
+  const { data, error } = await supabase.from("organizations").delete().eq("id", orgId).select("id");
+  if (error) throw orgError(error);
+  requireRows(data);
+}
+
+// Members of an organization with their profile (display name / icon), oldest first.
+// profiles has no FK to organization_members (both point at auth.users), so it is a second query;
+// members who never saved a profile get null fields.
+export async function listOrgMembers(orgId: string): Promise<OrgMember[]> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("user_id, role, created_at")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = (data ?? []) as { user_id: string; role: OrgRole; created_at: string }[];
+  if (rows.length === 0) return [];
+  const { data: profiles, error: pError } = await supabase
+    .from("profiles")
+    .select("user_id, display_name, avatar_path")
+    .in("user_id", rows.map((r) => r.user_id));
+  if (pError) throw pError;
+  const byUser = new Map(
+    ((profiles ?? []) as { user_id: string; display_name: string | null; avatar_path: string | null }[]).map((p) => [p.user_id, p])
+  );
+  return rows.map((r) => ({
+    user_id: r.user_id,
+    role: r.role,
+    joined_at: r.created_at,
+    display_name: byUser.get(r.user_id)?.display_name ?? null,
+    avatar_path: byUser.get(r.user_id)?.avatar_path ?? null,
+  }));
+}
+
+// Change a member's role (owner only). The last owner cannot be demoted (org_last_owner).
+export async function updateOrgMemberRole(orgId: string, userId: string, role: OrgRole): Promise<void> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .update({ role })
+    .eq("org_id", orgId)
+    .eq("user_id", userId)
+    .select("user_id");
+  if (error) throw orgError(error);
+  requireRows(data);
+}
+
+// Remove a member (owner), or leave (the member themselves). The last owner cannot leave.
+// Their tasks in the organization's projects go back to unassigned (0045, trg_organization_members_unassign).
+export async function removeOrgMember(orgId: string, userId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("user_id", userId)
+    .select("user_id");
+  if (error) throw orgError(error);
+  requireRows(data);
 }
 
 // Create the guest's sample project (idempotent) and return its id. Anonymous users only.

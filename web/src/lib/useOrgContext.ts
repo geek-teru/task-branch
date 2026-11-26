@@ -35,6 +35,10 @@ export interface OrgContext {
   select: (slug: string | null) => void;
   // Add a just-created organization to the list.
   add: (org: Organization) => void;
+  // Swap in an updated organization (renamed / new slug), matched by id.
+  replace: (org: Organization) => void;
+  // Drop an organization the user deleted or left.
+  remove: (orgId: string) => void;
 }
 
 // The owner (個人 / 組織) the project list is scoped to. The URL's ?org=<slug> wins (個人 has no
@@ -97,5 +101,13 @@ export function useOrgContext(userId: string | undefined): OrgContext {
     setOrgs((prev) => (prev.some((o) => o.id === org.id) ? prev : [...prev, org]));
   }, []);
 
-  return { orgs, loaded, current, requestedSlug, select, add };
+  const replace = useCallback((org: Organization) => {
+    setOrgs((prev) => prev.map((o) => (o.id === org.id ? org : o)));
+  }, []);
+
+  const remove = useCallback((orgId: string) => {
+    setOrgs((prev) => prev.filter((o) => o.id !== orgId));
+  }, []);
+
+  return { orgs, loaded, current, requestedSlug, select, add, replace, remove };
 }

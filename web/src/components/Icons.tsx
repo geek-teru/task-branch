@@ -115,6 +115,18 @@ export function ProjectIcon(p: IconProps) {
   );
 }
 
+// Organization: two people side by side.
+export function OrgIcon(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <circle cx="6" cy="5.5" r="2.2" />
+      <path d="M2 13c0-2.2 1.8-3.8 4-3.8s4 1.6 4 3.8" />
+      <circle cx="11.2" cy="6" r="1.8" />
+      <path d="M11 9.3c1.7 0 3 1.3 3 3.2" />
+    </Icon>
+  );
+}
+
 // Backlog: a stacked list with bullets.
 export function BacklogIcon(p: IconProps) {
   return (
