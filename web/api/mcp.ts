@@ -2,7 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import pkg from "../package.json" with { type: "json" };
-import { authenticate } from "./_lib/auth.js";
+import { authenticate, ownerIdOf } from "./_lib/auth.js";
 import { createUserClient } from "./_lib/supabase.js";
 import { registerTools } from "./_lib/tools.js";
 
@@ -11,7 +11,7 @@ export async function POST(req: Request): Promise<Response> {
   if (auth instanceof Response) return auth;
 
   const server = new McpServer({ name: "task-branch", version: pkg.version });
-  registerTools(server, createUserClient(auth.token), auth.claims.client_id);
+  registerTools(server, createUserClient(auth.token), auth.claims.client_id, ownerIdOf(auth.claims));
 
   // セッション ID を発行せず、SSE ではなく JSON で応答する。
   const transport = new WebStandardStreamableHTTPServerTransport({

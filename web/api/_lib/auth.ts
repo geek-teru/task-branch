@@ -47,3 +47,10 @@ export async function authenticate(req: Request): Promise<Authenticated | Respon
 
   return { token, claims: claims as AuthClaims };
 }
+
+// 操作している人の id。DB の current_owner_id()（0011）と同じく、JWT の app_metadata.owner_id があればそれ、無ければ sub。
+// MCP の assignee の user（呼び出した AI の持ち主 = 本人）に使う。
+export function ownerIdOf(claims: AuthClaims): string {
+  const meta = claims.app_metadata as { owner_id?: unknown } | undefined;
+  return typeof meta?.owner_id === "string" && meta.owner_id ? meta.owner_id : claims.sub;
+}
