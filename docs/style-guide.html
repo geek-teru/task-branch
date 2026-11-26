@@ -10,6 +10,18 @@
   rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap"
 />
+<script>
+  // web/index.html と同じ: 描画前に data-theme を当てる（ちらつき防止）。保存値が無い・不正なら system
+  (function () {
+    var p = "system";
+    try {
+      var v = localStorage.getItem("theme");
+      if (v === "light" || v === "dark" || v === "system") p = v;
+    } catch (e) {}
+    if (p === "system") p = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = p;
+  })();
+</script>
 <style>
   /* トークンは web/src/index.css の @theme と同じ値。アプリと食い違ったら index.css が正 */
   :root {
@@ -24,10 +36,15 @@
     --color-brand-hover: #18633e;
     --color-accent: #3ecf8e;
     --color-danger: #c4352b;
+    /* 文字用のブランド・危険（リンク・選択中の文字・チェック・エラー文）。ライトは塗りと同じ値 */
+    --color-brand-fg: #1f7a4d;
+    --color-danger-fg: #c4352b;
+    /* サイドナビ・設定タブの選択中の背景 */
+    --color-selected: #ededed;
 
     /* グラフの系列の色（status の色とは別） */
-    --color-chart-1: #7a62b8;
-    --color-chart-2: #3f78b5;
+    --color-chart-1: #b39ddb;
+    --color-chart-2: #7cc4ec;
     --color-chart-3: #3ecf8e;
 
     --color-status-planning-bg: #f1f5f9;
@@ -56,6 +73,54 @@
     --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    /* ダイアログの背景幕（アプリは bg-black/40、ダークは dark:bg-black/60） */
+    --backdrop: rgb(0 0 0 / 0.4);
+    color-scheme: light;
+  }
+
+  /* ダークテーマ: web/src/index.css の :root[data-theme="dark"] と同じ値。同じ名前のトークンを上書きする */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg: #121212;
+    --color-surface: #171717;
+    --color-surface-muted: #1f1f1f;
+    --color-border: #2e2e2e;
+    --color-border-strong: #3e3e3e;
+    --color-fg: #ededed;
+    --color-fg-muted: #a0a0a0;
+    --color-brand: #1f7a4d;
+    --color-brand-hover: #18633e;
+    --color-accent: #3ecf8e;
+    --color-danger: #c4352b;
+    --color-brand-fg: #3ecf8e;
+    --color-danger-fg: #ff7a70;
+    --color-selected: #2a2a2a;
+
+    --color-chart-1: #b39ddb;
+    --color-chart-2: #7cc4ec;
+    --color-chart-3: #3ecf8e;
+
+    --color-status-planning-bg: #1e242c;
+    --color-status-planning-border: #64748b;
+    --color-status-planning-fg: #b8c4d4;
+    --color-status-todo-bg: #16262b;
+    --color-status-todo-border: #4a92a6;
+    --color-status-todo-fg: #8fd0e0;
+    --color-status-in_progress-bg: #18212d;
+    --color-status-in_progress-border: #4d84c0;
+    --color-status-in_progress-fg: #9cc3ee;
+    --color-status-in_review-bg: #221d2f;
+    --color-status-in_review-border: #8a74c8;
+    --color-status-in_review-fg: #c3b4ea;
+    --color-status-done-bg: #18261c;
+    --color-status-done-border: #4f9463;
+    --color-status-done-fg: #93cfa4;
+    --color-status-closed-bg: #232323;
+    --color-status-closed-border: #6e6e6e;
+    --color-status-closed-fg: #b5b5b5;
+
+    --backdrop: rgb(0 0 0 / 0.6);
   }
 
   /* このページ自身も task-branch の決まりで作っている */
@@ -85,7 +150,7 @@
   .toc > li + li { margin-top: 6px; }
   .toc ul { margin: 2px 0 0; padding-left: 20px; list-style: none; }
   .toc li { font-size: 13px; }
-  .toc a { color: var(--color-brand); text-decoration: none; }
+  .toc a { color: var(--color-brand-fg); text-decoration: none; }
   .toc a:hover { text-decoration: underline; }
   table { border-collapse: collapse; width: 100%; }
   th { text-align: left; padding: 8px 12px; font-size: 12px; font-weight: 500; color: var(--color-fg-muted); background: var(--color-surface-muted); border-bottom: 1px solid var(--color-border); }
@@ -125,10 +190,10 @@
   .btn.danger { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
   .btn.danger:hover { filter: brightness(.9); }
   .btn:disabled { cursor: not-allowed; opacity: .5; }
-  /* IconButton: ghost・アイコンのみ・正方形（sm は 28px）・text-fg-muted、danger は text-danger */
+  /* IconButton: ghost・アイコンのみ・正方形（sm は 28px）・text-fg-muted、danger は text-danger-fg */
   .btn.icon { padding: 0; width: 28px; color: var(--color-fg-muted); }
   .btn.icon:hover { color: var(--color-fg); }
-  .btn.icon.danger-icon, .btn.icon.danger-icon:hover { color: var(--color-danger); }
+  .btn.icon.danger-icon, .btn.icon.danger-icon:hover { color: var(--color-danger-fg); }
   .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
   /* Input / Select / Textarea: fieldClass（rounded-md border-border-strong text-[13px]）・h-8・px-2.5 */
@@ -154,7 +219,7 @@
     font-size: 11px; line-height: 1; white-space: nowrap;
   }
   .badge.neutral { background: var(--color-surface-muted); border-color: var(--color-border-strong); color: var(--color-fg-muted); }
-  .badge.brand { background: color-mix(in srgb, var(--color-accent) 10%, transparent); border-color: var(--color-accent); color: var(--color-brand); }
+  .badge.brand { background: color-mix(in srgb, var(--color-accent) 10%, transparent); border-color: var(--color-accent); color: var(--color-brand-fg); }
   .badge.todo { background: var(--color-status-todo-bg); border-color: var(--color-status-todo-border); color: var(--color-status-todo-fg); }
   .badge.in_progress { background: var(--color-status-in_progress-bg); border-color: var(--color-status-in_progress-border); color: var(--color-status-in_progress-fg); }
   .badge.planning { background: var(--color-status-planning-bg); border-color: var(--color-status-planning-border); color: var(--color-status-planning-fg); }
@@ -168,7 +233,7 @@
     cursor: pointer; white-space: nowrap; transition: border-color .15s, color .15s;
   }
   .id-badge:hover { border-color: var(--color-border-strong); color: var(--color-fg); }
-  .id-badge.copied { font-family: var(--font-sans); border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-brand); }
+  .id-badge.copied { font-family: var(--font-sans); border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-brand-fg); }
 
   /* Card: rounded-md border border-border bg-surface（影なし）。interactive は hover で border-border-strong */
   .app-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; transition: border-color .15s; }
@@ -182,8 +247,8 @@
   .widget .w-body { padding: 12px 16px; }
   .widget .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 
-  /* Dialog: 背景幕 bg-black/40・z-50。本体 w-[400px] rounded-md border shadow-lg */
-  .backdrop { background: rgb(0 0 0 / 0.4); border-radius: 6px; padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: center; }
+  /* Dialog: 背景幕 bg-black/40（ダークは dark:bg-black/60）・z-50。本体 w-[400px] rounded-md border shadow-lg */
+  .backdrop { background: var(--backdrop); border-radius: 6px; padding: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: center; }
   .dialog { width: 400px; max-width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; box-shadow: var(--shadow-lg); }
   .dialog .d-title { padding: 12px 20px; border-bottom: 1px solid var(--color-border); font-size: 14px; font-weight: 500; }
   .dialog .d-body { padding: 16px 20px; font-size: 14px; line-height: 1.625; }
@@ -193,8 +258,8 @@
   .menu { min-width: 160px; max-height: 320px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; box-shadow: var(--shadow-md); padding: 4px 0; }
   .menu .item { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 12px; border: 0; background: transparent; font-family: var(--font-sans); font-size: 13px; color: var(--color-fg); text-align: left; cursor: pointer; }
   .menu .item:hover, .menu .item.active { background: var(--color-surface-muted); }
-  .menu .item.danger { color: var(--color-danger); }
-  .menu .check { display: flex; width: 14px; flex-shrink: 0; color: var(--color-brand); }
+  .menu .item.danger { color: var(--color-danger-fg); }
+  .menu .check { display: flex; width: 14px; flex-shrink: 0; color: var(--color-brand-fg); }
   .menu .sep { height: 1px; margin: 4px 0; background: var(--color-border); }
 
   /* Switch / SegmentedControl */
@@ -224,7 +289,7 @@
   .nav .items { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
   .nav .item { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 6px; font-size: 14px; color: var(--color-fg-muted); cursor: pointer; }
   .nav .item:hover { background: var(--color-surface-muted); color: var(--color-fg); }
-  .nav .item.active { background: #ededed; color: var(--color-fg); font-weight: 500; }
+  .nav .item.active { background: var(--color-selected); color: var(--color-fg); font-weight: 500; }
   .nav .foot { display: flex; justify-content: flex-end; padding: 8px; border-top: 1px solid var(--color-border); }
   .nav.collapsed { width: 52px; }
   .nav.collapsed .item { justify-content: center; padding: 0; }
@@ -237,7 +302,22 @@
   .type-table td.sub-cat { background: var(--color-bg); }
   .type-table .sub { font-size: 11px; font-weight: 400; color: var(--color-fg-muted); }
   .type-table .ex { color: var(--color-fg-muted); }
-  .type-table .ng { color: var(--color-danger); }
+  .type-table .ng { color: var(--color-danger-fg); }
+
+  /* 色見本（ライト / ダークの2面）。見本はページのテーマに関わらず両方の値で描く */
+  .swatch .chips { display: flex; height: 44px; border-bottom: 1px solid var(--color-border); }
+  .swatch .chips > span { flex: 1; display: flex; align-items: flex-end; padding: 3px 5px; font-size: 10px; font-family: var(--font-mono); }
+  .swatch .chips .l { color: #707070; }
+  .swatch .chips .d { color: #a0a0a0; border-left: 1px solid var(--color-border); }
+  .swatch .meta .vals { display: flex; gap: 10px; }
+  .pair { display: flex; gap: 6px; align-items: center; }
+  .pair .on-l, .pair .on-d { padding: 4px 6px; border-radius: 4px; }
+  .pair .on-l { background: #fcfcfc; border: 1px solid #e6e6e6; }
+  .pair .on-d { background: #121212; border: 1px solid #2e2e2e; }
+
+  /* ページ右上のテーマ切替（アプリの 3 択と同じ） */
+  .theme-switch { position: absolute; top: 12px; right: 16px; z-index: 10; }
+
 </style>
 </head>
 <body>
@@ -258,6 +338,11 @@
   <symbol id="i-grid" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="0.8"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="0.8"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="0.8"/><rect x="9" y="9" width="4.5" height="4.5" rx="0.8"/></symbol>
   <symbol id="i-list" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></symbol>
 </svg>
+<div class="theme-switch seg" role="group" aria-label="このページのテーマ">
+  <button type="button" data-pref="light">ライト</button>
+  <button type="button" data-pref="dark">ダーク</button>
+  <button type="button" data-pref="system">システム</button>
+</div>
 <div class="page">
 
 <h1>task-branch スタイルガイド</h1>
@@ -276,6 +361,8 @@
         <li><a href="#color-1">2.1 文字・背景・枠線</a></li>
         <li><a href="#color-2">2.2 ブランド・アクセント・危険</a></li>
         <li><a href="#color-3">2.3 ステータス</a></li>
+        <li><a href="#color-4">2.4 テーマの切替</a></li>
+        <li><a href="#color-5">2.5 色の書き方</a></li>
       </ul>
     </li>
     <li><a href="#type">3. タイポグラフィ</a>
@@ -318,51 +405,94 @@
 
 <h2 id="basis">1. 基本方針</h2>
 <ul>
-  <li>参考は Supabase のダッシュボード。ライトテーマのみ（ダークモードは別ストーリー。トークンを CSS 変数にしてあるので値の差し替えで足せる）。</li>
+  <li>参考は Supabase のダッシュボード（ライト・ダークとも）。テーマはライト / ダーク / システムの3択で、ダークは同じ名前の色トークンの値を差し替えて描く（<a href="#color-4">2.4</a>）。このページも右上の切替でダークにして見られる。</li>
   <li>スタイルは Tailwind CSS v4 の <code>className</code> で書く。色・フォントは <code>index.css</code> の <code>@theme</code> のトークン（<code>bg-surface</code>、<code>text-fg-muted</code> など）を使い、色コードを直書きしない。</li>
   <li>ボタン・入力欄・カード・バッジ・ダイアログ・メニューは <code>components/ui</code> の部品で描く。同じ見た目を画面ごとに書き直さない。</li>
-  <li>骨格は 白いヘッダー（48px）＋明るいサイドナビ＋本文。本文の背景は <code>bg</code>、カード・表・パネルは白い <code>surface</code> に 1px の <code>border</code>。影はメニュー・ツールチップ・ダイアログだけに付け、カードには付けない。</li>
+  <li>骨格は 白いヘッダー（48px）＋明るいサイドナビ＋本文（ダークでは同じ並びのまま暗い面になる）。本文の背景は <code>bg</code>、カード・表・パネルは白い <code>surface</code> に 1px の <code>border</code>。影はメニュー・ツールチップ・ダイアログだけに付け、カードには付けない。</li>
   <li>色で意味を持たせるのはブランドの緑（主操作・選択中）、danger の赤（削除・エラー）、ステータスの4色だけ。</li>
   <li>UI の文言は日本語。ボタンは何が起きるかが分かる動詞にする（「変更」「削除」「移動する」）。追加ボタンだけは英語の「New {object}」。</li>
 </ul>
 
 <h2 id="color">2. 色</h2>
 <p class="note">名前は <code>@theme</code> の <code>--color-*</code>。Tailwind では <code>bg-{名前}</code> <code>text-{名前}</code> <code>border-{名前}</code> で使い、<code>/30</code> のように付けると透明度を変えられる（例: <code>ring-brand/30</code>）。</p>
+<p class="note">見本は左（L）がライト、右（D）がダークの値。値は <code>web/src/index.css</code> の <code>@theme static</code>（ライト）と <code>:root[data-theme="dark"]</code>（ダーク）と同じ。ダークのコントラストは fg / bg 16.0:1、fg-muted / surface 6.9:1、fg-muted / selected 5.5:1。</p>
 
 <h3 id="color-1">文字・背景・枠線</h3>
 <div class="swatches">
-  <div class="swatch"><div class="chip" style="background:var(--color-fg)"></div><div class="meta"><b>fg — 文字</b><span class="mono">#171717</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-fg-muted)"></div><div class="meta"><b>fg-muted — 補助の文字・ラベル・アイコン</b><span class="mono">#707070</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-bg)"></div><div class="meta"><b>bg — ページ・サイドナビの地</b><span class="mono">#fcfcfc</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-surface)"></div><div class="meta"><b>surface — ヘッダー・カード・表・パネル</b><span class="mono">#ffffff</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-surface-muted)"></div><div class="meta"><b>surface-muted — hover・表の見出し行</b><span class="mono">#f8f8f8</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-border)"></div><div class="meta"><b>border — 枠線・区切り（標準）</b><span class="mono">#e6e6e6</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-border-strong)"></div><div class="meta"><b>border-strong — 入力欄・default ボタン・hover の枠</b><span class="mono">#d4d4d4</span></div></div>
-  <div class="swatch"><div class="chip" style="background:#ededed"></div><div class="meta"><b>サイドナビの選択中（トークン外）</b><span class="mono">#ededed</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#171717">L</span><span class="d" style="background:#ededed">D</span></div><div class="meta"><b>fg — 文字</b><span class="mono">#171717 / #ededed</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#707070">L</span><span class="d" style="background:#a0a0a0">D</span></div><div class="meta"><b>fg-muted — 補助の文字・ラベル・アイコン</b><span class="mono">#707070 / #a0a0a0</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#fcfcfc">L</span><span class="d" style="background:#121212">D</span></div><div class="meta"><b>bg — ページ・サイドナビの地</b><span class="mono">#fcfcfc / #121212</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#ffffff">L</span><span class="d" style="background:#171717">D</span></div><div class="meta"><b>surface — ヘッダー・カード・表・パネル</b><span class="mono">#ffffff / #171717</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#f8f8f8">L</span><span class="d" style="background:#1f1f1f">D</span></div><div class="meta"><b>surface-muted — hover・表の見出し行</b><span class="mono">#f8f8f8 / #1f1f1f</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#e6e6e6">L</span><span class="d" style="background:#2e2e2e">D</span></div><div class="meta"><b>border — 枠線・区切り（標準）</b><span class="mono">#e6e6e6 / #2e2e2e</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#d4d4d4">L</span><span class="d" style="background:#3e3e3e">D</span></div><div class="meta"><b>border-strong — 入力欄・default ボタン・hover の枠</b><span class="mono">#d4d4d4 / #3e3e3e</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#ededed">L</span><span class="d" style="background:#2a2a2a">D</span></div><div class="meta"><b>selected — サイドナビ・設定タブの選択中の背景</b><span class="mono">#ededed / #2a2a2a</span></div></div>
 </div>
 
 <h3 id="color-2">ブランド・アクセント・危険</h3>
+<p class="note">ブランドの緑と danger の赤は、<b>塗り</b>（<code>brand</code> / <code>danger</code>。白文字を載せる・枠線・リング）と<b>文字</b>（<code>brand-fg</code> / <code>danger-fg</code>）でトークンを分ける。1つの値では「白文字の塗り」と「ダークの地の上の文字」の両方で 4.5:1 を満たせないため。塗りはダークでも同じ値（白文字 5.3:1 / 5.4:1）、文字はダークで明るくする。</p>
 <div class="swatches">
-  <div class="swatch"><div class="chip" style="background:var(--color-brand)"></div><div class="meta"><b>brand — primary ボタン・フォーカス・選択のチェック・今日の線</b><span class="mono">#1f7a4d（白文字で約 5.3:1）</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-brand-hover)"></div><div class="meta"><b>brand-hover — primary の hover</b><span class="mono">#18633e</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-accent)"></div><div class="meta"><b>accent — brand バッジの枠（地は 10%）</b><span class="mono">#3ecf8e</span></div></div>
-  <div class="swatch"><div class="chip" style="background:var(--color-danger)"></div><div class="meta"><b>danger — 削除・エラー（帯は地 10%・枠 30%）</b><span class="mono">#c4352b</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#1f7a4d">L</span><span class="d" style="background:#1f7a4d">D</span></div><div class="meta"><b>brand — primary ボタン・フォーカス・枠線・今日の線（塗り）</b><span class="mono">#1f7a4d / #1f7a4d（白文字で約 5.3:1）</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#18633e">L</span><span class="d" style="background:#18633e">D</span></div><div class="meta"><b>brand-hover — primary の hover</b><span class="mono">#18633e / #18633e</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#1f7a4d">L</span><span class="d" style="background:#3ecf8e">D</span></div><div class="meta"><b>brand-fg — リンク・選択中の文字・チェック（文字）</b><span class="mono">#1f7a4d / #3ecf8e（D は surface の上で 9.0:1）</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#3ecf8e">L</span><span class="d" style="background:#3ecf8e">D</span></div><div class="meta"><b>accent — brand バッジの枠（地は 10%）</b><span class="mono">#3ecf8e / #3ecf8e</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#c4352b">L</span><span class="d" style="background:#c4352b">D</span></div><div class="meta"><b>danger — 削除ボタンの塗り・エラーの帯（地 10%・枠 30%）</b><span class="mono">#c4352b / #c4352b（白文字で約 5.4:1）</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#c4352b">L</span><span class="d" style="background:#ff7a70">D</span></div><div class="meta"><b>danger-fg — エラー文・削除のアイコンとメニュー（文字）</b><span class="mono">#c4352b / #ff7a70（D は surface の上で 7.1:1）</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#b39ddb">L</span><span class="d" style="background:#b39ddb">D</span></div><div class="meta"><b>chart-1 — グラフの系列 1</b><span class="mono">#b39ddb / #b39ddb</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#7cc4ec">L</span><span class="d" style="background:#7cc4ec">D</span></div><div class="meta"><b>chart-2 — グラフの系列 2</b><span class="mono">#7cc4ec / #7cc4ec</span></div></div>
+  <div class="swatch"><div class="chips"><span class="l" style="background:#3ecf8e">L</span><span class="d" style="background:#3ecf8e">D</span></div><div class="meta"><b>chart-3 — グラフの系列 3</b><span class="mono">#3ecf8e / #3ecf8e</span></div></div>
 </div>
+<div class="row" style="margin-top:10px">
+  <div class="pair"><span class="on-l" style="color:#1f7a4d">brand-fg（L）</span><span class="on-d" style="color:#3ecf8e">brand-fg（D）</span></div>
+  <div class="pair"><span class="on-l" style="color:#c4352b">danger-fg（L）</span><span class="on-d" style="color:#ff7a70">danger-fg（D）</span></div>
+  <div class="pair"><span class="on-d" style="color:#1f7a4d">✕ brand を文字に（D で 3.5:1）</span></div>
+</div>
+<p class="note">文字色は <code>text-brand-fg</code> / <code>text-danger-fg</code>。<code>text-brand</code> / <code>text-danger</code> は使わない。<code>border-brand</code> <code>ring-brand</code> <code>bg-brand/10</code> などの塗り・枠は <code>brand</code> のまま（ring-brand はダークの bg の上で 3.5:1 で、非テキストの 3:1 を満たす）。</p>
 
 <h3 id="color-3">ステータス（DESIGN.md 5.2。<code>lib/style.ts</code> の <code>STATUS_CLASS</code> / <code>STATUS_COLOR</code>）</h3>
 <table>
-  <thead><tr><th>状態</th><th>見本</th><th>bg</th><th>border</th><th>fg</th></tr></thead>
+  <thead><tr><th>状態</th><th>見本（L / D）</th><th>bg（上 L / 下 D）</th><th>border</th><th>fg</th></tr></thead>
   <tbody>
-    <tr><td>計画中 planning（ストーリーのみ）</td><td><span class="badge planning">計画中</span></td><td class="mono">#f1f5f9</td><td class="mono">#94a3b8</td><td class="mono">#475569</td></tr>
-    <tr><td>未着手 todo</td><td><span class="badge todo">未着手</span></td><td class="mono">#e8f3f7</td><td class="mono">#5aa5ba</td><td class="mono">#1f5a69</td></tr>
-    <tr><td>進行中 in_progress</td><td><span class="badge in_progress">進行中</span></td><td class="mono">#ebf1f8</td><td class="mono">#3f78b5</td><td class="mono">#24507e</td></tr>
-    <tr><td>レビュー中 in_review（タスクのみ）</td><td><span class="badge in_review">レビュー中</span></td><td class="mono">#f1eef8</td><td class="mono">#7a62b8</td><td class="mono">#4c3a80</td></tr>
-    <tr><td>完了 done</td><td><span class="badge done">完了</span></td><td class="mono">#ecf4ee</td><td class="mono">#4a8a5c</td><td class="mono">#2a5e39</td></tr>
-    <tr><td>クローズ closed</td><td><span class="badge closed">クローズ</span></td><td class="mono">#f3f3f3</td><td class="mono">#9a9a9a</td><td class="mono">#616161</td></tr>
+    <tr><td>計画中 planning（ストーリーのみ）</td><td><span class="badge" style="background:#f1f5f9;border-color:#94a3b8;color:#475569">計画中</span> <span class="badge" style="background:#1e242c;border-color:#64748b;color:#b8c4d4">計画中</span></td><td class="mono">#f1f5f9<br>#1e242c</td><td class="mono">#94a3b8<br>#64748b</td><td class="mono">#475569<br>#b8c4d4</td></tr>
+    <tr><td>未着手 todo</td><td><span class="badge" style="background:#e8f3f7;border-color:#5aa5ba;color:#1f5a69">未着手</span> <span class="badge" style="background:#16262b;border-color:#4a92a6;color:#8fd0e0">未着手</span></td><td class="mono">#e8f3f7<br>#16262b</td><td class="mono">#5aa5ba<br>#4a92a6</td><td class="mono">#1f5a69<br>#8fd0e0</td></tr>
+    <tr><td>進行中 in_progress</td><td><span class="badge" style="background:#ebf1f8;border-color:#3f78b5;color:#24507e">進行中</span> <span class="badge" style="background:#18212d;border-color:#4d84c0;color:#9cc3ee">進行中</span></td><td class="mono">#ebf1f8<br>#18212d</td><td class="mono">#3f78b5<br>#4d84c0</td><td class="mono">#24507e<br>#9cc3ee</td></tr>
+    <tr><td>レビュー中 in_review（タスクのみ）</td><td><span class="badge" style="background:#f1eef8;border-color:#7a62b8;color:#4c3a80">レビュー中</span> <span class="badge" style="background:#221d2f;border-color:#8a74c8;color:#c3b4ea">レビュー中</span></td><td class="mono">#f1eef8<br>#221d2f</td><td class="mono">#7a62b8<br>#8a74c8</td><td class="mono">#4c3a80<br>#c3b4ea</td></tr>
+    <tr><td>完了 done</td><td><span class="badge" style="background:#ecf4ee;border-color:#4a8a5c;color:#2a5e39">完了</span> <span class="badge" style="background:#18261c;border-color:#4f9463;color:#93cfa4">完了</span></td><td class="mono">#ecf4ee<br>#18261c</td><td class="mono">#4a8a5c<br>#4f9463</td><td class="mono">#2a5e39<br>#93cfa4</td></tr>
+    <tr><td>クローズ closed</td><td><span class="badge" style="background:#f3f3f3;border-color:#9a9a9a;color:#616161">クローズ</span> <span class="badge" style="background:#232323;border-color:#6e6e6e;color:#b5b5b5">クローズ</span></td><td class="mono">#f3f3f3<br>#232323</td><td class="mono">#9a9a9a<br>#6e6e6e</td><td class="mono">#616161<br>#b5b5b5</td></tr>
   </tbody>
 </table>
 <p class="note">トークン名は <code>status-{状態}-bg / -border / -fg</code>。クラス名は <code>STATUS_CLASS</code> に全文で書いてあるので（Tailwind がソースから拾うため）、画面で組み立てない。</p>
-<p class="note">ガントのバーとカンバンの列見出しの丸は、bg が淡いので <code>border</code> の色で塗る。クローズしたカードは不透明度 0.6。</p>
+<p class="note">ガントのバーとカンバンの列見出しの丸は、bg が淡いので <code>border</code> の色で塗る。クローズしたカードは不透明度 0.6。ダークでも色相は変えず、bg を暗く・fg を明るく・border を中間にする（fg / bg はすべて 7.6:1 以上）。</p>
+
+<h3 id="color-4">テーマの切替</h3>
+<ul>
+  <li><b>3択</b>: ライト / ダーク / システム（OS の設定に従う）。<b>既定はシステム</b>。システムのあいだは OS の設定を変えるとその場で切り替わる。</li>
+  <li><b>置き場所</b>: ヘッダーのユーザーメニュー（「設定」の上のライト / ダーク / システム）と、設定画面の「表示」タブ（<code>/settings/appearance</code>）。スマホは下部タブバーのメニュー →「設定」→「表示」。</li>
+  <li><b>保存先</b>: ブラウザの localStorage のキー <code>theme</code>（値 <code>light</code> / <code>dark</code> / <code>system</code>）。無い・不正な値・localStorage が使えないときは <code>system</code> 扱い。DB には持たない（端末をまたいで同期しない）。</li>
+  <li><b>仕組み</b>: 選んだ値を light / dark に解決して <code>&lt;html data-theme="…"&gt;</code> に入れる。<code>index.css</code> の <code>:root[data-theme="dark"]</code> が同じ名前の <code>--color-*</code> を上書きするので、画面のクラス（<code>bg-surface</code> など）はテーマで書き分けない。<code>color-scheme</code> も合わせて切り替え、スクロールバー・date 入力などブラウザ既定の部品もダークにする。</li>
+  <li><b>読み書き</b>: <code>web/src/lib/theme.ts</code> の <code>useTheme()</code>（<code>{ preference, resolved, setPreference }</code>）。ヘッダーと設定画面で同じ値になるよう、状態はモジュールに持ち <code>useSyncExternalStore</code> で購読する。別タブでの変更も <code>storage</code> イベントで追従する。</li>
+  <li><b>ちらつき防止</b>: <code>web/index.html</code> の <code>&lt;head&gt;</code> の小さなインラインスクリプトが、React の描画より前に data-theme を当てる。既定値は <code>theme.ts</code> の <code>DEFAULT_PREFERENCE</code> とこのスクリプトの2か所にあるので、変えるときは両方を直す。</li>
+</ul>
+<pre><code>&lt;script&gt;
+  (function () {
+    var p = "system";
+    try {
+      var v = localStorage.getItem("theme");
+      if (v === "light" || v === "dark" || v === "system") p = v;
+    } catch (e) {}
+    if (p === "system") p = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = p;
+  })();
+&lt;/script&gt;</code></pre>
+
+<h3 id="color-5">色の書き方</h3>
+<ul>
+  <li>画面では色を直書きせず、トークンのクラス（<code>bg-surface</code>、<code>text-fg-muted</code>、<code>border-border</code>）か <code>var(--color-*)</code> を使う。トークンを使っていれば、ダークの対応は何もしなくても効く。</li>
+  <li>ダークで崩れたら、まず <code>index.css</code> のトークンの値で直す。トークンでは直らない箇所（例: ダイアログの幕 <code>bg-black/40 dark:bg-black/60</code>、AI エージェントのアイコンの <code>dark:ring-1 dark:ring-border-strong</code>）だけ <code>dark:</code> を使う。<code>dark:</code> は data-theme に合わせて <code>@custom-variant dark</code> で定義してあり、OS の設定ではなく選んだテーマに従う。</li>
+  <li>直書きしてよいのはブランドのロゴの色（ServiceIcon・Google・AI エージェントのアイコン）だけ。<code>git grep -nE '#[0-9a-fA-F]{3,6}' web/src</code> で残るのはそれらだけにする。</li>
+  <li>トークンを足すときは、ライト（<code>@theme static</code>）とダーク（<code>:root[data-theme="dark"]</code>）の両方に値を入れ、このページの見本にも載せる。文字と背景は 4.5:1 以上、枠線・リングなど文字以外は 3:1 以上を両方のテーマで満たす。</li>
+</ul>
+
 
 <h2 id="type">3. タイポグラフィ</h2>
 <pre><code>font-family: Inter, "Noto Sans JP", sans-serif;  /* web/src/index.css の --font-sans */</code></pre>
@@ -612,7 +742,7 @@ return isMobile ? &lt;BottomTabBar /&gt; : &lt;Sidebar /&gt;;</code></pre>
     <tr><td class="mono">variant="danger"</td><td>地・枠 <code>danger</code>、白文字。hover で少し暗く</td><td>削除の確定（<code>ConfirmDialog danger</code>）</td></tr>
     <tr><td class="mono">size="md"（既定）/ "sm"</td><td>md: <code>h-8 px-3</code> 14px ／ sm: <code>h-7 px-2.5</code> 13px。どちらも 500・<code>rounded-md</code></td><td>sm はコメント・ヘッダーのメニュー・行の中など密な場所。ふだんは md</td></tr>
     <tr><td class="mono">icon</td><td>ラベルの前にアイコン（16px）</td><td><code>icon={&lt;AddIcon /&gt;}</code> など</td></tr>
-    <tr><td class="mono">IconButton label danger</td><td>ghost・正方形（sm 28px / md 32px）・<code>text-fg-muted</code>、hover で <code>fg</code>。<code>danger</code> は <code>text-danger</code></td><td>変更・削除・閉じる・行の中の追加。<code>label</code> がツールチップと <code>aria-label</code> に入る</td></tr>
+    <tr><td class="mono">IconButton label danger</td><td>ghost・正方形（sm 28px / md 32px）・<code>text-fg-muted</code>、hover で <code>fg</code>。<code>danger</code> は <code>text-danger-fg</code></td><td>変更・削除・閉じる・行の中の追加。<code>label</code> がツールチップと <code>aria-label</code> に入る</td></tr>
   </tbody>
 </table>
 <p class="note">無効は <code>disabled</code> で不透明度 0.5・<code>cursor: not-allowed</code>。フォーカスは <code>focus-visible:ring-2 ring-brand/30</code>。</p>
@@ -905,7 +1035,7 @@ return isMobile ? &lt;BottomTabBar /&gt; : &lt;Sidebar /&gt;;</code></pre>
 <p class="note">
   地 <code>bg</code>・右に 1px の <code>border</code>。幅は既定 220px（右端のドラッグで 160–480px）、閉じると 52px でアイコンだけ。
   項目は <code>h-8 px-2.5 rounded-md</code>・14px・<code>text-fg-muted</code>、hover で地 <code>surface-muted</code>・文字 <code>fg</code>。
-  選択中は地 <code>#ededed</code>・文字 <code>fg</code>・500（青の塗りは使わない）。開閉と幅は localStorage に残す。
+  選択中は地 <code>selected</code>（ライト #ededed / ダーク #2a2a2a）・文字 <code>fg</code>・500（青の塗りは使わない）。開閉と幅は localStorage に残す。
 </p>
 
 <h3 id="parts-13">列幅のドラッグハンドル</h3>
@@ -965,7 +1095,7 @@ return isMobile ? &lt;BottomTabBar /&gt; : &lt;Sidebar /&gt;;</code></pre>
 <h2 id="rules">6. 書き方の決まり</h2>
 <ul>
   <li>スタイルは Tailwind の <code>className</code> で書く。inline の <code>style</code> に残すのは、ドラッグで決まる幅・ガントのバーの位置など実行時に計算する値だけ。</li>
-  <li>色は <code>@theme</code> のトークンのクラス（<code>bg-surface</code>、<code>border-border</code>、<code>text-fg-muted</code>）で書き、<code>#xxxxxx</code> を直書きしない。inline style で色が要るときは <code>var(--color-*)</code>（ステータスは <code>STATUS_COLOR</code>）を使う。トークンを増やすときは <code>index.css</code> とこのページの両方を直す。</li>
+  <li>色は <code>@theme</code> のトークンのクラス（<code>bg-surface</code>、<code>border-border</code>、<code>text-fg-muted</code>）で書き、<code>#xxxxxx</code> を直書きしない。inline style で色が要るときは <code>var(--color-*)</code>（ステータスは <code>STATUS_COLOR</code>）を使う。トークンを増やすときは <code>index.css</code> のライト・ダークの両方とこのページを直す。ダーク対応の決まりは <a href="#color-5">2.5</a>。</li>
   <li>クラスの結合は <code>lib/cn.ts</code> の <code>cn()</code>（<code>cn("a", isActive &amp;&amp; "b")</code>）。clsx などの依存は足さない。</li>
   <li>部品の見た目を画面側で上書きしない。幅・余白・配置（<code>w-60</code>、<code>ml-auto</code> など）だけを <code>className</code> で渡す。部品に無い見た目が要るなら、部品に variant を足す。</li>
   <li>hover・フォーカス・無効は Tailwind の <code>hover:</code> <code>focus-visible:</code> <code>disabled:</code> で書く（<code>useState</code> で切り替えない）。</li>
@@ -979,5 +1109,29 @@ return isMobile ? &lt;BottomTabBar /&gt; : &lt;Sidebar /&gt;;</code></pre>
 </ul>
 
 </div>
+<script>
+  // ページ右上の切替（lib/theme.ts の setThemePreference と同じ: 保存してすぐ当てる。system は OS の変更に追従）
+  (function () {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    function read() {
+      try { var v = localStorage.getItem("theme"); if (v === "light" || v === "dark" || v === "system") return v; } catch (e) {}
+      return "system";
+    }
+    function apply(p) {
+      document.documentElement.dataset.theme = p === "system" ? (mq.matches ? "dark" : "light") : p;
+      document.querySelectorAll(".theme-switch button").forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.dataset.pref === p));
+      });
+    }
+    document.querySelectorAll(".theme-switch button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        try { localStorage.setItem("theme", b.dataset.pref); } catch (e) {}
+        apply(b.dataset.pref);
+      });
+    });
+    mq.addEventListener("change", function () { if (read() === "system") apply("system"); });
+    apply(read());
+  })();
+</script>
 </body>
 </html>
