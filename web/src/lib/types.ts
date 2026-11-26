@@ -80,6 +80,9 @@ export interface ProjectInput {
   description: string | null;
   url: string | null;
   repository_url: string | null;
+  // Create only: the owning organization (null / absent = 個人). The DB then clears owner_id
+  // (trg_00_projects_org_owner) and forbids changing it later (trg_projects_owner_immutable).
+  org_id?: string | null;
 }
 
 // Editable fields for a story, shared by the create/edit form and the API.

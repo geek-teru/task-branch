@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
-import type { Project, ProjectInput } from "../lib/types";
+import type { Organization, Project, ProjectInput } from "../lib/types";
 import { cn } from "../lib/cn";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useTableSort, type SortValue } from "../lib/useTableSort";
@@ -45,6 +45,8 @@ const SORT_COLUMNS = {
 export function ProjectsListPage({
   projects,
   ownerName = null,
+  orgs = [],
+  currentOrgId = null,
   onCreate,
   onShowDetail,
   onShowBacklog,
@@ -55,6 +57,10 @@ export function ProjectsListPage({
   projects: Project[];
   // The organization's name; null = 個人.
   ownerName?: string | null;
+  // Organizations the user belongs to: the owner choices of the create form.
+  orgs?: Organization[];
+  // The organization picked in the header (null = 個人): the create form's default owner.
+  currentOrgId?: string | null;
   onCreate: (input: ProjectInput) => void;
   onShowDetail: (projectId: string) => void;
   onShowBacklog: (projectId: string) => void;
@@ -252,6 +258,8 @@ export function ProjectsListPage({
       {creating && (
         <ProjectForm
           initial={null}
+          orgs={orgs}
+          defaultOrgId={currentOrgId}
           onSubmit={(input) => {
             onCreate(input);
             setCreating(false);

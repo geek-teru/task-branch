@@ -4,7 +4,9 @@ import { ChevronDownIcon } from "../Icons";
 import { MenuCheck, menuItemClass, menuPanelClass, useDismiss, useMenuPosition } from "./DropdownMenu";
 import { fieldClass } from "./Input";
 
-export type SelectOption<T extends string> = { value: T; label: ReactNode };
+// group: options with the same group sit under one heading in the open list (consecutive options
+// only, so pass them in group order). Options without one get no heading.
+export type SelectOption<T extends string> = { value: T; label: ReactNode; group?: string };
 
 type SelectProps<T extends string> = {
   // null shows the placeholder (nothing chosen yet).
@@ -82,7 +84,8 @@ export function Select<T extends string>({
     if (e.key in move) {
       e.preventDefault();
       setActive(move[e.key]);
-      panelRef.current?.children[move[e.key]]?.scrollIntoView({ block: "nearest" });
+      // By id: group headings are children of the panel too.
+      document.getElementById(`${listId}-${move[e.key]}`)?.scrollIntoView({ block: "nearest" });
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       choose(active);
@@ -121,7 +124,16 @@ export function Select<T extends string>({
       </span>
       {open && (
         <div ref={panelRef} id={listId} role="listbox" className={menuPanelClass} style={position}>
-          {options.map((o, i) => (
+          {options.map((o, i) => [
+            o.group && o.group !== options[i - 1]?.group && (
+              <div
+                key={`group-${i}`}
+                role="presentation"
+                className="truncate px-2.5 pb-1 pt-2 text-[11px] font-medium text-fg-muted"
+              >
+                {o.group}
+              </div>
+            ),
             <div
               key={o.value}
               id={`${listId}-${i}`}
@@ -135,8 +147,8 @@ export function Select<T extends string>({
             >
               <MenuCheck on={o.value === value} />
               <span className="truncate">{o.label}</span>
-            </div>
-          ))}
+            </div>,
+          ])}
         </div>
       )}
     </div>

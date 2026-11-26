@@ -1,7 +1,8 @@
 ﻿import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { Project, ProjectInput } from "../lib/types";
+import type { Organization, Project, ProjectInput } from "../lib/types";
 import { cn } from "../lib/cn";
+import { projectOwnerName } from "../lib/projectOwner";
 import { ProjectForm } from "../components/ProjectForm";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IdBadge } from "../components/IdBadge";
@@ -19,6 +20,7 @@ type Confirming = "archive" | "delete" | null;
 // the ⋮ menu next to it (jump to a view, export, archive, delete).
 export function ProjectDetailPage({
   project,
+  orgs = [],
   onUpdate,
   onDelete,
   onSetActive,
@@ -28,6 +30,8 @@ export function ProjectDetailPage({
   onShowKanban,
 }: {
   project: Project;
+  // Organizations the user belongs to (owner name, and whether the user may delete the project).
+  orgs?: Organization[];
   onUpdate: (id: string, input: ProjectInput) => void;
   onDelete: (id: string) => void;
   onSetActive: (id: string, isActive: boolean) => void;
@@ -38,6 +42,8 @@ export function ProjectDetailPage({
 }) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState<Confirming>(null);
+  // An organization's project can be deleted by its owners only (RLS projects_delete enforces it too).
+  const canDelete = !project.org_id || orgs.some((o) => o.id === project.org_id && o.role === "owner");
 
   return (
     <div className="h-full overflow-auto">
@@ -76,9 +82,11 @@ export function ProjectDetailPage({
               <DropdownMenuItem onSelect={() => setConfirming("archive")}>
                 {project.is_active ? "アーカイブする" : "アクティブに戻す"}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setConfirming("delete")} danger icon={<DeleteIcon size={14} />}>
-                削除
-              </DropdownMenuItem>
+              {canDelete && (
+                <DropdownMenuItem onSelect={() => setConfirming("delete")} danger icon={<DeleteIcon size={14} />}>
+                  削除
+                </DropdownMenuItem>
+              )}
             </DropdownMenu>
           </>
         }
@@ -91,6 +99,7 @@ export function ProjectDetailPage({
         <Card className="mt-6 max-w-[720px]">
           <div className="border-b border-border px-4 py-3 text-sm font-medium text-fg md:px-5">基本情報</div>
           <dl className="m-0 px-4 py-2 md:px-5">
+            <Field label="所有者">{projectOwnerName(project, orgs)}</Field>
             <Field label="URL">
               {project.url ? <ExternalLink href={project.url} /> : DASH}
             </Field>
@@ -108,6 +117,7 @@ export function ProjectDetailPage({
       {editing && (
         <ProjectForm
           initial={project}
+          orgs={orgs}
           onSubmit={(input) => {
             onUpdate(project.id, input);
             setEditing(false);
@@ -132,7 +142,7 @@ export function ProjectDetailPage({
         />
       )}
 
-      {confirming === "delete" && (
+      {confirming === "delete" && canDelete && (
         <ConfirmDialog
           message={`プロジェクト「${project.name}」を削除します。\n配下のエピック・ストーリー・タスク・依存関係もすべて削除されます。よろしいですか？`}
           confirmLabel="削除する"
