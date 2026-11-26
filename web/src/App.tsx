@@ -37,7 +37,7 @@ import {
   deleteStoryGroup,
   setStoryGroup,
 } from "./lib/api";
-import type { Assignees, BacklogStory, GraphNode, KanbanLane, OrganizationInput, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import type { Assignees, BacklogStory, GraphNode, KanbanLane, Organization, OrganizationInput, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { agentAssigneeId } from "./lib/types";
 import { agentClientLabel, findAgentProvider } from "./lib/agentProviders";
 import { useAgentGrants } from "./lib/useAgentGrants";
@@ -63,6 +63,7 @@ import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
 import { PerformanceView } from "./views/PerformanceView";
 import { SettingsPage } from "./views/SettingsPage";
+import { OrgSettingsPage, type OrgSettingsTab } from "./views/org/OrgSettingsPage";
 
 // The project picked in the header / toolbar, remembered per browser.
 const SELECTED_PROJECT_KEY = "project.selected";
@@ -101,6 +102,9 @@ export default function App() {
   const isBacklog = pathname === "/backlog" || storyMatch !== null;
   // Settings belong to no project: no side nav item is current, and the breadcrumb says 設定.
   const isSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  // Organization settings (/orgs/:slug/settings/...): no project either; the side nav marks 組織の設定.
+  const orgSettingsMatch = useMatch("/orgs/:slug/settings/*");
+  const isOrgSettings = orgSettingsMatch !== null;
   const [searchParams] = useSearchParams();
   // Gantt shows one project: the one in the URL, else the selected one, else the first active project.
   const defaultProjectId = selectedId ?? (projects.find((p) => p.is_active) ?? projects[0])?.id;
@@ -594,6 +598,44 @@ export default function App() {
     },
     [org.add, handleSelectOwner]
   );
+  // Organization settings: open the selected organization's, and follow renames / removals.
+  const openOrgSettings = useCallback(() => {
+    if (org.current) navigate(`/orgs/${encodeURIComponent(org.current.slug)}/settings/general`);
+  }, [org.current, navigate]);
+  const handleOrgUpdated = useCallback(
+    (updated: Organization, previousSlug: string) => {
+      org.replace(updated);
+      if (updated.slug !== previousSlug) {
+        // Keep the remembered choice on this organization under its new slug.
+        if (org.requestedSlug === previousSlug) org.select(updated.slug);
+        const tab = pathname.endsWith("/members") ? "members" : "general";
+        navigate(`/orgs/${encodeURIComponent(updated.slug)}/settings/${tab}`, { replace: true });
+      }
+    },
+    [org.replace, org.select, org.requestedSlug, pathname, navigate]
+  );
+  // Deleted or left: drop it (and its projects, no longer readable) and go back to the personal list.
+  const handleOrgRemoved = useCallback(
+    (orgId: string) => {
+      org.remove(orgId);
+      setProjects((prev) => prev.filter((p) => p.org_id !== orgId));
+      if (org.current?.id === orgId) org.select(null);
+      navigate("/projects");
+    },
+    [org.remove, org.select, org.current, navigate]
+  );
+  // Opening an organization's settings (e.g. from a link) picks that organization in the header too.
+  const orgSettingsSlug = orgSettingsMatch?.params.slug ?? null;
+  useEffect(() => {
+    if (orgSettingsSlug && org.requestedSlug !== orgSettingsSlug && org.orgs.some((o) => o.slug === orgSettingsSlug)) {
+      org.select(orgSettingsSlug);
+    }
+  }, [orgSettingsSlug, org.requestedSlug, org.orgs, org.select]);
+  const orgProjectCount = useCallback(
+    (orgId: string) => projects.filter((p) => p.org_id === orgId).length,
+    [projects]
+  );
+
   // The project list without ?org= but with a remembered organization: put it in the URL.
   const isProjectsList = pathname === "/projects";
   const urlOrg = searchParams.get("org");
@@ -733,7 +775,7 @@ export default function App() {
     </main>
   );
 
-  const activeMenu: MenuKey | null = isSettings
+  const activeMenu: MenuKey | null = isSettings || isOrgSettings
     ? null
     : isGantt
       ? "gantt"
@@ -760,7 +802,7 @@ export default function App() {
         allProjectsLabel={isKanban || isPerformance ? "すべてのプロジェクト" : undefined}
         onSelectProject={handleHeaderSelectProject}
         onSelectAllProjects={handleSelectAllProjects}
-        pageTitle={isSettings ? "設定" : undefined}
+        pageTitle={isSettings ? "設定" : isOrgSettings ? "組織の設定" : undefined}
         userName={profile.displayName}
         userAvatarUrl={profile.avatarUrl}
         userEmail={session.user.email ?? null}
@@ -793,7 +835,14 @@ export default function App() {
         />
       )}
       <div className="flex min-h-0 flex-1">
-        {!isMobile && <Sidebar active={activeMenu} onNavigate={onNavigate} />}
+        {!isMobile && (
+          <Sidebar
+            active={activeMenu}
+            onNavigate={onNavigate}
+            onOpenOrgSettings={org.current ? openOrgSettings : undefined}
+            orgSettingsActive={isOrgSettings}
+          />
+        )}
 
         <div className="flex min-w-0 flex-1 flex-col">
           {error && (
@@ -988,6 +1037,51 @@ export default function App() {
                 </main>
               }
             />
+            <Route path="/orgs/:slug/settings" element={<OrgSettingsRedirect />} />
+            <Route
+              path="/orgs/:slug/settings/general"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {orgSettingsMatch?.params.slug && (
+                    <OrgSettingsPage
+                      tab="general"
+                      slug={orgSettingsMatch.params.slug}
+                      orgs={org.orgs}
+                      orgsLoaded={org.loaded}
+                      userId={session.user.id}
+                      selfName={profile.displayName}
+                      selfAvatarUrl={profile.avatarUrl}
+                      projectCount={orgProjectCount}
+                      onUpdated={handleOrgUpdated}
+                      onDeleted={handleOrgRemoved}
+                      onLeft={handleOrgRemoved}
+                    />
+                  )}
+                </main>
+              }
+            />
+            <Route
+              path="/orgs/:slug/settings/members"
+              element={
+                <main style={{ flex: 1, minHeight: 0 }}>
+                  {orgSettingsMatch?.params.slug && (
+                    <OrgSettingsPage
+                      tab="members"
+                      slug={orgSettingsMatch.params.slug}
+                      orgs={org.orgs}
+                      orgsLoaded={org.loaded}
+                      userId={session.user.id}
+                      selfName={profile.displayName}
+                      selfAvatarUrl={profile.avatarUrl}
+                      projectCount={orgProjectCount}
+                      onUpdated={handleOrgUpdated}
+                      onDeleted={handleOrgRemoved}
+                      onLeft={handleOrgRemoved}
+                    />
+                  )}
+                </main>
+              }
+            />
             <Route path="*" element={<Navigate to="/projects" replace />} />
           </Routes>
         </div>
@@ -998,10 +1092,19 @@ export default function App() {
           settingsActive={isSettings}
           onNavigate={onNavigate}
           onOpenSettings={() => navigate("/settings/profile")}
+          onOpenOrgSettings={org.current ? openOrgSettings : undefined}
+          orgSettingsActive={isOrgSettings}
         />
       )}
     </div>
   );
+}
+
+// /orgs/:slug/settings → its first tab.
+function OrgSettingsRedirect() {
+  const match = useMatch("/orgs/:slug/settings");
+  const tab: OrgSettingsTab = "general";
+  return <Navigate to={`/orgs/${encodeURIComponent(match?.params.slug ?? "")}/settings/${tab}`} replace />;
 }
 
 function Shell({ children }: { children: ReactNode }) {

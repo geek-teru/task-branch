@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
-import { MoreIcon } from "./Icons";
+import { MoreIcon, OrgIcon } from "./Icons";
 import { MENU, type MenuKey } from "./Sidebar";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
@@ -19,16 +19,21 @@ export function BottomTabBar({
   settingsActive,
   onNavigate,
   onOpenSettings,
+  onOpenOrgSettings,
+  orgSettingsActive,
 }: {
   // Same value the sidebar gets; null on pages outside MENU (設定).
   active: MenuKey | null;
   settingsActive: boolean;
   onNavigate: (key: MenuKey) => void;
   onOpenSettings: () => void;
+  // Set while an organization is picked in the header: adds 「組織の設定」 to 「その他」.
+  onOpenOrgSettings?: () => void;
+  orgSettingsActive?: boolean;
 }) {
   const tabs = TAB_KEYS.map((k) => MENU.find((m) => m.key === k)!);
   const rest = MENU.filter((m) => !TAB_KEYS.includes(m.key));
-  const moreActive = settingsActive || (active !== null && !TAB_KEYS.includes(active));
+  const moreActive = settingsActive || !!orgSettingsActive || (active !== null && !TAB_KEYS.includes(active));
 
   return (
     <nav
@@ -77,6 +82,11 @@ export function BottomTabBar({
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        {onOpenOrgSettings && (
+          <DropdownMenuItem icon={<OrgIcon />} onSelect={onOpenOrgSettings} selected={!!orgSettingsActive}>
+            組織の設定
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={onOpenSettings} selected={settingsActive}>
           設定
         </DropdownMenuItem>
