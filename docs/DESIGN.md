@@ -899,7 +899,7 @@ node scripts/attachments-access-check.mjs   # 期待と違う結果が1つでも
 
 | `record_usage_events(events jsonb)` | 使用量 | API 応答ごとの使用量（配列。1 回 500 件まで）を usage_events に記録し `{inserted, updated, skipped}` を返す。必須は session_id / request_key / model / occurred_at。持ち主は `current_owner_id()`、task_id は自分が触れるプロジェクト（`can_access_project()`。組織プロジェクトはメンバーなら可）のタスクだけ受け付け（それ以外は null。`0045_org_project_functions.sql`）、project_id はタスクから埋める。同じ (owner_id, request_key) は、cost_usd が null で新しい値があるときだけ埋め（updated）、ほかは skipped。呼び出し内の重複は先頭だけ使う。JWT が無い・ゲストは例外。security definer、execute は authenticated のみ（`0035_usage_events.sql`） |
 | `usage_totals(project uuid, story uuid)` | 使用量 | usage_events の累計を 1 行で返す（responses / input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens / cost_usd / uncosted_responses / first_at / last_at）。`story` が null ならプロジェクト（`usage_events.project_id`）の合計、渡せばそのストーリーと配下タスク（`parent_id`）にひも付いた分の合計。cost_usd は費用の分かる応答だけの合計（無ければ null）、uncosted_responses は費用が null の応答数。画面のプロジェクト詳細・ストーリー詳細の「AI の使用量」カードが使う。security invoker（usage_events の RLS＝持ち主だけ）、execute は authenticated のみ（`0037_usage_totals.sql`） |
-| `create_plan(project uuid, stories jsonb)` | 計画の登録 | ストーリーと配下のタスクを一括で登録し `{project_id, stories}` を返す（入力・返り値は MCP の `create_plan` と同じ）。1 トランザクションで、途中で失敗（ゲストの件数上限など）しても半端に作られない。`external_id` が既存の行と一致したら作らず `created: false`。入力の誤り（external_id の重複、level の食い違い、他プロジェクトのストーリー、status・assignee の値）は何も作らずに errcode 22023 の例外。ストーリーはプロジェクトの末尾（無ければ 1 から）、タスクはストーリーの末尾（無ければ 0 から）に並ぶ。`assignee` の `ai` は JWT の `client_id` のエージェント（画面の人のセッションからは AI（未指定））。MCP の `create_plan` はこの RPC を呼ぶだけ。security invoker（RLS の範囲。他人のプロジェクトは「見つかりません」）、execute は authenticated のみ（`0038_create_plan.sql`） |
+| `create_plan(project uuid, stories jsonb)` | 計画の登録 | ストーリーと配下のタスクを一括で登録し `{project_id, stories}` を返す（入力・返り値は MCP の `create_plan` と同じ）。1 トランザクションで、途中で失敗（ゲストの件数上限など）しても半端に作られない。`external_id` が既存の行と一致したら作らず `created: false`。入力の誤り（external_id の重複、level の食い違い、他プロジェクトのストーリー、status・assignee の値）は何も作らずに errcode 22023 の例外。ストーリーはプロジェクトの末尾（無ければ 1 から）、タスクはストーリーの末尾（無ければ 0 から）に並ぶ。`assignee` の `ai` は JWT の `client_id` のエージェント（画面の人のセッションからは AI（未指定））、`user` は呼び出した人（`current_owner_id()`。AI なら持ち主の人）。`tasks[].assignee_user_id`（uuid）を渡すとその人を担当にする（`assignee` と同時指定は不可。個人プロジェクトは持ち主、組織プロジェクトは組織のメンバーだけで、違えば何も作らずに 22023）。MCP の `create_plan` はこの RPC を呼ぶだけ。security invoker（RLS の範囲。他人のプロジェクトは「見つかりません」）、execute は authenticated のみ（`0038_create_plan.sql`、担当者の扱いは `0047_create_plan_org.sql`） |
 - 循環検出・最長経路・集約は Postgres の再帰 CTE（`WITH RECURSIVE`）で実装。
 - AI・UI が同じ RPC を使い、計算結果を一致させる。
 
@@ -1079,7 +1079,7 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 | 方式           | Streamable HTTP のステートレス。セッション ID を発行せず、リクエストごとにサーバーとトランスポートを作り、SSE ではなく JSON で応答する。サーバー名は `task-branch`           |
 | 認証           | `Authorization: Bearer <JWT>`。JWKS（`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`）で署名を検証する（`web/api/_lib/auth.ts`）                                             |
 | Supabase の呼び方 | anon key ＋ 利用者の JWT で REST を呼ぶ（`web/api/_lib/supabase.ts`）。RLS の下で動き、service_role キーは持たない                                                        |
-| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`move_task`（下記「タスクの移動のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `request_task_review` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
+| ツール         | `web/api/_lib/tools.ts` の `registerTools` に足す。確認用の `list_projects`、`create_project`（下記「プロジェクトの作成のツール」）、`list_members`（下記「担当にできる人のツール」）、`export_project`（下記「プロジェクトの全体のツール」）、`list_stories`（下記「ストーリーの一覧のツール」）、`get_story`（下記「ストーリーの中身のツール」）、`find_items`（下記「検索のツール」）、`update_story`（下記「ストーリーの更新のツール」）、`update_task`（下記「タスクの更新のツール」）、`move_task`（下記「タスクの移動のツール」）、`get_task_context`（下記「タスクの文脈のツール」）、`get_next_task`（下記「次のタスクのツール」）、作業進行の `start_task` / `request_task_review` / `complete_task`（下記「作業進行のツール」）と、コメントの4ツール（下記「コメントのツール」）                                                 |
 
 **JWT の検証**
 
@@ -1123,15 +1123,16 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 
 | ツール                | 入力                     | 返り値                                                                                     |
 | --------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
-| `list_projects`       | なし                     | 自分のプロジェクトの `id` / `name` / `description` / `url` / `repository_url` の配列（作成順。URL は未登録なら null） |
-| `create_project`      | `name`, `description` / `url` / `repository_url`（いずれも任意） | 作ったプロジェクト（`id` / `name` / `description` / `url` / `repository_url`）。持ち主は人のユーザーになる（下記「プロジェクトの作成のツール」） |
+| `list_projects`       | なし                     | 自分のプロジェクト（個人と、メンバーになっている組織のもの）の `id` / `name` / `description` / `url` / `repository_url` / `owner_type`（`user` / `org`）/ `org`（`{ id, slug, name }`、個人なら null）の配列（作成順。URL は未登録なら null） |
+| `create_project`      | `name`, `description` / `url` / `repository_url` / `org`（いずれも任意） | 作ったプロジェクト（`list_projects` と同じ形）。`org`（組織の slug）を省略したら個人のプロジェクトで持ち主は人のユーザー、渡したらその組織のプロジェクト（下記「プロジェクトの作成のツール」） |
+| `list_members`        | `project_id`             | 担当にできる人の配列 `[{ user_id, display_name, role, is_me }]`。個人は持ち主1人、組織はメンバー全員で自分が先頭（下記「担当にできる人のツール」） |
 | `export_project`      | `project_id`             | `{ format, version: 4, exported_at, project, stories }`。ストーリー（`context` 込み）と配下のタスクの入れ子。コメントは含まない（下記「プロジェクトの全体のツール」） |
 | `list_stories`        | `project_id`             | `{ project, stories }`。ストーリーの一覧（進捗・タスク数込み）。`context` と配下のタスクは含まない（下記「ストーリーの一覧のツール」） |
 | `get_story`           | `story_id`               | `{ story, project, tasks }`。ストーリー1件（`context`・進捗込み）と配下のタスク。コメントは含まない（下記「ストーリーの中身のツール」） |
 | `find_items`          | `query`, `kind`（任意）  | `{ items, truncated }`。プロジェクト・ストーリー・タスクを短縮 ID か名前の一部で横断検索する（下記「検索のツール」） |
 | `update_story`        | `story_id`, `title` / `description` / `context` / `start_date` / `due_date` / `status`（いずれも任意） | 更新後のストーリー（`id` / `title` / `description` / `context` / `status` / `start_date` / `due_date`）。渡した項目だけ書き換える（下記「ストーリーの更新のツール」） |
-| `create_plan`         | `project_id`, `stories`（`stories[]` の `status`、`tasks[]` の `assignee` は任意） | `{ project_id, stories }`。ストーリーと配下のタスクを一括で登録する。新規のストーリーは `status`（`planning` / `todo`。既定 `todo`）、新規のタスクは `todo` で作る。`external_id` が既存の行と一致したら作らず、担当も書き換えない（`assignee` の値は下記「タスクの更新のツール」）。処理は RPC `create_plan`（§4.2）で、入力の誤りはその例外のメッセージを `isError` で返す |
-| `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date` / `assignee`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
+| `create_plan`         | `project_id`, `stories`（`stories[]` の `status`、`tasks[]` の `assignee` / `assignee_user_id` は任意） | `{ project_id, stories }`。ストーリーと配下のタスクを一括で登録する。新規のストーリーは `status`（`planning` / `todo`。既定 `todo`）、新規のタスクは `todo` で作る。`external_id` が既存の行と一致したら作らず、担当も書き換えない（`assignee` の値は下記「タスクの更新のツール」）。処理は RPC `create_plan`（§4.2）で、入力の誤りはその例外のメッセージを `isError` で返す |
+| `update_task`         | `task_id`, `title` / `description` / `start_date` / `due_date` / `assignee` / `assignee_user_id`（いずれも任意） | 更新後のタスク（`id` / `title` / `description` / `status` / `assignee_type` / `assignee_client_id` / `start_date` / `due_date`）。渡した項目だけ書き換える。状態は変えない（下記「タスクの更新のツール」） |
 | `move_task`           | `task_id`, `story_id`    | `{ task, from_story, to_story }`。タスクを同じプロジェクトの別のストーリーの末尾へ移す。`task` は `update_task` と同じ形、`from_story` / `to_story` は `{ id, title }`。状態・担当・期間は変えない（下記「タスクの移動のツール」） |
 | `list_task_comments`  | `task_id`                | タスクのコメントの配列（古い順）。各要素は下記「コメントの形」                             |
 | `get_task_context`    | `task_id`                | `{ task, story, project, comments }`。タスクと親ストーリー（`context` 込み）・プロジェクト・コメントをまとめて返す（下記「タスクの文脈のツール」） |
@@ -1152,6 +1153,15 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - `name` は前後の空白を落として 1 文字以上。`url` / `repository_url` は URL の形でなければ入力エラー。
 - `owner_id` は送らず、DB の既定値 `current_owner_id()`（§3.5）に任せる。AI の JWT では `app_metadata.owner_id` が入るので、持ち主の人のプロジェクトになり、画面の `/projects` にそのまま出る。`is_active` は既定の `true`。
 - 同じ名前のプロジェクトは弾かない（画面と同じ）。ツールの説明で、作る前に `list_projects` で重複を確かめるよう伝える。
+- `org`（組織の slug）を渡すと、`organizations` を slug で引き（RLS でメンバーにしか見えない）、`org_id` を付けて入れる。見つからなければ `isError`（メンバーでない組織も同じ）。`owner_id` はトリガ `set_project_owner_for_org()`（0043）が null にする。組織プロジェクトの作成はメンバーなら誰でもよい（`projects` の insert ポリシー、0044）。
+
+**担当にできる人のツール**
+
+`list_members` は、`create_plan` / `update_task` の `assignee_user_id` に渡す人を選ぶのに使う。DB の変更は持たず、RLS の下で読むだけ。
+
+- 個人プロジェクトは持ち主1人（`role: owner`）。組織プロジェクトは `organization_members`（同じ組織のメンバーなら読める、0042）を参加順に返し、自分（`is_me: true`。JWT の `app_metadata.owner_id`、無ければ `sub`）を先頭にする。
+- `display_name` は `profiles`（同じ組織のメンバーなら読める）から別に引く。プロフィール未設定なら null。
+- 見つからない（他人のものを含む）プロジェクトは `isError`。
 
 **プロジェクトの全体のツール**
 
@@ -1207,7 +1217,8 @@ Claude Code から呼ぶ MCP サーバー。画面と同じ Vercel のプロジ�
 - 渡した項目だけ書き換える。ひとつも無ければ `isError`。`title` は前後の空白を落として 1 文字以上。
 - `description` は置き換え。追記は、呼び出し側が `get_task_context` で今の説明を取り、末尾に足して渡す（ツールに追記の機能は持たせない）。
 - `status` は入力に含めない。状態は `start_task` / `request_task_review` / `complete_task` で変える。
-- `assignee`（`create_plan` の `tasks[]` も同じ）: `user` は `assignee_type = 'human'`、`assignee_id` に持ち主の id。`ai` は `assignee_type = 'ai'`、`assignee_client_id` に呼び出したトークンの `client_id`。`none` は3列とも null。
+- `assignee`（`create_plan` の `tasks[]` も同じ）: `user` は `assignee_type = 'human'`、`assignee_id` に呼び出した AI の持ち主（本人）の id（JWT の `app_metadata.owner_id`、無ければ `sub`。個人プロジェクトでは持ち主と同じ）。`ai` は `assignee_type = 'ai'`、`assignee_client_id` に呼び出したトークンの `client_id`。`none` は3列とも null。
+- `assignee_user_id`（`create_plan` の `tasks[]` も同じ）: その人を担当にする（`assignee_type = 'human'`）。`assignee` と同時に渡すと `isError`。担当にできるかは DB のトリガ `check_task_assignee()`（0045）が見て、拒否は日本語にして返す（`create_plan` は RPC の中で先に確かめる）。候補は `list_members` で取る。
 - `ai` は呼び出したエージェントの担当になる。動的登録で環境ごとに `client_id` が変わるので、別の環境の同じエージェントでは `get_next_task` の候補から外れる。別のエージェントの指定は画面で行う（接続中のエージェントの一覧は画面のセッションでしか読めない）。
 - 見つからない（他人のものを含む）タスクと、ストーリーの id は `isError`（ストーリーには `update_story` を使うよう伝える）。`start_task` と同じ `findTask` で引く。
 

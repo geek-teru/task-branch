@@ -60,15 +60,32 @@ const COMMENT_NOT_EDITABLE = "コメントが見つからないか、編集・�
 
 const externalId = z.string().trim().min(1).describe("呼び出し側で決める識別子。metadata.external_id に入れ、同じプロジェクトに同じ値があれば作らない");
 
-const assigneeInput = z.enum(["user", "ai", "none"]).describe("担当者。user はプロジェクトの持ち主、ai は呼び出したエージェント、none は未割り当て");
+const assigneeInput = z
+  .enum(["user", "ai", "none"])
+  .describe("担当者。user は呼び出した AI の持ち主（本人）、ai は呼び出したエージェント、none は未割り当て。ほかのメンバーは assignee_user_id で指定する");
 
-// assignee の入力を tasks の担当の3列にする。
+const assigneeUserIdInput = z
+  .uuid()
+  .describe("担当にする人の user_id（list_members で取る）。組織プロジェクトでほかのメンバーを担当にするときに使う。assignee と同時には指定できない");
+
+// assignee の入力を tasks の担当の3列にする。user は本人（ownerId = 呼び出した AI の持ち主）。
 function assigneeColumns(assignee: z.infer<typeof assigneeInput>, ownerId: string, clientId: string) {
   return {
     assignee_type: assignee === "user" ? "human" : assignee === "ai" ? "ai" : null,
     assignee_id: assignee === "user" ? ownerId : null,
     assignee_client_id: assignee === "ai" ? clientId : null,
   };
+}
+
+// 担当者のトリガ check_task_assignee（0045）の拒否を日本語にする。
+function assigneeError(error: { message: string }): CallToolResult | null {
+  if (error.message === "the assignee must be a member of the organization") {
+    return toolError("担当にできるのは組織のメンバーだけです（list_members で確かめてください）");
+  }
+  if (error.message === "the assignee must be the owner of the project") {
+    return toolError("個人プロジェクトの担当にできるのは持ち主だけです");
+  }
+  return null;
 }
 
 const planTask = z.object({
@@ -78,6 +95,7 @@ const planTask = z.object({
   start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
   due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
   assignee: assigneeInput.optional(),
+  assignee_user_id: assigneeUserIdInput.optional(),
 });
 
 const planStory = z.object({
@@ -95,8 +113,22 @@ const planStory = z.object({
   tasks: z.array(planTask).optional().describe("ストーリー配下に作るタスク"),
 });
 
-// list_projects / create_project で返すプロジェクトの列。
-const PROJECT_COLUMNS = "id, name, description, url, repository_url";
+// list_projects / create_project で返すプロジェクトの列。org は組織プロジェクトの組織（個人なら null）。
+const PROJECT_COLUMNS = "id, name, description, url, repository_url, org:org_id(id, slug, name)";
+
+type ProjectRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  url: string | null;
+  repository_url: string | null;
+  org: { id: string; slug: string; name: string } | null;
+};
+
+// 所有者の種別（user 個人 / org 組織）を足し、org を最後に並べる。
+function withOwnerType({ org, ...project }: ProjectRow) {
+  return { ...project, owner_type: org ? "org" : "user", org };
+}
 
 // get_task_context で返すタスク・親ストーリー・プロジェクトの列。親とプロジェクトは外部キーの列名で埋め込む。
 // supabase-js が select の文字列から型を推論するので、連結せず1つのリテラルにする。
@@ -198,7 +230,8 @@ async function selectAll<T>(db: SupabaseClient, table: string, columns: string, 
   }
 }
 
-export function registerTools(server: McpServer, db: SupabaseClient, clientId: string): void {
+// clientId は呼び出したエージェント（OAuth の client_id）、ownerId はその持ち主の人（DB の current_owner_id() と同じ）。
+export function registerTools(server: McpServer, db: SupabaseClient, clientId: string, ownerId: string): void {
   // 参照ツールのタスクに、呼び出したエージェント自身の担当かを足す。
   const withAssignedToMe = <T extends { assignee_client_id: string | null }>(task: T) => ({
     ...task,
@@ -209,7 +242,9 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
     "list_projects",
     {
       title: "プロジェクトの一覧",
-      description: "自分のプロジェクトの id, name, description, url, repository_url を作成順に返す。url / repository_url は未登録なら null",
+      description:
+        "自分のプロジェクト（個人のプロジェクトと、メンバーになっている組織のプロジェクト）の id, name, description, url, repository_url, " +
+        "owner_type（user 個人 / org 組織）, org（組織プロジェクトなら { id, slug, name }、個人なら null）を作成順に返す。url / repository_url は未登録なら null",
     },
     async () => {
       const { data, error } = await db
@@ -217,7 +252,7 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
         .select(PROJECT_COLUMNS)
         .order("created_at", { ascending: true });
       if (error) return restError(error);
-      return json(data);
+      return json((data as unknown as ProjectRow[]).map(withOwnerType));
     },
   );
 
@@ -226,20 +261,74 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
     {
       title: "プロジェクトの作成",
       description:
-        "プロジェクトを作り、作ったプロジェクトの id, name, description, url, repository_url を返す。持ち主は自分（AI なら持ち主の人）になる。" +
+        "プロジェクトを作り、作ったプロジェクトを list_projects と同じ形で返す。org を省略したら個人のプロジェクトで、持ち主は自分（AI なら持ち主の人）になる。" +
+        "org に組織の slug を渡したら、その組織のプロジェクトになる（メンバーになっている組織だけ）。" +
         "同じ名前のプロジェクトがあっても作るので、作る前に list_projects で重複を確かめる",
       inputSchema: {
         name: z.string().trim().min(1).describe("プロジェクト名"),
         description: z.string().optional().describe("プロジェクトの説明"),
         url: z.url().optional().describe("デプロイ先などの URL"),
         repository_url: z.url().optional().describe("GitHub などのリポジトリ URL"),
+        org: z.string().trim().min(1).optional().describe("組織の slug（list_projects の org.slug）。省略したら個人のプロジェクト"),
       },
     },
-    async (fields) => {
+    async ({ org, ...fields }) => {
+      const row: Record<string, unknown> = { ...fields };
+      if (org !== undefined) {
+        // organizations はメンバー（と作った人）にしか見えないので、見つからなければメンバーではない。
+        const { data: found, error: orgError } = await db.from("organizations").select("id").eq("slug", org).maybeSingle();
+        if (orgError) return restError(orgError);
+        if (!found) return toolError(`組織が見つかりません（メンバーになっている組織の slug を指定してください）: ${org}`);
+        row.org_id = found.id;
+      }
       // owner_id は送らず、DB の既定値 current_owner_id() に任せる（AI の JWT なら持ち主の人の id になる）。
-      const { data, error } = await db.from("projects").insert(fields).select(PROJECT_COLUMNS).single();
+      // org_id を渡したときは、トリガ（0043）が owner_id を null にする。
+      const { data, error } = await db.from("projects").insert(row).select(PROJECT_COLUMNS).single();
       if (error) return restError(error);
-      return json(data);
+      return json(withOwnerType(data as unknown as ProjectRow));
+    },
+  );
+
+  server.registerTool(
+    "list_members",
+    {
+      title: "担当にできる人の一覧",
+      description:
+        "プロジェクトのタスクの担当にできる人を返す。返り値は [{ user_id, display_name, role, is_me }]。" +
+        "個人のプロジェクトは持ち主1人（role は owner）、組織のプロジェクトは組織のメンバー全員（role は owner / member）で、自分（is_me: true）を先頭に並べる。" +
+        "user_id を create_plan の tasks[].assignee_user_id や update_task の assignee_user_id に渡す。display_name はプロフィール未設定なら null",
+      inputSchema: { project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）") },
+    },
+    async ({ project_id }) => {
+      const { data: project, error: projectError } = await db.from("projects").select("id, owner_id, org_id").eq("id", project_id).maybeSingle();
+      if (projectError) return restError(projectError);
+      if (!project) return toolError(`プロジェクトが見つかりません: ${project_id}`);
+
+      let members: { user_id: string; role: string }[];
+      if (project.org_id) {
+        const { data, error } = await db
+          .from("organization_members")
+          .select("user_id, role")
+          .eq("org_id", project.org_id)
+          .order("created_at", { ascending: true });
+        if (error) return restError(error);
+        members = data;
+      } else {
+        members = [{ user_id: project.owner_id as string, role: "owner" }];
+      }
+
+      // profiles は本人と同じ組織のメンバーの行が読める（0042）。organization_members とは FK が無いので別に引く。
+      const { data: profiles, error: profileError } = await db
+        .from("profiles")
+        .select("user_id, display_name")
+        .in("user_id", members.map((m) => m.user_id));
+      if (profileError) return restError(profileError);
+      const nameById = new Map((profiles as { user_id: string; display_name: string | null }[]).map((p) => [p.user_id, p.display_name]));
+
+      const rows = members.map((m) => ({ user_id: m.user_id, display_name: nameById.get(m.user_id) ?? null, role: m.role, is_me: m.user_id === ownerId }));
+      // 自分を先頭に。ほかは参加順のまま（sort は安定）。
+      rows.sort((a, b) => Number(b.is_me) - Number(a.is_me));
+      return json(rows);
     },
   );
 
@@ -419,7 +508,9 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       description:
         "プロジェクトにストーリーとその配下のタスクをまとめて登録する。既存のストーリーにタスクを足すときは stories[].id を指定する。" +
         "external_id が同じプロジェクトの既存の行と一致したら作らず（担当者も書き換えない）、その id を created: false で返すので、失敗したら同じ入力で呼び直してよい。" +
-        "新規のストーリーは stories[].status（planning 計画中 / todo 未着手。既定は todo）、新規のタスクは status todo で、既存の末尾に並ぶ。tasks[].assignee を省略したら未割り当てになる",
+        "新規のストーリーは stories[].status（planning 計画中 / todo 未着手。既定は todo）、新規のタスクは status todo で、既存の末尾に並ぶ。" +
+        "tasks[].assignee の user は呼び出した AI の持ち主（本人）。ほかのメンバーを担当にするときは tasks[].assignee_user_id（list_members の user_id）を渡す。" +
+        "assignee と assignee_user_id を両方省略したら未割り当てになる",
       inputSchema: {
         project_id: z.uuid().describe("プロジェクトの id（list_projects で取る）"),
         stories: z.array(planStory).min(1).describe("登録するストーリー（配下のタスクを含む）"),
@@ -485,7 +576,8 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
       description:
         "タスクの名前・説明・期間・担当者を更新し、更新後のタスクを返す。渡した項目だけ書き換える。" +
         "description は置き換えなので、追記するときは get_task_context で今の説明を取り、末尾に足して渡す。" +
-        "assignee の ai は呼び出したエージェントの担当にする（別のエージェントは指定できない）。" +
+        "assignee の user は呼び出した AI の持ち主（本人）、ai は呼び出したエージェントの担当にする（別のエージェントは指定できない）。" +
+        "組織プロジェクトでほかのメンバーを担当にするときは assignee_user_id（list_members の user_id）を渡す（assignee と同時には指定できない）。" +
         "状態は変えない（着手は start_task、レビュー依頼は request_task_review、完了は complete_task）",
       inputSchema: {
         task_id: z.uuid().describe("タスクの id（ストーリーは不可）"),
@@ -494,26 +586,27 @@ export function registerTools(server: McpServer, db: SupabaseClient, clientId: s
         start_date: z.iso.date().optional().describe("開始日（YYYY-MM-DD）"),
         due_date: z.iso.date().optional().describe("期限（YYYY-MM-DD）"),
         assignee: assigneeInput.optional(),
+        assignee_user_id: assigneeUserIdInput.optional(),
       },
     },
-    async ({ task_id, assignee, ...fields }) => {
+    async ({ task_id, assignee, assignee_user_id, ...fields }) => {
       const patch: Record<string, unknown> = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-      if (assignee === undefined && Object.keys(patch).length === 0) {
-        return toolError("更新する項目がありません。title / description / start_date / due_date / assignee のどれかを渡してください");
+      if (assignee !== undefined && assignee_user_id !== undefined) {
+        return toolError("assignee と assignee_user_id は同時に指定できません");
+      }
+      if (assignee === undefined && assignee_user_id === undefined && Object.keys(patch).length === 0) {
+        return toolError("更新する項目がありません。title / description / start_date / due_date / assignee / assignee_user_id のどれかを渡してください");
       }
 
       const found = await findTask(db, task_id, "update_story を使ってください");
       if ("error" in found) return found.error;
 
-      if (assignee !== undefined) {
-        const { data: task, error: ownerError } = await db.from("tasks").select("project:project_id(owner_id)").eq("id", task_id).single();
-        if (ownerError) return restError(ownerError);
-        const { owner_id } = task.project as unknown as { owner_id: string };
-        Object.assign(patch, assigneeColumns(assignee, owner_id, clientId));
-      }
+      // 担当にできる人かは DB のトリガ check_task_assignee（0045）が確かめる。
+      if (assignee !== undefined) Object.assign(patch, assigneeColumns(assignee, ownerId, clientId));
+      if (assignee_user_id !== undefined) Object.assign(patch, { assignee_type: "human", assignee_id: assignee_user_id, assignee_client_id: null });
 
       const { data, error } = await db.from("tasks").update(patch).eq("id", task_id).select(TASK_COLUMNS);
-      if (error) return restError(error);
+      if (error) return assigneeError(error) ?? restError(error);
       if (data.length === 0) return toolError(`タスクを更新できませんでした: ${task_id}`);
       return json(data[0]);
     },
