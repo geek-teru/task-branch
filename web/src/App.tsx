@@ -484,12 +484,15 @@ export default function App() {
     [refreshGraph]
   );
 
-  const handleCreateProject = useCallback(async (input: ProjectInput) => {
+  // Returns the created project (null on failure, which is shown as the page error).
+  const handleCreateProject = useCallback(async (input: ProjectInput): Promise<Project | null> => {
     try {
       const p = await createProject(input);
       setProjects((prev) => [...prev, p]);
+      return p;
     } catch (e: any) {
       setError(String(e.message ?? e));
+      return null;
     }
   }, []);
 
@@ -685,6 +688,7 @@ export default function App() {
   const projectSelect = (value: string | null | undefined) => (
     <ProjectSelect
       projects={projects}
+      orgs={org.orgs}
       value={value ?? null}
       allowAll={isKanban || isPerformance}
       onChange={(id) => (id ? handleHeaderSelectProject(id) : handleSelectAllProjects())}
@@ -810,7 +814,15 @@ export default function App() {
                   <ProjectsListPage
                     projects={ownerProjects}
                     ownerName={org.current?.name ?? null}
-                    onCreate={handleCreateProject}
+                    orgs={org.orgs}
+                    currentOrgId={org.current?.id ?? null}
+                    onCreate={async (input) => {
+                      // Created under another owner than the one shown: switch to it so the project shows.
+                      const p = await handleCreateProject(input);
+                      if (p && (p.org_id ?? null) !== (org.current?.id ?? null)) {
+                        handleSelectOwner(org.orgs.find((o) => o.id === p.org_id)?.slug ?? null);
+                      }
+                    }}
                     onShowDetail={(projectId) => navigate(`/projects/${projectId}`)}
                     onShowBacklog={(projectId) => navigate(`/backlog?project=${projectId}`)}
                     onShowGantt={(projectId) => navigate(`/projects/${projectId}/gantt`)}
@@ -830,6 +842,7 @@ export default function App() {
                   ) : (
                     <ProjectDetailPage
                       project={detailProject}
+                      orgs={org.orgs}
                       onUpdate={handleUpdateProject}
                       onDelete={(id) => {
                         handleDeleteProject(id);

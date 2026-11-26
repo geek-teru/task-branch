@@ -1,20 +1,39 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import type { Project, ProjectInput } from "../lib/types";
+import type { Organization, Project, ProjectInput } from "../lib/types";
+import { projectOwnerName } from "../lib/projectOwner";
 import { Button } from "./ui/Button";
 import { Dialog } from "./ui/Dialog";
 import { Input } from "./ui/Input";
+import { Select, type SelectOption } from "./ui/Select";
 import { Textarea } from "./ui/Textarea";
 
+// "" stands for 個人 inside the owner Select (its values are strings).
+const PERSONAL = "";
+
 // Create / edit form for a project. Shared by the list page (create) and the detail page (edit).
+// The owner (個人 / an organization) is chosen on create only; the edit form just shows it.
 export function ProjectForm({
   initial,
+  orgs = [],
+  defaultOrgId = null,
   onSubmit,
   onCancel,
 }: {
   initial: Project | null;
+  // Organizations the user belongs to (the owner choices besides 個人).
+  orgs?: Organization[];
+  // Owner picked in the header; preselected on create (null = 個人).
+  defaultOrgId?: string | null;
   onSubmit: (input: ProjectInput) => void;
   onCancel: () => void;
 }) {
+  const [orgId, setOrgId] = useState<string>(
+    defaultOrgId && orgs.some((o) => o.id === defaultOrgId) ? defaultOrgId : PERSONAL
+  );
+  const ownerOptions: SelectOption<string>[] = [
+    { value: PERSONAL, label: "個人" },
+    ...orgs.map((o) => ({ value: o.id, label: o.name })),
+  ];
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
@@ -29,6 +48,8 @@ export function ProjectForm({
       description: trim(description),
       url: trim(url),
       repository_url: trim(repositoryUrl),
+      // Only on create, and only when an organization is chosen: older DBs have no org_id column.
+      ...(!initial && orgId !== PERSONAL ? { org_id: orgId } : {}),
     });
   };
 
@@ -52,6 +73,20 @@ export function ProjectForm({
       }
     >
       <div className="flex flex-col gap-4">
+        {initial ? (
+          <Field label="所有者">
+            <span className="text-sm text-fg">
+              {projectOwnerName(initial, orgs)}
+              <span className="ml-2 text-xs text-fg-muted">作成後は変更できません</span>
+            </span>
+          </Field>
+        ) : (
+          orgs.length > 0 && (
+            <Field label="所有者">
+              <Select value={orgId} onChange={setOrgId} options={ownerOptions} aria-label="所有者" />
+            </Field>
+          )
+        )}
         <Field label="プロジェクト名">
           <Input
             autoFocus
