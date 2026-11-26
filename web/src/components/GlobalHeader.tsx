@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import type { Project } from "../lib/types";
+import type { Organization, Project } from "../lib/types";
+import { useIsMobile } from "../lib/useIsMobile";
 import { Avatar } from "./Avatar";
 import { useTheme, type ThemePreference } from "../lib/theme";
-import { ChevronUpDownIcon, GitHubIcon, GlobeIcon, MonitorIcon, MoonIcon, ServiceIcon, SunIcon } from "./Icons";
+import { AddIcon, ChevronUpDownIcon, GitHubIcon, GlobeIcon, MonitorIcon, MoonIcon, ServiceIcon, SunIcon } from "./Icons";
 import { Badge } from "./ui/Badge";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "./ui/DropdownMenu";
 
@@ -18,6 +19,10 @@ const THEME_ITEMS: { value: ThemePreference; label: string; icon: ReactNode }[] 
 // Full-width bar across the top of every signed-in page: breadcrumb with the project switcher on
 // the left, the user menu on the right.
 export function GlobalHeader({
+  orgs = [],
+  currentOrg = null,
+  onSelectOwner,
+  onCreateOrg,
   projects,
   currentProjectId,
   allProjectsLabel,
@@ -32,6 +37,14 @@ export function GlobalHeader({
   onLinkGoogle,
   onLogout,
 }: {
+  // Organizations the user belongs to, for the owner switcher (個人 / 組織).
+  orgs?: Organization[];
+  // The selected owner; null = 個人.
+  currentOrg?: Organization | null;
+  // Switch the owner (null = 個人). Without it the owner switcher is not shown.
+  onSelectOwner?: (slug: string | null) => void;
+  // Opens the create-organization dialog. Not passed for guests (they cannot create one).
+  onCreateOrg?: () => void;
   projects: Project[];
   // The project the page shows; null when the page has none.
   currentProjectId: string | null;
@@ -55,6 +68,30 @@ export function GlobalHeader({
   onLogout: () => void;
 }) {
   const theme = useTheme();
+  const isMobile = useIsMobile();
+  // Guests have no organizations and cannot create one, so they get no owner switcher.
+  const showOwner = !!onSelectOwner && (orgs.length > 0 || !!onCreateOrg);
+  const ownerItems = showOwner && (
+    <>
+      <div className="px-3 pt-1.5 pb-1 text-xs text-fg-muted">所有者</div>
+      <DropdownMenuItem onSelect={() => onSelectOwner!(null)} selected={!currentOrg}>
+        <span className="truncate">個人</span>
+      </DropdownMenuItem>
+      {orgs.map((o) => (
+        <DropdownMenuItem key={o.id} onSelect={() => onSelectOwner!(o.slug)} selected={o.id === currentOrg?.id}>
+          <span className="truncate">{o.name}</span>
+        </DropdownMenuItem>
+      ))}
+      {onCreateOrg && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={onCreateOrg} icon={<span className="flex text-fg-muted"><AddIcon size={14} /></span>}>
+            組織を作成
+          </DropdownMenuItem>
+        </>
+      )}
+    </>
+  );
   const current = projects.find((p) => p.id === currentProjectId);
   // Active projects first; archived ones follow, greyed out.
   const ordered = [...projects.filter((p) => p.is_active), ...projects.filter((p) => !p.is_active)];
@@ -78,6 +115,30 @@ export function GlobalHeader({
         <span className="shrink-0 text-lg text-border-strong max-md:hidden" aria-hidden>
           /
         </span>
+        {showOwner && !isMobile && (
+          <>
+            <DropdownMenu
+              variant="ghost"
+              size="sm"
+              label="所有者を切り替える"
+              className="min-w-0 shrink-0"
+              menuClassName="max-h-[60vh] min-w-[220px] overflow-y-auto"
+              trigger={
+                <>
+                  <span className="max-w-[200px] truncate">{currentOrg?.name ?? "個人"}</span>
+                  <span className="flex text-fg-muted">
+                    <ChevronUpDownIcon size={12} />
+                  </span>
+                </>
+              }
+            >
+              {ownerItems}
+            </DropdownMenu>
+            <span className="shrink-0 text-lg text-border-strong" aria-hidden>
+              /
+            </span>
+          </>
+        )}
         {pageTitle ? (
           <span className="truncate px-2 text-[13px] font-medium">{pageTitle}</span>
         ) : (
@@ -147,6 +208,13 @@ export function GlobalHeader({
           {!isGuest && userEmail && userEmail !== userName && <div className="truncate text-xs text-fg-muted">{userEmail}</div>}
         </div>
         {isGuest && onLinkGoogle && <DropdownMenuItem onSelect={onLinkGoogle}>Google で本登録</DropdownMenuItem>}
+        {/* Phones have no room for the owner switcher in the bar, so it lives in the user menu. */}
+        {showOwner && isMobile && (
+          <>
+            <DropdownMenuSeparator />
+            {ownerItems}
+          </>
+        )}
         <DropdownMenuSeparator />
         {THEME_ITEMS.map((t) => (
           <DropdownMenuItem
