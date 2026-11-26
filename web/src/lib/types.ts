@@ -54,6 +54,17 @@ export interface OrgInvitation {
   created_at: string;
 }
 
+// What an invitee sees of an invitation link (get_org_invitation). invalid carries only the status.
+export type OrgInvitationStatus = "valid" | "expired" | "revoked" | "invalid";
+export interface OrgInvitationPreview {
+  status: OrgInvitationStatus;
+  org_name?: string;
+  org_slug?: string;
+  role?: OrgRole;
+  expires_at?: string;
+  is_member?: boolean; // the signed-in user is already a member
+}
+
 // Fields of the create-organization form.
 export interface OrganizationInput {
   name: string;

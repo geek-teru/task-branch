@@ -2,7 +2,7 @@
 // Views consume ProjectGraph and never call Supabase directly.
 
 import { supabase } from "./supabase";
-import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, OrgInvitation, OrgMember, OrgRole, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
+import type { ActivityBucket, ActivityCount, AssigneeType, BacklogStory, ContextRevision, KanbanLane, Organization, OrganizationInput, OrgInvitation, OrgInvitationPreview, OrgMember, OrgRole, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task, TaskComment, TaskEvent, EventType, UsageTotals } from "./types";
 
 // Guest limits (0031_guest_limits.sql) reject inserts with message 'guest_limit_exceeded'
 // and detail '<projects|stories|tasks|comments>:<limit>'. Turn that into a Japanese message.
@@ -171,7 +171,14 @@ function orgInvitationError(error: { code?: string; message?: string }): Error {
     case "org_invitation_invalid_days":
       return new Error("期限は 1〜30 日で選んでください");
     case "org_invitation_already_revoked":
+    case "org_invitation_revoked":
       return new Error("この招待リンクはすでに失効しています");
+    case "org_invitation_guest":
+      return new Error("ゲストは組織に参加できません。Google で本登録してから参加してください");
+    case "org_invitation_invalid":
+      return new Error("この招待リンクは無効です");
+    case "org_invitation_expired":
+      return new Error("この招待リンクは期限切れです");
   }
   if (error.code === "42501") return new Error("この操作の権限がありません");
   return new Error(error.message ?? String(error));
@@ -213,6 +220,21 @@ export async function revokeOrgInvitation(invitationId: string): Promise<void> {
     .select("id");
   if (error) throw orgInvitationError(error);
   if (!data || data.length === 0) throw new Error("失効できませんでした（すでに失効しているか、権限がありません）");
+}
+
+// What the invitee may see of an invitation (organization name, role, status). Signed-in users only
+// (guests included); the RPC is security definer because non-members cannot read organizations.
+export async function getOrgInvitation(token: string): Promise<OrgInvitationPreview> {
+  const { data, error } = await supabase.rpc("get_org_invitation", { token });
+  if (error) throw orgInvitationError(error);
+  return data as OrgInvitationPreview;
+}
+
+// Join the organization through the link and return its slug. Already a member: nothing changes.
+export async function acceptOrgInvitation(token: string): Promise<string> {
+  const { data, error } = await supabase.rpc("accept_org_invitation", { token });
+  if (error) throw orgInvitationError(error);
+  return data as string;
 }
 
 // The URL to hand to invitees: /invite/<token> on this origin.
