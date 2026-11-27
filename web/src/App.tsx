@@ -61,6 +61,7 @@ import { TimelineView } from "./views/TimelineView";
 import { StoryDetailPage } from "./views/StoryDetailPage";
 import { LoginPage } from "./views/LoginPage";
 import { OAuthConsentPage } from "./views/OAuthConsentPage";
+import { InvitePage } from "./views/InvitePage";
 import { PerformanceView } from "./views/PerformanceView";
 import { SettingsPage } from "./views/SettingsPage";
 import { OrgSettingsPage, type OrgSettingsTab } from "./views/org/OrgSettingsPage";
@@ -687,6 +688,17 @@ export default function App() {
   // would drop the authorization_id from the URL.
   if (pathname === "/oauth/consent") {
     return <Shell>{session !== undefined && <OAuthConsentPage session={session} />}</Shell>;
+  }
+
+  // The invitation page (/invite/<token>) stands alone too, and signs in by itself so the token
+  // stays in the URL (the /login detour would drop it).
+  const inviteMatch = pathname.match(/^\/invite\/([^/]+)\/?$/);
+  if (inviteMatch) {
+    return (
+      <Shell>
+        {session !== undefined && <InvitePage session={session} token={decodeURIComponent(inviteMatch[1])} />}
+      </Shell>
+    );
   }
 
   // Every other page needs a signed-in user. Render nothing while the session is still being read.
