@@ -129,7 +129,8 @@ export interface StoryInput {
   assignee_client_id?: string | null;
 }
 
-// A task's assignee as shown on screen: the project owner (the signed-in user) or an AI agent.
+// A task's assignee as shown on screen: a person (the signed-in user or a member of an
+// organization) or an AI agent.
 export interface AssigneeOption {
   id: string; // a user id, or an AI key (agentAssigneeId / AI_ASSIGNEE_ID)
   name: string;
@@ -139,9 +140,31 @@ export interface AssigneeOption {
 
 // Who can be picked as an assignee. agentsLoaded is false while the connected agents are unknown
 // (not read yet, or the read failed), when an agent missing from options may still be connected.
+// options holds everyone who can be shown (the signed-in user, the members of their organizations
+// and their agents), so a task or comment of another member shows that member's name and icon.
+// Which people can be picked depends on the project: see assigneesForProject.
 export interface Assignees {
   options: AssigneeOption[];
   agentsLoaded: boolean;
+  selfId?: string; // the signed-in user (always a candidate in a personal project)
+  // Organization projects only: the user ids of the organization's members, the signed-in user
+  // included. Absent for a personal project (or while the members are not loaded yet).
+  memberIdsByProject?: Record<string, string[]>;
+}
+
+// The assignees narrowed to what can be picked in a project: 自分 and the connected agents in a
+// personal project; the organization's members (自分 first) and the agents in an organization's.
+// Lookups for display (assigneeOf) on the result still find the picked people.
+export function assigneesForProject(assignees: Assignees, projectId: string): Assignees {
+  const memberIds = assignees.memberIdsByProject?.[projectId];
+  const selfId = assignees.selfId;
+  const isPerson = (a: AssigneeOption) => !a.agent;
+  const self = assignees.options.filter((a) => isPerson(a) && a.id === selfId);
+  const others = memberIds
+    ? assignees.options.filter((a) => isPerson(a) && a.id !== selfId && memberIds.includes(a.id))
+    : [];
+  const agents = assignees.options.filter((a) => !isPerson(a));
+  return { ...assignees, options: [...self, ...others, ...agents] };
 }
 
 type AssigneeFields = Pick<StoryInput, "assignee_id" | "assignee_type" | "assignee_client_id">;

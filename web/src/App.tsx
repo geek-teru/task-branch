@@ -10,6 +10,7 @@ import {
   withoutAuthRedirectError,
 } from "./lib/useSession";
 import { useProfile } from "./lib/useProfile";
+import { avatarUrl } from "./lib/profile";
 import {
   addRootStory,
   addTaskComment,
@@ -23,6 +24,7 @@ import {
   listBacklogStories,
   createBacklogStory,
   getProjectGraph,
+  listOrgMembers,
   listProjects,
   moveTask,
   moveTaskToStory,
@@ -37,7 +39,7 @@ import {
   deleteStoryGroup,
   setStoryGroup,
 } from "./lib/api";
-import type { Assignees, BacklogStory, GraphNode, KanbanLane, Organization, OrganizationInput, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
+import type { AssigneeOption, Assignees, BacklogStory, GraphNode, KanbanLane, Organization, OrganizationInput, OrgMember, Project, ProjectGraph, ProjectInput, Status, StoryInput, Task } from "./lib/types";
 import { agentAssigneeId } from "./lib/types";
 import { agentClientLabel, findAgentProvider } from "./lib/agentProviders";
 import { useAgentGrants } from "./lib/useAgentGrants";
@@ -118,25 +120,6 @@ export default function App() {
   const userId = session?.user.id;
   // Read again on leaving the settings, where agents can be disconnected.
   const grants = useAgentGrants(isConfigured ? userId : undefined, isSettings);
-  // Candidates for a task's 担当者: the project owner (every project shown is the user's own) and the
-  // connected agents.
-  const assignees = useMemo<Assignees>(
-    () => ({
-      options: userId
-        ? [
-            { id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl },
-            ...(grants ?? []).map((g) => ({
-              id: agentAssigneeId(g.client.id),
-              name: agentClientLabel(g.client),
-              avatarUrl: null,
-              agent: { provider: findAgentProvider({ name: g.client.name }) },
-            })),
-          ]
-        : [],
-      agentsLoaded: grants !== undefined,
-    }),
-    [userId, profile.displayName, profile.avatarUrl, grants]
-  );
 
   useEffect(() => {
     if (!isConfigured || !userId) return;
@@ -582,6 +565,61 @@ export default function App() {
   // Owner (個人 / 組織) the project list is scoped to: ?org=<slug>, else the last choice.
   const org = useOrgContext(isConfigured ? userId : undefined);
   const [creatingOrg, setCreatingOrg] = useState(false);
+  // Members of each of the user's organizations (user id → member list), for the 担当者 of the
+  // organization's projects. Read again on leaving the organization settings, where members change.
+  const [orgMembers, setOrgMembers] = useState<Record<string, OrgMember[]>>({});
+  useEffect(() => {
+    if (!isConfigured || !userId || isOrgSettings) return;
+    let cancelled = false;
+    Promise.all(
+      org.orgs.map((o) =>
+        listOrgMembers(o.id)
+          .then((members) => [o.id, members] as const)
+          .catch(() => [o.id, [] as OrgMember[]] as const) // the project then offers 自分 only
+      )
+    ).then((entries) => {
+      if (!cancelled) setOrgMembers(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, org.orgs, isOrgSettings]);
+
+  // Who can be shown as a task's 担当者 (and a comment's author): the signed-in user, the members of
+  // their organizations and the connected agents. Each project narrows it with assigneesForProject:
+  // a personal project offers 自分, an organization's project its members.
+  const assignees = useMemo<Assignees>(() => {
+    if (!userId) return { options: [], agentsLoaded: grants !== undefined };
+    const people = new Map<string, AssigneeOption>([[userId, { id: userId, name: profile.displayName, avatarUrl: profile.avatarUrl }]]);
+    for (const members of Object.values(orgMembers)) {
+      for (const m of members) {
+        if (people.has(m.user_id)) continue;
+        people.set(m.user_id, {
+          id: m.user_id,
+          name: m.display_name ?? "名前未設定のメンバー",
+          avatarUrl: m.avatar_path ? avatarUrl(m.avatar_path) : null,
+        });
+      }
+    }
+    const memberIdsByProject: Record<string, string[]> = {};
+    for (const p of projects) {
+      if (p.org_id && orgMembers[p.org_id]) memberIdsByProject[p.id] = orgMembers[p.org_id].map((m) => m.user_id);
+    }
+    return {
+      options: [
+        ...people.values(),
+        ...(grants ?? []).map((g) => ({
+          id: agentAssigneeId(g.client.id),
+          name: agentClientLabel(g.client),
+          avatarUrl: null,
+          agent: { provider: findAgentProvider({ name: g.client.name }) },
+        })),
+      ],
+      agentsLoaded: grants !== undefined,
+      selfId: userId,
+      memberIdsByProject,
+    };
+  }, [userId, profile.displayName, profile.avatarUrl, grants, orgMembers, projects]);
   const handleSelectOwner = useCallback(
     (slug: string | null) => {
       org.select(slug);

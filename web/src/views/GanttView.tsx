@@ -2,7 +2,7 @@
 // Built from start_date/due_date on the story and task nodes.
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { Assignees, GraphNode, Project, ProjectGraph, Status, StoryInput } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeFields } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeFields, assigneesForProject } from "../lib/types";
 import { cn } from "../lib/cn";
 import { TaskForm } from "../components/TaskForm";
 import { GroupForm } from "../components/GroupForm";
@@ -825,7 +825,9 @@ ${f(addDays(r.start!, days))} 〜 ${f(addDays(r.end!, days))}
               : editInitial(form.node)
           }
           assignees={
-            form.mode === "create-task" || (form.mode === "edit" && form.node.level === "task") ? assignees : undefined
+            assignees && (form.mode === "create-task" || (form.mode === "edit" && form.node.level === "task"))
+              ? assigneesForProject(assignees, project.id)
+              : undefined
           }
           attachTo={
             form.mode === "edit" && form.node.level === "task"

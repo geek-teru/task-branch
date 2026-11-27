@@ -10,6 +10,7 @@ import {
   assigneeFields,
   assigneeKey,
   assigneeOf,
+  assigneesForProject,
   isFinished,
 } from "../lib/types";
 import { cn } from "../lib/cn";
@@ -215,7 +216,12 @@ export function KanbanView({
         visibleProjects.some((p) => p.id === l.story.project_id) &&
         l.tasks.some((t) => assigneeKey(t) === AI_ASSIGNEE_ID),
     );
-    const people = assignees.options.filter((a) => a.id !== AI_ASSIGNEE_ID);
+    // 表示中のプロジェクトで担当にできる人・エージェント（組織のプロジェクトならメンバー）を重複なく並べる。
+    const seen = new Set<string>();
+    const people = visibleProjects
+      .flatMap((p) => assigneesForProject(assignees, p.id).options)
+      .filter((a) => a.id !== AI_ASSIGNEE_ID && !seen.has(a.id) && (seen.add(a.id), true))
+      .sort((a, b) => Number(!!a.agent) - Number(!!b.agent)); // 人が先、エージェントが後（安定ソート）
     const unspecified = assigneeOf({ assignee_id: null, assignee_type: "ai", assignee_client_id: null }, assignees);
     return [
       { value: FILTER_ALL, label: "すべて" },
@@ -589,7 +595,7 @@ export function KanbanView({
                   assignee_client_id: editing.assignee_client_id,
                 }
           }
-          assignees={editing.level === "story" ? undefined : assignees}
+          assignees={editing.level === "story" ? undefined : assigneesForProject(assignees, editing.project_id)}
           attachTo={editing.level === "story" ? undefined : { projectId: editing.project_id, taskId: editing.id }}
           onSubmit={(values) => {
             onUpdateTask(editing.id, values);
@@ -606,7 +612,7 @@ export function KanbanView({
           statuses={TASK_STATUSES}
           submitLabel="追加"
           initial={{ title: "", status: "todo", start_date: null, due_date: null, description: null }}
-          assignees={assignees}
+          assignees={assigneesForProject(assignees, adding.project_id)}
           onSubmit={(values) => {
             onAddTask(adding, values);
             setAdding(null);

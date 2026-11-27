@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AssigneeOption, Assignees, Status, Task } from "../lib/types";
-import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf } from "../lib/types";
+import { LEVEL_LABEL, STATUS_LABEL, STORY_STATUSES, TASK_STATUSES, assigneeKey, assigneeOf, assigneesForProject } from "../lib/types";
 import { useIsMobile } from "../lib/useIsMobile";
 import { AssigneeLabel } from "./AssigneeLabel";
 import { AttachmentList } from "./AttachmentList";
@@ -197,7 +197,7 @@ export function DetailPanel<T extends DetailNode>({
               <AssigneePicker
                 assigneeId={assigneeKey(node)}
                 current={assigneeOf(node, assignees)}
-                candidates={assignees.options}
+                candidates={assigneesForProject(assignees, node.project_id).options}
                 onPick={(id) => id !== assigneeKey(node) && onChangeAssignee(node, id)}
               />
             ) : (
